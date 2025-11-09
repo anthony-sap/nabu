@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum StatusEnum {
+  ENABLE
+  DISABLE
+}
+
+model Tenant {
+  id        String     @id @default(cuid())
+  status    StatusEnum @default(ENABLE)
+  name      String     @db.VarChar(50)
+  createdAt DateTime   @default(now())
+  createdBy String?
+  updatedAt DateTime   @default(now()) @updatedAt
+  updatedBy String?
+  deletedAt DateTime?
+  AuditLog  AuditLog[]
+  Account   Account[]
+  User      User[]
+}
+
+model AuditLog {
+  id               String    @id @default(cuid())
+  entityType       String    @db.VarChar(50)
+  entityId         String
+  action           String    @db.VarChar(50)
+  actionReason     String?
+  eventStatus      String?
+  eventDescription String?
+  oldData          Json?
+  newData          Json?
+  createdAt        DateTime  @default(now())
+  createdBy        String?
+  tenantId         String?
+  Tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deletedAt        DateTime?
+}
+
+model Account {
+  id                String    @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?   @db.Text
+  access_token      String?   @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?   @db.Text
+  session_state     String?
+  tenantId          String?
+  Tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  createdBy         String?
+  updatedAt         DateTime  @default(now()) @updatedAt
+  updatedBy         String?
+  deletedAt         DateTime?
+  User              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id                     String     @id @default(cuid())
+  status                 StatusEnum @default(ENABLE)
+  firstName              String?
+  lastName               String?
+  email                  String?    @unique
+  emailVerified          DateTime?
+  image                  String?
+  roles                  UserRole[] @default([USER])
+  tenantId               String?
+  Tenant                 Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt              DateTime   @default(now())
+  createdBy              String?
+  updatedAt              DateTime   @default(now()) @updatedAt
+  updatedBy              String?
+  deletedAt              DateTime?
+  accounts               Account[]
+  sessions               Session[]
+  stripeCustomerId       String?    @unique @map(name: "stripe_customer_id")
+  stripeSubscriptionId   String?    @unique @map(name: "stripe_subscription_id")
+  stripePriceId          String?    @map(name: "stripe_price_id")
+  stripeCurrentPeriodEnd DateTime?  @map(name: "stripe_current_period_end")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

@@ -1,0 +1,28 @@
+# ============================
+# Aerion Dockerfile for Running tests on a NextJS project
+# ============================
+
+# ============================
+# Tests Stage
+# ============================
+FROM node:20-slim AS tests
+
+# Install runtime dependencies - Change this per project, add a comment for what each package is used for. If no packages are needed, remove this section.
+# OpenSSL is needed by the "Prisma" package
+RUN apt-get update -y && \
+    apt-get install -y openssl --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy necessary files
+COPY package.json package-lock.json jest.config.ts jest.setup.ts prisma ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Run tests, and remove sources from coverage report, so that it doesn't try to link the source files to a folder that doesn't exist
+CMD npm run test:coverage && sed -i -z 's|<sources>.*</sources>||g' coverage/cobertura-coverage.xml

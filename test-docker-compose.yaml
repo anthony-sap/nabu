@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: TestsDockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:root@postgres:5432/tests
+
+      # Fake values
+      - KINDE_CLIENT_ID=test
+      - KINDE_CLIENT_SECRET=test
+      - KINDE_ISSUER_URL=http://localhost:3000
+      - KINDE_REDIRECT_URI=http://localhost:3000/dashboard
+      - KINDE_POST_LOGOUT_REDIRECT_URL=http://localhost:3000
+      - KINDE_POST_LOGIN_REDIRECT_URL=http://localhost:3000/dashboard
+      - KINDE_SITE_URL=http://localhost:3000
+      - KINDE_M2M_DOMAIN=http://localhost:3000
+      - KINDE_M2M_AUTH_CLIENT_ID=test
+      - KINDE_M2M_AUTH_CLIENT_SECRET=test
+      - KINDE_DEFAULT_ORG_CODE=test
+      - NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID=123
+      - NEXT_PUBLIC_STRIPE_BUSINESS_MONTHLY_PLAN_ID=456
+      - NEXT_PUBLIC_STRIPE_PRO_YEARLY_PLAN_ID=789
+      - NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PLAN_ID=012
+      - STRIPE_WEBHOOK_SECRET=abc
+      - STRIPE_API_KEY=abc
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - POSTMARK_TOKEN=test
+      - POSTMARK_API_KEY=test
+      - EMAIL_FROM=test@test.com
+
+    volumes:
+        - ./test-results:/app/test-results
+        - ./coverage:/app/coverage
+
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=tests
