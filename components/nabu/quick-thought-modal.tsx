@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Lightbulb, Minimize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickThought, ThoughtDraft } from "./quick-thought-context";
+import { LexicalEditor } from "./notes/lexical-editor";
 
 /**
  * Props for the QuickThoughtModal component
@@ -111,7 +112,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         minimizeDraft(draft.id);
       }
     }}>
-      <DialogContent className="sm:max-w-[600px] bg-card border-border" showCloseButton={false}>
+      <DialogContent className="max-w-[95vw] w-full lg:max-w-6xl bg-card border-border overflow-visible" showCloseButton={false}>
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2 text-foreground">
@@ -145,7 +146,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
             </p>
           </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-visible">
           {/* Title field */}
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
@@ -161,16 +162,23 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
           </div>
 
           {/* Content field */}
-          <div>
+          <div className="overflow-visible">
             <label className="text-sm font-medium text-foreground mb-2 block">
               Content <span className="text-destructive">*</span>
             </label>
-            <textarea
-              placeholder="What's on your mind?"
+            <LexicalEditor
               value={draft.content}
-              onChange={(e) => updateDraft(draft.id, { content: e.target.value })}
-              className="w-full px-3 py-2 bg-muted/30 border border-input rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary resize-none min-h-[120px] transition-colors"
+              editorState={draft.editorState}
+              onChange={(plainText, serializedState) => 
+                updateDraft(draft.id, { 
+                  content: plainText, 
+                  editorState: serializedState 
+                })
+              }
+              placeholder="What's on your mind?"
               autoFocus
+              showToolbar
+              className="min-h-[400px]"
             />
           </div>
 

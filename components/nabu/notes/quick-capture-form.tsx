@@ -1,7 +1,10 @@
+"use client";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
+import { LexicalEditor } from "./lexical-editor";
 
 /**
  * Props for the QuickCaptureForm component
@@ -17,7 +20,11 @@ interface QuickCaptureFormProps {
  * - Cmd/Ctrl + Enter in content saves the thought
  */
 export function QuickCaptureForm({ onSave }: QuickCaptureFormProps) {
-  const [newThought, setNewThought] = useState({ title: "", content: "" });
+  const [newThought, setNewThought] = useState({ 
+    title: "", 
+    content: "",
+    editorState: "" 
+  });
 
   /**
    * Handles saving a new thought and resetting the form
@@ -28,7 +35,7 @@ export function QuickCaptureForm({ onSave }: QuickCaptureFormProps) {
     }
     
     onSave(newThought.title, newThought.content);
-    setNewThought({ title: "", content: "" });
+    setNewThought({ title: "", content: "", editorState: "" });
   };
 
   return (
@@ -51,19 +58,19 @@ export function QuickCaptureForm({ onSave }: QuickCaptureFormProps) {
               }}
             />
             
-            {/* Content textarea */}
-            <textarea
-              id="thought-content"
-              placeholder="What's on your mind?"
+            {/* Content editor */}
+            <LexicalEditor
               value={newThought.content}
-              onChange={(e) => setNewThought({ ...newThought, content: e.target.value })}
-              className="w-full px-3 py-2 bg-muted/30 border border-input rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary resize-none min-h-[80px] transition-colors"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleSave();
-                }
-              }}
+              editorState={newThought.editorState}
+              onChange={(plainText, serializedState) => 
+                setNewThought({ 
+                  ...newThought, 
+                  content: plainText,
+                  editorState: serializedState 
+                })
+              }
+              placeholder="What's on your mind?"
+              className="min-h-[80px]"
             />
           </div>
           

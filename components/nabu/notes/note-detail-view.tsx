@@ -1,9 +1,13 @@
+"use client";
+
+import { useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Plus, Folder } from "lucide-react";
+import { FileText, Edit, Save, X } from "lucide-react";
 import { FolderItem } from "./types";
+import { LexicalEditor } from "./lexical-editor";
 
 /**
  * Props for the NoteDetailView component
@@ -14,9 +18,13 @@ interface NoteDetailViewProps {
 
 /**
  * Component for displaying detailed view of a selected note
- * Shows note title, tags, and content (placeholder for now)
+ * Shows note title, tags, and content with editing capabilities
  */
 export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
+  const [editorState, setEditorState] = useState("");
+
   // Empty state when no note is selected
   if (!selectedNote) {
     return (
@@ -68,38 +76,87 @@ export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
               </div>
             )}
           </div>
-          <Button
-            size="sm"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 font-semibold"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Edit Note
-          </Button>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditing(false)}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 font-semibold"
+                  onClick={() => {
+                    // TODO: Save note content
+                    console.log("Saving note:", noteContent);
+                    setIsEditing(false);
+                  }}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 font-semibold"
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Note
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       
       {/* Note content area */}
       <ScrollArea className="flex-1">
-        <CardContent className="pt-6 prose prose-sm max-w-none">
-          <div className="text-muted-foreground space-y-4">
-            <p className="leading-relaxed">
-              This is where your note content would appear. The modern scribe for your
-              thinking - capture, organize, and share your knowledge effortlessly.
-            </p>
-            <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-              <h3 className="font-serif font-semibold text-foreground mb-2">Key Insights</h3>
-              <ul className="space-y-2 text-sm">
-                <li>Structured note-taking improves knowledge retention</li>
-                <li>Tags enable cross-referencing between related topics</li>
-                <li>Hierarchical folders provide intuitive organization</li>
-              </ul>
+        <CardContent className="pt-6">
+          {isEditing ? (
+            <div className="space-y-4">
+              <LexicalEditor
+                value={noteContent}
+                editorState={editorState}
+                onChange={(plainText, serializedState) => {
+                  setNoteContent(plainText);
+                  setEditorState(serializedState);
+                }}
+                placeholder="Start writing your note..."
+                autoFocus
+                showToolbar
+                className="min-h-[400px]"
+              />
             </div>
-            <p className="leading-relaxed">
-              Use the sidebar to navigate between your feed and organized note collections.
-              Create folders to structure your knowledge base and use tags for flexible
-              categorization.
-            </p>
-          </div>
+          ) : (
+            <div className="prose prose-sm max-w-none">
+              {noteContent ? (
+                <div className="text-foreground whitespace-pre-wrap">
+                  {noteContent}
+                </div>
+              ) : (
+                <div className="text-muted-foreground space-y-4">
+                  <p className="leading-relaxed">
+                    This note is empty. Click "Edit Note" to start writing.
+                  </p>
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                    <h3 className="font-serif font-semibold text-foreground mb-2">
+                      Rich Text Editing
+                    </h3>
+                    <ul className="space-y-2 text-sm">
+                      <li>Format text with bold, italic, and underline</li>
+                      <li>Organize your thoughts with structured content</li>
+                      <li>All formatting is preserved when you save</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </ScrollArea>
     </Card>
