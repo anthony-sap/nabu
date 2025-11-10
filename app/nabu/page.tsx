@@ -263,7 +263,7 @@ export default function NabuLanding() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-[var(--nabu-deep)] relative">
-            <img src="/static/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+            <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
 
             </div>
             <span>Nabu</span>

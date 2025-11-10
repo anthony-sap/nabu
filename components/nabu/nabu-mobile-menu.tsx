@@ -34,7 +34,7 @@ export function NabuMobileMenu() {
           {/* Brand */}
           <div className="flex items-center gap-2 px-2">
             <div className="h-8 w-8 rounded-xl bg-primary/10 relative">
-            <img src="/static/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+            <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
 
             </div>
             <span className="font-serif font-bold text-lg">Nabu</span>
@@ -48,10 +48,10 @@ export function NabuMobileMenu() {
                 href={link.href || "#"}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                   pathname === link.href
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ? "bg-primary/15 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
               >
                 {link.title}

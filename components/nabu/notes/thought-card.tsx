@@ -18,7 +18,7 @@ interface ThoughtCardProps {
  */
 export function ThoughtCard({ thought }: ThoughtCardProps) {
   return (
-    <Card className="border-border hover:border-primary/40 transition-all duration-300 shadow-nabu-card hover:shadow-nabu-glow">
+    <Card className="bg-card border-border hover:border-primary/40 transition-all duration-300 shadow-nabu-card hover:shadow-nabu-glow">
       <CardContent className="pt-6">
         <div className="space-y-3">
           {/* Header: Title and timestamp */}
@@ -42,7 +42,7 @@ export function ThoughtCard({ thought }: ThoughtCardProps) {
           {/* Metadata: Folder and tags */}
           <div className="flex flex-wrap items-center gap-2">
             {thought.folder && (
-              <Badge variant="secondary" className="text-xs gap-1.5">
+              <Badge variant="secondary" className="text-xs gap-1.5 bg-secondary/20 text-secondary border-secondary/30">
                 <Folder className="h-3 w-3" />
                 {thought.folder}
               </Badge>
@@ -55,7 +55,7 @@ export function ThoughtCard({ thought }: ThoughtCardProps) {
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="text-[10px] border-primary/40 text-primary hover:bg-primary/10 transition-colors px-2 py-0.5"
+                      className="text-[10px] border-primary/40 text-primary bg-primary/10 hover:bg-primary/15 transition-colors px-2 py-0.5"
                     >
                       <Tag className="h-2.5 w-2.5 mr-1" />
                       {tag}

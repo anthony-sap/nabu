@@ -31,7 +31,7 @@ export function NotesSidebar({
 }: NotesSidebarProps) {
   return (
     <div className="w-72 flex-shrink-0">
-      <Card className="h-full border-border shadow-nabu-card flex flex-col">
+      <Card className="h-full bg-card border-border shadow-nabu-card flex flex-col">
         {/* Header */}
         <CardHeader className="pb-4 border-b border-border/50">
           <div className="flex items-center gap-2 mb-2">
@@ -46,10 +46,10 @@ export function NotesSidebar({
           <div className="p-3 space-y-1">
             {/* Feed navigation option */}
             <div
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
                 view === "feed"
-                  ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-medium border-l-2 border-primary shadow-sm"
-                  : "hover:bg-muted/50 text-foreground"
+                  ? "bg-primary/15 text-primary font-medium border border-primary/20 shadow-sm"
+                  : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => {
                 onViewChange("feed");

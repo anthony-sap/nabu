@@ -20,7 +20,7 @@ export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
   // Empty state when no note is selected
   if (!selectedNote) {
     return (
-      <Card className="h-full border-border shadow-nabu-card flex items-center justify-center">
+      <Card className="h-full bg-card border-border shadow-nabu-card flex items-center justify-center">
         <CardContent className="text-center space-y-4 py-12">
           <div className="relative mx-auto w-32 h-32">
             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl" />
@@ -43,7 +43,7 @@ export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
   }
 
   return (
-    <Card className="h-full border-border shadow-nabu-card flex flex-col">
+    <Card className="h-full bg-card border-border shadow-nabu-card flex flex-col">
       {/* Note header with title, tags, and edit button */}
       <CardHeader className="border-b border-border/50">
         <div className="flex items-start justify-between">
@@ -70,7 +70,7 @@ export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
           </div>
           <Button
             size="sm"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 font-semibold"
           >
             <Plus className="h-4 w-4 mr-2" />
             Edit Note

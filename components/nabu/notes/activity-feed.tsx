@@ -27,7 +27,7 @@ export function ActivityFeed({ thoughts, onSaveThought }: ActivityFeedProps) {
           
           {/* Empty state when no thoughts exist */}
           {thoughts.length === 0 ? (
-            <Card className="border-border shadow-nabu-card">
+            <Card className="bg-card border-border shadow-nabu-card">
               <CardContent className="py-12 text-center space-y-3">
                 <div className="relative mx-auto w-20 h-20">
                   <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl" />

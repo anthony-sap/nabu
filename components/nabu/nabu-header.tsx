@@ -17,7 +17,7 @@ export function NabuHeader() {
             <div className="h-9 w-9 rounded-2xl bg-[var(--nabu-deep)] relative shadow-inner ring-1 ring-white/10">
               <div className="absolute inset-1 rounded-2xl bg-[var(--nabu-deep)]"/>
               {/* Mint tablet minimal glyph */}
-              <img src="/static/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+              <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
             </div>
             <span className="text-xl font-serif">Nabu</span>
           </Link>

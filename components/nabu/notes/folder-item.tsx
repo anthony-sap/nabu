@@ -34,7 +34,7 @@ export function FolderItem({
         className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${
           isSelected
             ? "bg-primary/15 text-primary font-medium border-l-2 border-primary"
-            : "hover:bg-muted/50 text-foreground"
+            : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
         }`}
         style={{ paddingLeft: `${level * 12 + 12}px` }}
         onClick={() => {
