@@ -8,7 +8,8 @@ import { createContext, useContext, useState, ReactNode } from "react";
 export interface ThoughtDraft {
   id: string;
   title: string;
-  content: string;
+  content: string; // Plain text for display/search
+  editorState?: string; // Serialized Lexical editor state (JSON)
   selectedFolder: string;
   selectedTags: string[];
   state: "open" | "minimized";
@@ -43,6 +44,7 @@ export function QuickThoughtProvider({ children }: { children: ReactNode }) {
       id: `draft-${Date.now()}`,
       title: "",
       content: "",
+      editorState: undefined,
       selectedFolder: "Inbox",
       selectedTags: [],
       state: "open",
