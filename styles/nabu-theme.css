@@ -2,87 +2,131 @@
 
 @layer base {
   :root {
-    /* Nabu Brand Tokens */
-    --nabu-mint: 174 100% 35%; /* #00B3A6 */
-    --nabu-deep: 218 64% 13%; /* #071633 */
-    --nabu-lapis: 224 68% 40%; /* #1E40AF */
-    --nabu-gold: 45 63% 48%; /* #C59B2F */
-    --nabu-clay: 40 40% 85%; /* #E7DCC7 */
+    /* Nabu brand palette */
+    --nabu-mint: 0 179 166;        /* #00B3A6 */
+    --nabu-deep: 7 22 51;          /* #071633 */
+    --nabu-lapis: 30 64 175;       /* #1E40AF */
+    --nabu-gold: 197 155 47;       /* #C59B2F */
+    --nabu-gold-access: 224 195 106; /* #E0C36A */
+    --nabu-clay: 231 220 199;      /* #E7DCC7 */
+    --nabu-white: 255 255 255;
 
-    /* Override primary to use mint */
-    --primary: var(--nabu-mint);
-    --primary-foreground: var(--nabu-deep);
+    /* shadcn design tokens - light */
+    --background: 0 0% 100%;
+    --foreground: 226 15% 14%;                /* near deep */
+    --card: 0 0% 100%;
+    --card-foreground: 226 15% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 226 15% 14%;
+    --primary: 173 100% 35%;                  /* mint as HSL */
+    --primary-foreground: 228 44% 11%;        /* deep text on mint */
+    --secondary: 226 70% 40%;                 /* lapis */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 36 32% 85%;                      /* clay */
+    --muted-foreground: 226 15% 35%;
+    --accent: 43 62% 48%;                     /* gold */
+    --accent-foreground: 228 44% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 226 15% 90%;
+    --input: 226 15% 90%;
+    --ring: 173 100% 35%;
+    --radius: 16px;
   }
 
   .dark {
-    /* Nabu tokens remain the same in dark mode */
-    --nabu-mint: 174 100% 35%;
-    --nabu-deep: 218 64% 13%;
-    --nabu-lapis: 224 68% 40%;
-    --nabu-gold: 45 63% 48%;
-    --nabu-clay: 40 40% 85%;
+    /* shadcn design tokens - dark */
+    --background: 226 58% 11%;                /* deep navy */
+    --foreground: 0 0% 98%;
+    --card: 226 58% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 226 58% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 173 100% 45%;                  /* brighter mint for dark */
+    --primary-foreground: 228 44% 11%;
+    --secondary: 226 70% 46%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 226 30% 20%;
+    --muted-foreground: 226 15% 70%;
+    --accent: 43 62% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 226 30% 24%;
+    --input: 226 30% 24%;
+    --ring: 173 100% 45%;
+  }
+
+  /* Focus outline that matches mint brand */
+  :focus-visible {
+    outline: 3px solid hsl(var(--ring) / 0.35);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  /* Nabu Button Styles */
-  .btn {
-    @apply inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-medium transition-all duration-200;
-  }
-
-  .btn-primary {
-    background: hsl(var(--nabu-mint));
-    color: hsl(var(--nabu-deep));
-  }
-
-  .btn-primary:hover {
-    filter: brightness(1.05);
-    transform: translateY(-1px);
-  }
-
-  .btn-ghost {
-    background: transparent;
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-  }
-
-  .btn-ghost:hover {
-    border-color: rgba(255, 255, 255, 0.35);
-  }
-
-  /* Glass morphism effect */
-  .glass {
+  /* Nabu glass morphism effect */
+  .nabu-glass {
     backdrop-filter: saturate(140%) blur(10px);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
   }
 
-  /* Pill badge */
-  .pill {
-    @apply rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide;
+  /* Nabu pill badge */
+  .nabu-pill {
+    @apply rounded-full px-3 py-1 text-xs font-semibold tracking-wide;
+    background: hsl(var(--ring) / 0.15);
+    color: hsl(var(--ring));
+    border: 1px solid hsl(var(--ring) / 0.35);
   }
 }
 
 @layer utilities {
-  /* Nabu-specific utility classes */
+  /* Utility aliases for brand surfaces */
+  .nabu-surface-deep { 
+    background-color: hsl(226 58% 11%); 
+  }
+  
+  .nabu-surface-lapis { 
+    background-color: rgb(var(--nabu-lapis)); 
+  }
+  
+  .nabu-text-muted { 
+    color: hsl(var(--muted-foreground)); 
+  }
+
+  /* Rounded-rect shape language */
+  .rounded-nabu { 
+    border-radius: var(--radius); 
+  }
+
+  /* Direct brand color utilities */
   .text-nabu-mint {
-    color: hsl(var(--nabu-mint));
+    color: rgb(var(--nabu-mint));
   }
 
   .bg-nabu-mint {
-    background-color: hsl(var(--nabu-mint));
+    background-color: rgb(var(--nabu-mint));
   }
 
   .bg-nabu-deep {
-    background-color: hsl(var(--nabu-deep));
+    background-color: rgb(var(--nabu-deep));
   }
 
   .bg-nabu-lapis {
-    background-color: hsl(var(--nabu-lapis));
+    background-color: rgb(var(--nabu-lapis));
+  }
+
+  .bg-nabu-gold {
+    background-color: rgb(var(--nabu-gold));
+  }
+
+  .bg-nabu-clay {
+    background-color: rgb(var(--nabu-clay));
   }
 
   .border-nabu-mint {
-    border-color: hsl(var(--nabu-mint));
+    border-color: rgb(var(--nabu-mint));
   }
 }
 

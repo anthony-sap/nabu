@@ -17,12 +17,7 @@ export function NabuHeader() {
             <div className="h-9 w-9 rounded-2xl bg-[var(--nabu-deep)] relative shadow-inner ring-1 ring-white/10">
               <div className="absolute inset-1 rounded-2xl bg-[var(--nabu-deep)]"/>
               {/* Mint tablet minimal glyph */}
-              <svg viewBox="0 0 100 100" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]">
-                <rect x="18" y="20" width="64" height="10" rx="5"/>
-                <path d="M29 70 a7 7 0 1 0 18 0 a7 7 0 1 0 -18 0"/>
-                <path d="M42 46 c20 5 25 37 25 37 c-9 4 -19 2 -28 -6 c-8 -7 -7 -30 3 -31z"/>
-                <path d="M69 44 a8 10 0 1 0 0 20 a8 10 0 1 0 0 -20"/>
-              </svg>
+              <img src="/static/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
             </div>
             <span className="text-xl font-serif">Nabu</span>
           </Link>

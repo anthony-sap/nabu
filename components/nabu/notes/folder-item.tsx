@@ -1,0 +1,92 @@
+import { ChevronRight, ChevronDown, FileText, Folder } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FolderItem as FolderItemType } from "./types";
+
+/**
+ * Props for the FolderItem component
+ */
+interface FolderItemProps {
+  item: FolderItemType;
+  level: number;
+  onToggle: (id: string) => void;
+  onSelect: (item: FolderItemType) => void;
+  selectedId: string | null;
+}
+
+/**
+ * Recursive component for rendering folder tree items
+ * Supports both folder and note items with expand/collapse functionality
+ */
+export function FolderItem({ 
+  item, 
+  level, 
+  onToggle, 
+  onSelect, 
+  selectedId 
+}: FolderItemProps) {
+  const isFolder = item.type === "folder";
+  const hasChildren = item.children && item.children.length > 0;
+  const isSelected = selectedId === item.id;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+          isSelected
+            ? "bg-primary/15 text-primary font-medium border-l-2 border-primary"
+            : "hover:bg-muted/50 text-foreground"
+        }`}
+        style={{ paddingLeft: `${level * 12 + 12}px` }}
+        onClick={() => {
+          if (isFolder && hasChildren) {
+            onToggle(item.id);
+          } else {
+            onSelect(item);
+          }
+        }}
+      >
+        {/* Expand/collapse icon for folders with children */}
+        {isFolder && hasChildren && (
+          <div className="text-muted-foreground">
+            {item.expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </div>
+        )}
+        
+        {/* File/folder icon */}
+        {!isFolder && <FileText className="h-4 w-4 text-primary/70" />}
+        {isFolder && <Folder className="h-4 w-4 text-primary/70" />}
+        
+        {/* Item name */}
+        <span className="text-sm flex-1 truncate">{item.name}</span>
+        
+        {/* Tag count badge for notes */}
+        {!isFolder && item.tags && (
+          <Badge variant="secondary" className="h-5 text-[10px] px-1.5">
+            {item.tags.length}
+          </Badge>
+        )}
+      </div>
+      
+      {/* Recursively render children when folder is expanded */}
+      {isFolder && hasChildren && item.expanded && (
+        <div>
+          {item.children!.map((child) => (
+            <FolderItem
+              key={child.id}
+              item={child}
+              level={level + 1}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              selectedId={selectedId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
