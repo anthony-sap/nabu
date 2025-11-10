@@ -1,6 +1,5 @@
 "use client";
 
-import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
@@ -216,6 +215,25 @@ function ContentSyncPlugin({
 }
 
 /**
+ * Custom AutoFocus Plugin with delay to ensure mentions plugin is initialized
+ */
+function DelayedAutoFocusPlugin({ shouldAutoFocus }: { shouldAutoFocus: boolean }) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (shouldAutoFocus) {
+      // Delay focus slightly to allow Beautiful Mentions plugin to initialize
+      const timer = setTimeout(() => {
+        editor.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [editor, shouldAutoFocus]);
+
+  return null;
+}
+
+/**
  * Lexical Rich Text Editor Component
  * Provides a rich text editing experience with formatting capabilities
  */
@@ -381,7 +399,7 @@ export function LexicalEditor({
         {/* Core Plugins */}
         <OnChangePlugin onChange={handleChange} />
         <HistoryPlugin />
-        {autoFocus && <AutoFocusPlugin />}
+        <DelayedAutoFocusPlugin shouldAutoFocus={autoFocus} />
         <ContentSyncPlugin plainText={value} serializedState={editorState} />
         
         {/* List Plugins */}
