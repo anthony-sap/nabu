@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { NabuHeader } from "@/components/nabu/nabu-header";
+import { NabuMobileNav } from "@/components/nabu/nabu-mobile-nav";
 
 export default function NabuLanding() {
   return (
@@ -15,40 +17,8 @@ export default function NabuLanding() {
       `}</style>
 
       {/* NAV */}
-      <header className="sticky top-0 z-40 bg-[#0a1428]/70 backdrop-blur border-b border-white/5">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-2xl bg-[var(--nabu-deep)] relative shadow-inner ring-1 ring-white/10">
-              <div className="absolute inset-1 rounded-2xl bg-[var(--nabu-deep)]"/>
-              {/* Mint tablet minimal glyph */}
-              <svg viewBox="0 0 100 100" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]">
-                <rect x="18" y="20" width="64" height="10" rx="5"/>
-                <path d="M29 70 a7 7 0 1 0 18 0 a7 7 0 1 0 -18 0"/>
-                <path d="M42 46 c20 5 25 37 25 37 c-9 4 -19 2 -28 -6 c-8 -7 -7 -30 3 -31z"/>
-                <path d="M69 44 a8 10 0 1 0 0 20 a8 10 0 1 0 0 -20"/>
-              </svg>
-            </div>
-            <span className="text-xl font-serif">Nabu</span>
-            <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/10 hover:bg-white/15">
-              Beta
-            </Badge>
-          </div>
-          <nav className="hidden md:flex items-center gap-8 text-white/80">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how" className="hover:text-white transition-colors">How it works</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="lg" rounded="2xl" asChild className="border-white/15 hover:bg-white/5 hover:border-white/35 text-white">
-              <a href="#demo">Live demo</a>
-            </Button>
-            <Button size="lg" rounded="2xl" asChild className="bg-[#00B3A6] hover:bg-[#00B3A6]/90 text-[#071633] shadow-lg shadow-[#00B3A6]/20">
-              <a href="#cta">Start free</a>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <NabuMobileNav />
+      <NabuHeader />
 
       {/* HERO */}
       <section className="relative overflow-hidden">
