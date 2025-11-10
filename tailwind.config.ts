@@ -60,6 +60,12 @@ const config = {
         urban: ["var(--font-urban)", ...fontFamily.sans],
         heading: ["var(--font-heading)", ...fontFamily.sans],
         geist: ["var(--font-geist)", ...fontFamily.sans],
+        serif: ["Georgia", "Cambria", "Times New Roman", "Times", "serif"],
+      },
+      boxShadow: {
+        "nabu": "0 10px 30px -10px hsl(var(--ring) / 0.25)",
+        "nabu-card": "0 2px 8px -2px rgba(0, 0, 0, 0.1), 0 4px 12px -2px rgba(0, 0, 0, 0.06)",
+        "nabu-glow": "0 4px 16px -2px rgba(0, 179, 166, 0.15), 0 8px 24px -4px rgba(0, 179, 166, 0.1)",
       },
       keyframes: {
         "accordion-down": {

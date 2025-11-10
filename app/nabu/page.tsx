@@ -263,12 +263,8 @@ export default function NabuLanding() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-[var(--nabu-deep)] relative">
-              <svg viewBox="0 0 100 100" className="absolute inset-0 m-1 fill-[var(--nabu-mint)]">
-                <rect x="18" y="20" width="64" height="10" rx="5"/>
-                <path d="M29 70 a7 7 0 1 0 18 0 a7 7 0 1 0 -18 0"/>
-                <path d="M42 46 c20 5 25 37 25 37 c-9 4 -19 2 -28 -6 c-8 -7 -7 -30 3 -31z"/>
-                <path d="M69 44 a8 10 0 1 0 0 20 a8 10 0 1 0 0 -20"/>
-              </svg>
+            <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+
             </div>
             <span>Nabu</span>
           </div>
