@@ -15,6 +15,8 @@ interface NotesSidebarProps {
   onViewChange: (view: "feed" | "folders") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
+  onAddFolder?: (parentId: string) => void;
+  onAddNote?: (folderId: string) => void;
 }
 
 /**
@@ -28,6 +30,8 @@ export function NotesSidebar({
   onViewChange,
   onFolderToggle,
   onNoteSelect,
+  onAddFolder,
+  onAddNote,
 }: NotesSidebarProps) {
   return (
     <div className="w-72 flex-shrink-0">
@@ -74,6 +78,8 @@ export function NotesSidebar({
                     onNoteSelect(item);
                   }}
                   selectedId={selectedNote?.id || null}
+                  onAddFolder={onAddFolder}
+                  onAddNote={onAddNote}
                 />
               ))}
             </div>

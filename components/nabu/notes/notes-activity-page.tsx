@@ -127,6 +127,71 @@ export default function NotesActivityPage() {
     }
   };
 
+  /**
+   * Handles adding a new subfolder to a parent folder
+   */
+  const handleAddFolder = (parentId: string) => {
+    const folderName = prompt("Enter folder name:");
+    if (!folderName?.trim()) return;
+
+    const addFolder = (items: FolderItem[]): FolderItem[] => {
+      return items.map((item) => {
+        if (item.id === parentId && item.type === "folder") {
+          const newFolder: FolderItem = {
+            id: `folder-${Date.now()}`,
+            name: folderName.trim(),
+            type: "folder",
+            expanded: false,
+            children: [],
+          };
+          return {
+            ...item,
+            children: [...(item.children || []), newFolder],
+            expanded: true, // Auto-expand to show new folder
+          };
+        }
+        if (item.children) {
+          return { ...item, children: addFolder(item.children) };
+        }
+        return item;
+      });
+    };
+
+    setFolders(addFolder(folders));
+  };
+
+  /**
+   * Handles adding a new note to a folder
+   */
+  const handleAddNote = (folderId: string) => {
+    const noteName = prompt("Enter note title:");
+    if (!noteName?.trim()) return;
+
+    const addNote = (items: FolderItem[]): FolderItem[] => {
+      return items.map((item) => {
+        if (item.id === folderId && item.type === "folder") {
+          const newNote: FolderItem = {
+            id: `note-${Date.now()}`,
+            name: noteName.trim(),
+            type: "note",
+            tags: [],
+          };
+          return {
+            ...item,
+            children: [...(item.children || []), newNote],
+            expanded: true, // Auto-expand to show new note
+          };
+        }
+        if (item.children) {
+          return { ...item, children: addNote(item.children) };
+        }
+        return item;
+      });
+    };
+
+    setFolders(addNote(folders));
+  };
+
   return (
     <div className="flex h-[calc(100vh-10rem)] gap-6">
       {/* Left Sidebar: Navigation and folder tree */}
@@ -137,6 +202,8 @@ export default function NotesActivityPage() {
         onViewChange={handleViewChange}
         onFolderToggle={toggleFolder}
         onNoteSelect={setSelectedNote}
+        onAddFolder={handleAddFolder}
+        onAddNote={handleAddNote}
       />
 
       {/* Main Content Area: Activity feed or note detail view */}
