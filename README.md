@@ -1,4 +1,5 @@
-# Aerion NextJS
+# Nabu
+Nabu (Mesopotamian/Babylonian) — scribe god of wisdom and writing. → Brand: NabuNote, Nabu
 
 ## About project
 
