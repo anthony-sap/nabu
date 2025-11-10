@@ -1,0 +1,88 @@
+/* Nabu Brand Theme - Mint Icon Variant */
+
+@layer base {
+  :root {
+    /* Nabu Brand Tokens */
+    --nabu-mint: 174 100% 35%; /* #00B3A6 */
+    --nabu-deep: 218 64% 13%; /* #071633 */
+    --nabu-lapis: 224 68% 40%; /* #1E40AF */
+    --nabu-gold: 45 63% 48%; /* #C59B2F */
+    --nabu-clay: 40 40% 85%; /* #E7DCC7 */
+
+    /* Override primary to use mint */
+    --primary: var(--nabu-mint);
+    --primary-foreground: var(--nabu-deep);
+  }
+
+  .dark {
+    /* Nabu tokens remain the same in dark mode */
+    --nabu-mint: 174 100% 35%;
+    --nabu-deep: 218 64% 13%;
+    --nabu-lapis: 224 68% 40%;
+    --nabu-gold: 45 63% 48%;
+    --nabu-clay: 40 40% 85%;
+  }
+}
+
+@layer components {
+  /* Nabu Button Styles */
+  .btn {
+    @apply inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-medium transition-all duration-200;
+  }
+
+  .btn-primary {
+    background: hsl(var(--nabu-mint));
+    color: hsl(var(--nabu-deep));
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .btn-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    backdrop-filter: saturate(140%) blur(10px);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Pill badge */
+  .pill {
+    @apply rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide;
+  }
+}
+
+@layer utilities {
+  /* Nabu-specific utility classes */
+  .text-nabu-mint {
+    color: hsl(var(--nabu-mint));
+  }
+
+  .bg-nabu-mint {
+    background-color: hsl(var(--nabu-mint));
+  }
+
+  .bg-nabu-deep {
+    background-color: hsl(var(--nabu-deep));
+  }
+
+  .bg-nabu-lapis {
+    background-color: hsl(var(--nabu-lapis));
+  }
+
+  .border-nabu-mint {
+    border-color: hsl(var(--nabu-mint));
+  }
+}
+
