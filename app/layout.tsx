@@ -1,4 +1,5 @@
 import "@/styles/globals.css";
+import "@/styles/nabu-theme.css";
 
 import { fontGeist, fontHeading, fontSans, fontUrban } from "@/assets/fonts";
 import { ThemeProvider } from "next-themes";
