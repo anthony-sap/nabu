@@ -22,6 +22,7 @@ export interface FolderItem {
   id: string;
   name: string;
   type: "folder" | "note";
+  color?: string; // Optional color for folder items
   expanded?: boolean;
   children?: FolderItem[];
   tags?: string[];

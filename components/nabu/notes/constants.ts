@@ -43,12 +43,14 @@ export const folderStructure: FolderItem[] = [
     id: "1",
     name: "Product Strategy",
     type: "folder",
+    color: "#00B3A6", // Nabu mint
     expanded: true,
     children: [
       {
         id: "1-1",
         name: "Roadmap 2024",
         type: "folder",
+        color: "#00B3A6",
         expanded: false,
         children: [
           { id: "1-1-1", name: "Q1 Planning.md", type: "note", tags: ["planning", "strategy"] },
@@ -63,6 +65,7 @@ export const folderStructure: FolderItem[] = [
     id: "2",
     name: "Engineering",
     type: "folder",
+    color: "#1E40AF", // Lapis
     expanded: false,
     children: [
       { id: "2-1", name: "Architecture Decisions.md", type: "note", tags: ["technical", "architecture"] },
@@ -71,6 +74,7 @@ export const folderStructure: FolderItem[] = [
         id: "2-3",
         name: "Sprint Notes",
         type: "folder",
+        color: "#1E40AF",
         children: [
           { id: "2-3-1", name: "Sprint 23.md", type: "note", tags: ["sprint"] },
           { id: "2-3-2", name: "Sprint 24.md", type: "note", tags: ["sprint"] },
@@ -82,6 +86,7 @@ export const folderStructure: FolderItem[] = [
     id: "3",
     name: "Team Meetings",
     type: "folder",
+    color: "#E0C36A", // Gold access
     expanded: false,
     children: [
       { id: "3-1", name: "Weekly Standups.md", type: "note", tags: ["meetings"] },

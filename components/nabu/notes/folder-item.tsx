@@ -69,7 +69,18 @@ export function FolderItem({
         
         {/* File/folder icon */}
         {!isFolder && <FileText className="h-4 w-4 text-primary/70" />}
-        {isFolder && <Folder className="h-4 w-4 text-primary/70" />}
+        {isFolder && (
+          <div className="relative flex items-center">
+            <Folder className="h-4 w-4 text-primary/70" />
+            {item.color && (
+              <span
+                className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-background"
+                style={{ backgroundColor: item.color }}
+                title={item.color}
+              />
+            )}
+          </div>
+        )}
         
         {/* Item name */}
         <span className="text-sm flex-1 truncate">{item.name}</span>

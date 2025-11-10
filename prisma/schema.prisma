@@ -20,18 +20,76 @@ enum StatusEnum {
   DISABLE
 }
 
+enum ThoughtSource {
+  WEB
+  TELEGRAM
+  WHATSAPP
+  TEAMS
+  EMAIL
+  VOICE
+  OTHER
+}
+
+enum ThoughtState {
+  NEW
+  ENRICHED
+  GROUPED
+  PROMOTED
+  ARCHIVED
+}
+
+enum NoteVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+enum NoteLinkRelation {
+  RELATED
+  EXPANDS
+  SUPPORTS
+  CONTRADICTS
+  FOLLOWS_UP
+}
+
+enum TagType {
+  TOPIC
+  PROJECT
+  CLIENT
+  OTHER
+}
+
+enum ShareEntityType {
+  NOTE
+  TAG
+  FOLDER
+}
+
+enum SharePermission {
+  VIEW
+  COMMENT
+  EDIT
+}
+
 model Tenant {
-  id        String     @id @default(cuid())
-  status    StatusEnum @default(ENABLE)
-  name      String     @db.VarChar(50)
-  createdAt DateTime   @default(now())
-  createdBy String?
-  updatedAt DateTime   @default(now()) @updatedAt
-  updatedBy String?
-  deletedAt DateTime?
-  AuditLog  AuditLog[]
-  Account   Account[]
-  User      User[]
+  id         String       @id @default(cuid())
+  status     StatusEnum   @default(ENABLE)
+  name       String       @db.VarChar(50)
+  createdAt  DateTime     @default(now())
+  createdBy  String?
+  updatedAt  DateTime     @default(now()) @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  AuditLog   AuditLog[]
+  Account    Account[]
+  User       User[]
+  Folder     Folder[]
+  Tag        Tag[]
+  Note       Note[]
+  Thought    Thought[]
+  NoteLink   NoteLink[]
+  Attachment Attachment[]
+  Share      Share[]
 }
 
 model AuditLog {
@@ -109,6 +167,11 @@ model User {
   stripeSubscriptionId   String?    @unique @map(name: "stripe_subscription_id")
   stripePriceId          String?    @map(name: "stripe_price_id")
   stripeCurrentPeriodEnd DateTime?  @map(name: "stripe_current_period_end")
+  thoughts               Thought[]
+  notes                  Note[]
+  folders                Folder[]
+  tags                   Tag[]
+  shares                 Share[]
 }
 
 model VerificationToken {
@@ -117,4 +180,176 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Folder {
+  id          String     @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  color       String?
+  description String?
+  parentId    String?
+  parent      Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Folder[]   @relation("FolderHierarchy")
+  order       Int?
+  status      StatusEnum @default(ENABLE)
+  createdAt   DateTime   @default(now())
+  createdBy   String?
+  updatedAt   DateTime   @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  notes       Note[]
+
+  @@index([tenantId, userId])
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String?
+  type      TagType?
+  status    StatusEnum @default(ENABLE)
+  createdAt DateTime   @default(now())
+  createdBy String?
+  updatedAt DateTime   @default(now()) @updatedAt
+  updatedBy String?
+  deletedAt DateTime?
+  noteTags  NoteTag[]
+
+  @@unique([tenantId, userId, name])
+  @@index([tenantId, userId])
+}
+
+model Note {
+  id             String         @id @default(cuid())
+  tenantId       String?
+  tenant         Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  title          String
+  content        String         @db.Text
+  sourceThoughts String[]
+  summary        String?        @db.Text
+  embedding      Bytes?
+  visibility     NoteVisibility @default(PRIVATE)
+  status         StatusEnum     @default(ENABLE)
+  createdAt      DateTime       @default(now())
+  createdBy      String?
+  updatedAt      DateTime       @default(now()) @updatedAt
+  updatedBy      String?
+  deletedAt      DateTime?
+  noteTags       NoteTag[]
+  attachments    Attachment[]
+  outgoingLinks  NoteLink[]     @relation("NoteOutgoing")
+  incomingLinks  NoteLink[]     @relation("NoteIncoming")
+  thoughts       Thought[]
+
+  @@index([tenantId, userId])
+  @@index([folderId])
+}
+
+model Thought {
+  id            String        @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId        String?
+  note          Note?         @relation(fields: [noteId], references: [id], onDelete: SetNull)
+  content       String        @db.Text
+  source        ThoughtSource
+  state         ThoughtState  @default(NEW)
+  suggestedTags String[]
+  embedding     Bytes?
+  meta          Json?
+  createdAt     DateTime      @default(now())
+  createdBy     String?
+  updatedAt     DateTime      @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  attachments   Attachment[]
+
+  @@index([tenantId, userId])
+  @@index([noteId])
+}
+
+model NoteTag {
+  noteId     String
+  tagId      String
+  confidence Float?
+  createdAt  DateTime @default(now())
+  createdBy  String?
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+model NoteLink {
+  id         String           @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromNoteId String
+  toNoteId   String
+  relation   NoteLinkRelation
+  createdAt  DateTime         @default(now())
+  createdBy  String?
+
+  from Note @relation("NoteOutgoing", fields: [fromNoteId], references: [id], onDelete: Cascade)
+  to   Note @relation("NoteIncoming", fields: [toNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([fromNoteId])
+  @@index([toNoteId])
+}
+
+model Attachment {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  noteId        String?
+  note          Note?     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  thoughtId     String?
+  thought       Thought?  @relation(fields: [thoughtId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  extractedText String?   @db.Text
+  embedding     Bytes?
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([noteId])
+  @@index([thoughtId])
+}
+
+model Share {
+  id         String          @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType ShareEntityType
+  entityId   String
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission SharePermission
+  createdAt  DateTime        @default(now())
+  createdBy  String?
+  revokedAt  DateTime?
+
+  @@index([tenantId, entityType, entityId])
+  @@index([userId])
 }
