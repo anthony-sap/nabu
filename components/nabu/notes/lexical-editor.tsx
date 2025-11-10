@@ -252,9 +252,11 @@ export function LexicalEditor({
   const [mentionItems, setMentionItems] = useState<{
     "@": Array<{ value: string; description?: string }>;
     "#": Array<{ value: string; description?: string }>;
+    "/": Array<{ value: string; description?: string }>;
   }>({
     "@": [],
     "#": [],
+    "/": [],
   });
 
   /**
@@ -297,6 +299,7 @@ export function LexicalEditor({
       setMentionItems({
         "@": [...folderMentions, ...thoughtMentions],
         "#": tagMentions,
+        "/": folderMentions,
       });
     } catch (error) {
       console.error("Failed to load mentions:", error);
@@ -419,10 +422,11 @@ export function LexicalEditor({
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin
           items={mentionItems}
-          triggers={["@", "#"]}
+          triggers={["@", "#", "/"]}
           creatable={{
             "@": 'Add folder/note "{{name}}"',
             "#": 'Add tag "{{name}}"',
+            "/": 'Add folder "{{name}}"',
           }}
           insertOnBlur
           autoSpace
