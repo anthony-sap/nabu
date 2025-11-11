@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Color from "color";
+import { Loader2 } from "lucide-react";
 import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
@@ -19,11 +20,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   ColorPicker,
-  ColorPickerSelection,
-  ColorPickerHue,
-  ColorPickerAlpha,
-  ColorPickerOutput,
   ColorPickerEyeDropper,
+  ColorPickerHue,
+  ColorPickerOutput,
 } from "@/components/ui/color-picker";
 
 /**
@@ -42,7 +41,9 @@ export default function NotesActivityPage() {
   const [view, setView] = useState<"feed" | "folders">("feed");
   
   // Folder structure with expand/collapse state
-  const [folders, setFolders] = useState<FolderItem[]>(folderStructure);
+  const [folders, setFolders] = useState<FolderItem[]>(() =>
+    sortFolderItems(folderStructure),
+  );
   
   // Currently selected note in folder view
   const [selectedNote, setSelectedNote] = useState<FolderItem | null>(null);
@@ -57,6 +58,8 @@ export default function NotesActivityPage() {
   const [newFolderColor, setNewFolderColor] = useState("#00B3A6");
   const [folderNameError, setFolderNameError] = useState("");
   const [folderColorError, setFolderColorError] = useState<string | null>(null);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
 
   /**
    * Load thoughts from localStorage on component mount
@@ -157,12 +160,14 @@ export default function NotesActivityPage() {
   /**
    * Handles adding a new subfolder to a parent folder
    */
-  const handleAddFolderRequest = (parentId: string) => {
-    const parentFolder = findFolderById(folders, parentId);
+  const handleAddFolderRequest = (parentId: string | null) => {
+    const parentFolder = parentId ? findFolderById(folders, parentId) : undefined;
     setFolderModalParentId(parentId);
     setNewFolderName("");
     setNewFolderColor(parentFolder?.color || "#00B3A6");
     setFolderNameError("");
+    setFolderColorError(null);
+    setFolderCreateError(null);
     setFolderModalOpen(true);
   };
 
@@ -216,25 +221,6 @@ export default function NotesActivityPage() {
     return undefined;
   }
 
-  /**
-   * Helper to insert a new folder into the tree
-   */
-  const addFolderToTree = (items: FolderItem[], parentId: string, folder: FolderItem): FolderItem[] => {
-    return items.map((item) => {
-      if (item.id === parentId && item.type === "folder") {
-        return {
-          ...item,
-          children: [...(item.children || []), folder],
-          expanded: true,
-        };
-      }
-      if (item.children) {
-        return { ...item, children: addFolderToTree(item.children, parentId, folder) };
-      }
-      return item;
-    });
-  };
-
   const handleFolderNameChange = (value: string) => {
     setNewFolderName(value);
     if (folderNameError && value.trim()) {
@@ -247,13 +233,15 @@ export default function NotesActivityPage() {
     setFolderModalParentId(null);
     setNewFolderName("");
     setFolderNameError("");
+    setFolderColorError(null);
+    setFolderCreateError(null);
+    setIsCreatingFolder(false);
     setNewFolderColor("#00B3A6");
   };
 
-  const handleFolderCreate = (event: FormEvent<HTMLFormElement>) => {
+  const handleFolderCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!folderModalParentId) {
+    if (isCreatingFolder) {
       return;
     }
 
@@ -263,19 +251,69 @@ export default function NotesActivityPage() {
       return;
     }
 
-    const normalizedHex = Color(newFolderColor).hex().toUpperCase();
+    let normalizedHex: string;
+    try {
+      normalizedHex = Color(newFolderColor).hex().toUpperCase();
+    } catch (error) {
+      setFolderColorError("Please select a valid colour.");
+      return;
+    }
 
-    const newFolder: FolderItem = {
-      id: `folder-${Date.now()}`,
-      name: trimmedName,
-      type: "folder",
-      expanded: false,
-      children: [],
-      color: normalizedHex,
-    };
+    setFolderColorError(null);
+    setIsCreatingFolder(true);
+    setFolderCreateError(null);
 
-    setFolders((current) => addFolderToTree(current, folderModalParentId, newFolder));
-    closeFolderModal();
+    const parentId = folderModalParentId;
+
+    try {
+      const requestBody = {
+        name: trimmedName,
+        color: normalizedHex,
+        ...(parentId ? { parentId } : {}),
+      };
+
+      const response = await fetch("/api/nabu/folders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to create folder.");
+      }
+
+      const createdFolder = payload?.data;
+      if (!createdFolder) {
+        throw new Error("Unexpected response from server.");
+      }
+
+      const newFolder: FolderItem = {
+        id: createdFolder.id,
+        name: createdFolder.name,
+        type: "folder",
+        expanded: false,
+        children: [],
+        color: createdFolder.color || undefined,
+      };
+
+      const parentIdFromResponse: string | null =
+        createdFolder.parentId ?? parentId ?? null;
+
+      setFolders((current) =>
+        insertFolderSorted(current, parentIdFromResponse, newFolder),
+      );
+
+      closeFolderModal();
+    } catch (error) {
+      setFolderCreateError(
+        error instanceof Error ? error.message : "Failed to create folder.",
+      );
+    } finally {
+      setIsCreatingFolder(false);
+    }
   };
 
   return (
@@ -324,6 +362,7 @@ export default function NotesActivityPage() {
                 onChange={(event) => handleFolderNameChange(event.target.value)}
                 placeholder="Product Strategy"
                 autoFocus
+                disabled={isCreatingFolder}
               />
               {folderNameError && (
                 <p className="text-sm text-destructive">{folderNameError}</p>
@@ -332,37 +371,57 @@ export default function NotesActivityPage() {
 
             <div className="space-y-2">
               <Label>Folder colour</Label>
-              <ColorPicker
-                value={newFolderColor}
-                onChange={(hex) => {
-                  setNewFolderColor(hex);
-                  setFolderColorError(null);
-                }}
-                className="gap-3 rounded-lg border border-border/60 p-3"
-              >
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                 
-                  <div className="flex items-center gap-2">
-                    <span>Preview</span>
-                    <span
-                      className="h-4 w-4 rounded-full border border-border shadow-inner"
-                      style={{ backgroundColor: newFolderColor }}
-                    />
+              <div className={isCreatingFolder ? "pointer-events-none opacity-60" : undefined}>
+                <ColorPicker
+                  value={newFolderColor}
+                  onChange={(hex) => {
+                    setNewFolderColor(hex);
+                    setFolderColorError(null);
+                  }}
+                  className="gap-3 rounded-lg border border-border/60 p-3"
+                >
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>Preview</span>
+                      <span
+                        className="h-4 w-4 rounded-full border border-border shadow-inner"
+                        style={{ backgroundColor: newFolderColor }}
+                      />
+                    </div>
+                    <span className="font-mono text-[11px]">
+                      {Color(newFolderColor).hex().toUpperCase()}
+                    </span>
                   </div>
-                </div>
-                <ColorPickerHue className="h-3" />
-                <ColorPickerOutput className="h-8 text-xs" />
-              </ColorPicker>
+                  <div className="flex items-center gap-2">
+                    <ColorPickerHue className="h-3 flex-1" />
+                    <ColorPickerEyeDropper />
+                  </div>
+                  <ColorPickerOutput className="h-8 text-xs font-mono" />
+                </ColorPicker>
+              </div>
               {folderColorError && (
                 <p className="text-sm text-destructive">{folderColorError}</p>
               )}
             </div>
 
+            {folderCreateError && (
+              <p className="text-sm text-destructive" role="alert">
+                {folderCreateError}
+              </p>
+            )}
+
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={closeFolderModal}>
+              <Button type="button" variant="ghost" onClick={closeFolderModal} disabled={isCreatingFolder}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Button
+                type="submit"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={isCreatingFolder}
+              >
+                {isCreatingFolder && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Create folder
               </Button>
             </div>
@@ -371,5 +430,49 @@ export default function NotesActivityPage() {
       </Dialog>
     </>
   );
+}
+
+function insertFolderSorted(
+  items: FolderItem[],
+  parentId: string | null,
+  folder: FolderItem,
+): FolderItem[] {
+  if (!parentId) {
+    return sortFolderItems([...items, folder]);
+  }
+
+  let inserted = false;
+
+  const updated = items.map((item) => {
+    if (item.id === parentId && item.type === "folder") {
+      inserted = true;
+      const childList = sortFolderItems([...(item.children || []), folder]);
+      return {
+        ...item,
+        children: childList,
+        expanded: true,
+      };
+    }
+
+    if (item.children) {
+      const nextChildren = insertFolderSorted(item.children, parentId, folder);
+      if (nextChildren !== item.children) {
+        inserted = true;
+        return { ...item, children: nextChildren };
+      }
+    }
+
+    return item;
+  });
+
+  return inserted ? sortFolderItems(updated) : updated;
+}
+
+function sortFolderItems(items: FolderItem[]): FolderItem[] {
+  return [...items]
+    .map((item) =>
+      item.children ? { ...item, children: sortFolderItems(item.children) } : item,
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 

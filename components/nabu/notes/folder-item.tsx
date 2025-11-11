@@ -15,7 +15,7 @@ interface FolderItemProps {
   onToggle: (id: string) => void;
   onSelect: (item: FolderItemType) => void;
   selectedId: string | null;
-  onAddFolder?: (parentId: string) => void;
+  onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
 }
 

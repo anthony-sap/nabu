@@ -92,6 +92,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { userId, tenantId } = await getUserContext();
+    console.log("userId", userId);
+    console.log("tenantId", tenantId);
     const body = await req.json();
 
     // Validate request body

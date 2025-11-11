@@ -15,7 +15,7 @@ interface NotesSidebarProps {
   onViewChange: (view: "feed" | "folders") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
-  onAddFolder?: (parentId: string) => void;
+  onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
 }
 
@@ -47,7 +47,7 @@ export function NotesSidebar({
         
         {/* Navigation content */}
         <ScrollArea className="flex-1">
-          <div className="p-3 space-y-1">
+          <div className="p-3 space-y-2">
             {/* Feed navigation option */}
             <div
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
@@ -64,6 +64,18 @@ export function NotesSidebar({
             </div>
             
             <Separator className="my-3 bg-border/50" />
+
+            {/* Root-level new folder */}
+            {onAddFolder && (
+              <button
+                type="button"
+                onClick={() => onAddFolder(null)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition hover:border-primary hover:bg-primary/15"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                New Folder
+              </button>
+            )}
             
             {/* Folder hierarchy */}
             <div className="space-y-0.5">
