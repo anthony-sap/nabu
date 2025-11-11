@@ -43,10 +43,10 @@ export function FolderItem({
   return (
     <div>
       <div
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all relative group ${
+        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors relative group ${
           isSelected
-            ? "bg-primary/15 text-primary font-medium border-l-2 border-primary"
-            : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
         }`}
         style={{ paddingLeft: `${level * 12 + 12}px` }}
         onMouseEnter={() => setIsHovered(true)}

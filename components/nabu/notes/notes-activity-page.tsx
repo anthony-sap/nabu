@@ -470,7 +470,7 @@ export default function NotesActivityPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-10rem)] gap-6">
+      <div className="flex h-[calc(100vh-10rem)] gap-0">
         {/* Left Sidebar: Navigation and folder tree */}
         <NotesSidebar
           folders={folders}
@@ -487,7 +487,7 @@ export default function NotesActivityPage() {
         />
 
         {/* Main Content Area: Activity feed or note detail view */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 bg-muted/15 px-6">
           {view === "feed" ? (
             <ActivityFeed
               thoughts={thoughts}
