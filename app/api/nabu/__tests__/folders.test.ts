@@ -83,6 +83,7 @@ describe("Folders API Routes", () => {
           userId: defaultContext.userId,
           tenantId: defaultContext.tenantId,
           deletedAt: null,
+          parentId: null, // Updated: now filters for root folders by default
         },
         include: {
           _count: {
@@ -138,6 +139,71 @@ describe("Folders API Routes", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.data[0].children).toHaveLength(1);
+    });
+
+    it("includes notes when requested", async () => {
+      const folderWithNotes = {
+        ...baseFolder,
+        notes: [
+          {
+            id: "note-1",
+            title: "Test Note",
+            createdAt: new Date("2025-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2025-01-01T00:00:00.000Z"),
+          },
+        ],
+      };
+      (prisma.folder.findMany as jest.Mock).mockResolvedValue([folderWithNotes]);
+
+      const res = await listFolders(
+        new Request(
+          "http://localhost/api/nabu/folders?includeNotes=true",
+        ),
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data[0].notes).toHaveLength(1);
+      expect(body.data[0].notes[0].title).toBe("Test Note");
+      expect(body.data[0].notes[0].content).toBeUndefined(); // Content not included
+    });
+
+    it("filters by parentId when specified", async () => {
+      const childFolder = {
+        ...baseFolder,
+        id: "folder-2",
+        name: "Child",
+        parentId: validCuid,
+      };
+      (prisma.folder.findMany as jest.Mock).mockResolvedValue([childFolder]);
+
+      const res = await listFolders(
+        new Request(
+          `http://localhost/api/nabu/folders?parentId=${validCuid}`,
+        ),
+      );
+
+      expect(prisma.folder.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: defaultContext.userId,
+          tenantId: defaultContext.tenantId,
+          deletedAt: null,
+          parentId: validCuid,
+        },
+        include: {
+          _count: {
+            select: {
+              notes: true,
+              children: true,
+            },
+          },
+        },
+        orderBy: [{ order: "asc" as const }, { name: "asc" as const }],
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data[0].parentId).toBe(validCuid);
     });
 
     it("delegates to handleApiError when an exception occurs", async () => {

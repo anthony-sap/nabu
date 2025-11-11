@@ -25,13 +25,14 @@ export async function GET(req: NextRequest) {
     const queryResult = folderQuerySchema.safeParse({
       parentId: searchParams.get("parentId") || undefined,
       includeChildren: searchParams.get("includeChildren") || undefined,
+      includeNotes: searchParams.get("includeNotes") || undefined,
     });
 
     if (!queryResult.success) {
       return errorResponse("Invalid query parameters", 400);
     }
 
-    const { parentId, includeChildren } = queryResult.data;
+    const { parentId, includeChildren, includeNotes } = queryResult.data;
 
     // Build query
     const where: any = {
@@ -57,6 +58,18 @@ export async function GET(req: NextRequest) {
             children: true,
           },
         },
+        ...(includeNotes && {
+          notes: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              title: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        }),
         ...(includeChildren && {
           children: {
             where: { deletedAt: null },
@@ -76,7 +89,7 @@ export async function GET(req: NextRequest) {
     });
 
     const formattedFolders = folders.map((folder) =>
-      formatFolderResponse(folder, includeChildren)
+      formatFolderResponse(folder, includeChildren, includeNotes)
     );
 
     return new Response(JSON.stringify(successResponse(formattedFolders)), {

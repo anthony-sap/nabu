@@ -143,7 +143,11 @@ export function formatThoughtResponse(thought: any) {
 /**
  * Format Folder with relations for API response
  */
-export function formatFolderResponse(folder: any, includeChildren = false) {
+export function formatFolderResponse(
+  folder: any,
+  includeChildren = false,
+  includeNotes = false
+) {
   const formatted: any = {
     id: folder.id,
     tenantId: folder.tenantId,
@@ -161,8 +165,12 @@ export function formatFolderResponse(folder: any, includeChildren = false) {
 
   if (includeChildren && folder.children) {
     formatted.children = folder.children.map((child: any) =>
-      formatFolderResponse(child, true)
+      formatFolderResponse(child, true, includeNotes)
     );
+  }
+
+  if (includeNotes && folder.notes) {
+    formatted.notes = folder.notes; // All notes, titles only
   }
 
   return formatted;

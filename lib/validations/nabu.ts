@@ -39,6 +39,13 @@ export const folderResponseSchema = z.object({
     notes: z.number(),
     children: z.number(),
   }).optional(),
+  // Notes list (titles only, no content)
+  notes: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  })).optional(),
 });
 
 // ============================================================================
@@ -170,6 +177,7 @@ export const thoughtResponseSchema = z.object({
 export const folderQuerySchema = z.object({
   parentId: z.string().cuid().optional(),
   includeChildren: z.string().transform(val => val === "true").optional(),
+  includeNotes: z.string().transform(val => val === "true").optional(),
 });
 
 export const tagQuerySchema = z.object({

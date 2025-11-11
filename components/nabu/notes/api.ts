@@ -1,4 +1,14 @@
-import { FolderItem } from "./types";
+import { FolderItem, NoteItem } from "./types";
+
+/**
+ * API note response format from the backend (title only, no content)
+ */
+interface ApiNoteResponse {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * API response format from the backend
@@ -16,6 +26,7 @@ interface ApiFolderResponse {
   updatedAt: string;
   deletedAt: string | null;
   children?: ApiFolderResponse[];
+  notes?: ApiNoteResponse[];
   _count?: {
     notes: number;
     children: number;
@@ -35,16 +46,29 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
     children: apiFolder.children?.map(transformFolder) || [],
     hasLoadedChildren: !!apiFolder.children, // if children were included, mark as loaded
     childCount: apiFolder._count?.children || 0,
+    notes: apiFolder.notes?.map(note => ({
+      id: note.id,
+      title: note.title,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    })),
   };
 }
 
 /**
  * Fetch root-level folders for the current user
+ * @param includeNotes - Whether to include notes in the response
  * @returns Array of root folders (where parentId is null)
  */
-export async function fetchRootFolders(): Promise<FolderItem[]> {
+export async function fetchRootFolders(includeNotes = true): Promise<FolderItem[]> {
   try {
-    const response = await fetch("/api/nabu/folders");
+    const params = new URLSearchParams();
+    if (includeNotes) {
+      params.set("includeNotes", "true");
+    }
+    
+    const url = `/api/nabu/folders${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -67,11 +91,19 @@ export async function fetchRootFolders(): Promise<FolderItem[]> {
 /**
  * Fetch children of a specific folder
  * @param parentId - ID of the parent folder
+ * @param includeNotes - Whether to include notes in the response
  * @returns Array of child folders/notes
  */
-export async function fetchFolderChildren(parentId: string): Promise<FolderItem[]> {
+export async function fetchFolderChildren(parentId: string, includeNotes = true): Promise<FolderItem[]> {
   try {
-    const response = await fetch(`/api/nabu/folders?parentId=${encodeURIComponent(parentId)}`);
+    const params = new URLSearchParams({
+      parentId,
+    });
+    if (includeNotes) {
+      params.set("includeNotes", "true");
+    }
+    
+    const response = await fetch(`/api/nabu/folders?${params.toString()}`);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
