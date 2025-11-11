@@ -77,13 +77,14 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
 
     // Verify ownership
-    const isOwner = await validateOwnership("folder", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("folder", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Folder not found or access denied", 404);
     }
@@ -120,12 +121,12 @@ export async function PATCH(
         }
 
         // Prevent setting self as parent
-        if (data.parentId === params.id) {
+        if (data.parentId === id) {
           return errorResponse("Cannot set folder as its own parent", 400);
         }
 
         // Prevent circular references (check if new parent is a descendant)
-        const descendants = await getDescendantIds(params.id);
+        const descendants = await getDescendantIds(id);
         if (descendants.includes(data.parentId)) {
           return errorResponse("Cannot create circular folder hierarchy", 400);
         }
@@ -134,7 +135,7 @@ export async function PATCH(
 
     // Update folder
     const folder = await prisma.folder.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...data,
         updatedBy: userId,
@@ -167,20 +168,21 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
 
     // Verify ownership
-    const isOwner = await validateOwnership("folder", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("folder", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Folder not found or access denied", 404);
     }
 
     // Check if folder has notes or children
     const folder = await prisma.folder.findFirst({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -207,7 +209,7 @@ export async function DELETE(
 
     // Soft delete
     await prisma.folder.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         deletedAt: new Date(),
         updatedBy: userId,

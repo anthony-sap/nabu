@@ -45,7 +45,7 @@ export function NotesSidebar({
       
       {/* Navigation content */}
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-1">
+        <div className="p-3 pb-6 space-y-1">
           {/* Feed navigation option */}
           <div
             className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors ${
