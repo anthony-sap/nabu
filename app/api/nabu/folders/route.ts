@@ -40,9 +40,12 @@ export async function GET(req: NextRequest) {
       deletedAt: null,
     };
 
-    // If parentId is specified, filter by it; if null string, get root folders
+    // If parentId is not specified, get only root folders (parentId is null)
+    // If parentId is specified, get children of that folder
     if (parentId !== undefined) {
       where.parentId = parentId;
+    } else {
+      where.parentId = null; // Only root-level folders
     }
 
     const folders = await prisma.folder.findMany({
@@ -92,8 +95,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { userId, tenantId } = await getUserContext();
-    console.log("userId", userId);
-    console.log("tenantId", tenantId);
+    
     const body = await req.json();
 
     // Validate request body

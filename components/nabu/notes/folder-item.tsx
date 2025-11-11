@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FolderItem as FolderItemType } from "./types";
@@ -36,6 +36,7 @@ export function FolderItem({
   const isFolder = item.type === "folder";
   const hasChildren = item.children && item.children.length > 0;
   const isSelected = selectedId === item.id;
+  const hasUnloadedChildren = isFolder && !item.hasLoadedChildren && (item.childCount ?? 0) > 0;
 
   return (
     <div>
@@ -49,17 +50,19 @@ export function FolderItem({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => {
-          if (isFolder && hasChildren) {
+          if (isFolder && (hasChildren || hasUnloadedChildren)) {
             onToggle(item.id);
-          } else {
+          } else if (!isFolder) {
             onSelect(item);
           }
         }}
       >
-        {/* Expand/collapse icon for folders with children */}
-        {isFolder && hasChildren && (
+        {/* Expand/collapse icon or loading spinner for folders with children */}
+        {isFolder && (hasChildren || hasUnloadedChildren) && (
           <div className="text-muted-foreground">
-            {item.expanded ? (
+            {item.isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : item.expanded ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
               <ChevronRight className="h-4 w-4" />

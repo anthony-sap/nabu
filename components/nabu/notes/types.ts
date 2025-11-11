@@ -26,5 +26,8 @@ export interface FolderItem {
   expanded?: boolean;
   children?: FolderItem[];
   tags?: string[];
+  isLoading?: boolean; // true while fetching children from API
+  hasLoadedChildren?: boolean; // true if children have been fetched from API
+  childCount?: number; // total count of children from API _count.children
 }
 

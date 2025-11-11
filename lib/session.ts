@@ -30,7 +30,6 @@ export const getCurrentUser = cache(
     if (!user || !user.email) {
       return undefined;
     }
-    console.log(user)
     user["firstName"] = user.given_name;
     user["lastName"] = user.family_name;
     if (user?.properties) {

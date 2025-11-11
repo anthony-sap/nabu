@@ -1,7 +1,8 @@
 import { Card, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Home } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Sparkles, Home, AlertCircle } from "lucide-react";
 import { FolderItem } from "./folder-item";
 import { FolderItem as FolderItemType } from "./types";
 
@@ -17,6 +18,8 @@ interface NotesSidebarProps {
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
+  isLoadingFolders?: boolean;
+  folderLoadError?: string | null;
 }
 
 /**
@@ -32,6 +35,8 @@ export function NotesSidebar({
   onNoteSelect,
   onAddFolder,
   onAddNote,
+  isLoadingFolders,
+  folderLoadError,
 }: NotesSidebarProps) {
   return (
     <div className="w-72 flex-shrink-0">
@@ -66,7 +71,7 @@ export function NotesSidebar({
             <Separator className="my-3 bg-border/50" />
 
             {/* Root-level new folder */}
-            {onAddFolder && (
+            {onAddFolder && !isLoadingFolders && (
               <button
                 type="button"
                 onClick={() => onAddFolder(null)}
@@ -77,24 +82,46 @@ export function NotesSidebar({
               </button>
             )}
             
+            {/* Loading state - 5 skeleton folders */}
+            {isLoadingFolders && (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2">
+                    <Skeleton className="h-4 w-4 rounded" />
+                    <Skeleton className="h-4 flex-1" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error state */}
+            {folderLoadError && !isLoadingFolders && (
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{folderLoadError}</span>
+              </div>
+            )}
+
             {/* Folder hierarchy */}
-            <div className="space-y-0.5">
-              {folders.map((folder) => (
-                <FolderItem
-                  key={folder.id}
-                  item={folder}
-                  level={0}
-                  onToggle={onFolderToggle}
-                  onSelect={(item) => {
-                    onViewChange("folders");
-                    onNoteSelect(item);
-                  }}
-                  selectedId={selectedNote?.id || null}
-                  onAddFolder={onAddFolder}
-                  onAddNote={onAddNote}
-                />
-              ))}
-            </div>
+            {!isLoadingFolders && !folderLoadError && (
+              <div className="space-y-0.5">
+                {folders.map((folder) => (
+                  <FolderItem
+                    key={folder.id}
+                    item={folder}
+                    level={0}
+                    onToggle={onFolderToggle}
+                    onSelect={(item) => {
+                      onViewChange("folders");
+                      onNoteSelect(item);
+                    }}
+                    selectedId={selectedNote?.id || null}
+                    onAddFolder={onAddFolder}
+                    onAddNote={onAddNote}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </ScrollArea>
       </Card>

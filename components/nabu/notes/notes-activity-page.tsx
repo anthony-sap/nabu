@@ -7,7 +7,8 @@ import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
 import { SavedThought, FolderItem } from "./types";
-import { exampleThoughts, folderStructure, STORAGE_KEY } from "./constants";
+import { exampleThoughts, STORAGE_KEY } from "./constants";
+import { fetchRootFolders, fetchFolderChildren } from "./api";
 import {
   Dialog,
   DialogContent,
@@ -41,9 +42,11 @@ export default function NotesActivityPage() {
   const [view, setView] = useState<"feed" | "folders">("feed");
   
   // Folder structure with expand/collapse state
-  const [folders, setFolders] = useState<FolderItem[]>(() =>
-    sortFolderItems(folderStructure),
-  );
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  
+  // Loading state for initial folder fetch
+  const [isLoadingFolders, setIsLoadingFolders] = useState(true);
+  const [folderLoadError, setFolderLoadError] = useState<string | null>(null);
   
   // Currently selected note in folder view
   const [selectedNote, setSelectedNote] = useState<FolderItem | null>(null);
@@ -60,6 +63,28 @@ export default function NotesActivityPage() {
   const [folderColorError, setFolderColorError] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
+
+  /**
+   * Load folders from API on component mount
+   */
+  useEffect(() => {
+    const loadFolders = async () => {
+      try {
+        setIsLoadingFolders(true);
+        setFolderLoadError(null);
+        const rootFolders = await fetchRootFolders();
+        setFolders(sortFolderItems(rootFolders));
+      } catch (error) {
+        console.error('Failed to load folders:', error);
+        setFolderLoadError(error instanceof Error ? error.message : 'Failed to load folders');
+        setFolders([]);
+      } finally {
+        setIsLoadingFolders(false);
+      }
+    };
+
+    loadFolders();
+  }, []);
 
   /**
    * Load thoughts from localStorage on component mount
@@ -131,20 +156,76 @@ export default function NotesActivityPage() {
 
   /**
    * Recursively toggles the expanded state of a folder in the tree
+   * Lazy loads children if they haven't been loaded yet
    */
-  const toggleFolder = (id: string) => {
-    const updateFolders = (items: FolderItem[]): FolderItem[] => {
+  const toggleFolder = async (id: string) => {
+    // First, find the folder to check its state
+    const folder = findFolderById(folders, id);
+    if (!folder || folder.type !== "folder") return;
+
+    const isExpanding = !folder.expanded;
+
+    // Toggle expanded state immediately for UI responsiveness
+    const updateExpanded = (items: FolderItem[]): FolderItem[] => {
       return items.map((item) => {
         if (item.id === id) {
           return { ...item, expanded: !item.expanded };
         }
         if (item.children) {
-          return { ...item, children: updateFolders(item.children) };
+          return { ...item, children: updateExpanded(item.children) };
         }
         return item;
       });
     };
-    setFolders(updateFolders(folders));
+    setFolders(updateExpanded(folders));
+
+    // If expanding and children haven't been loaded yet, fetch them
+    if (isExpanding && !folder.hasLoadedChildren && (folder.childCount ?? 0) > 0) {
+      // Set loading state
+      const setLoading = (items: FolderItem[], loading: boolean): FolderItem[] => {
+        return items.map((item) => {
+          if (item.id === id) {
+            return { ...item, isLoading: loading };
+          }
+          if (item.children) {
+            return { ...item, children: setLoading(item.children, loading) };
+          }
+          return item;
+        });
+      };
+      setFolders((current) => setLoading(current, true));
+
+      try {
+        const children = await fetchFolderChildren(id);
+        
+        // Insert children into the tree
+        const insertChildren = (items: FolderItem[]): FolderItem[] => {
+          return items.map((item) => {
+            if (item.id === id) {
+              return {
+                ...item,
+                children: sortFolderItems(children),
+                hasLoadedChildren: true,
+                isLoading: false,
+              };
+            }
+            if (item.children) {
+              return { ...item, children: insertChildren(item.children) };
+            }
+            return item;
+          });
+        };
+        setFolders((current) => insertChildren(current));
+      } catch (error) {
+        console.error(`Failed to load children for folder ${id}:`, error);
+        // Remove loading state and collapse folder on error
+        setFolders((current) => 
+          setLoading(current, false).map((item) => 
+            item.id === id ? { ...item, expanded: false } : item
+          )
+        );
+      }
+    }
   };
 
   /**
@@ -297,6 +378,8 @@ export default function NotesActivityPage() {
         expanded: false,
         children: [],
         color: createdFolder.color || undefined,
+        hasLoadedChildren: true, // New folder has no children yet
+        childCount: 0,
       };
 
       const parentIdFromResponse: string | null =
@@ -329,6 +412,8 @@ export default function NotesActivityPage() {
           onNoteSelect={setSelectedNote}
           onAddFolder={handleAddFolderRequest}
           onAddNote={handleAddNote}
+          isLoadingFolders={isLoadingFolders}
+          folderLoadError={folderLoadError}
         />
 
         {/* Main Content Area: Activity feed or note detail view */}
