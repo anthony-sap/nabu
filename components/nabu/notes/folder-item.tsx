@@ -93,7 +93,11 @@ export function FolderItem({
           <div title={item.color || "Default color"} className="flex-shrink-0">
             <Folder 
               className="h-4 w-4" 
-              style={{ color: item.color || 'hsl(var(--primary) / 0.7)' }}
+              fill={item.color || 'hsl(var(--primary) / 0.7)'}
+              style={{ 
+                color: item.color || 'hsl(var(--primary) / 0.7)',
+                stroke: item.color || 'hsl(var(--primary) / 0.7)',
+              }}
             />
           </div>
         )}
