@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FolderItem as FolderItemType } from "./types";
@@ -17,6 +17,7 @@ interface FolderItemProps {
   selectedId: string | null;
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
+  onEditFolder?: (folderId: string) => void;
 }
 
 /**
@@ -30,7 +31,8 @@ export function FolderItem({
   onSelect, 
   selectedId,
   onAddFolder,
-  onAddNote
+  onAddNote,
+  onEditFolder
 }: FolderItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isFolder = item.type === "folder";
@@ -73,15 +75,11 @@ export function FolderItem({
         {/* File/folder icon */}
         {!isFolder && <FileText className="h-4 w-4 text-primary/70" />}
         {isFolder && (
-          <div className="relative flex items-center">
-            <Folder className="h-4 w-4 text-primary/70" />
-            {item.color && (
-              <span
-                className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-background"
-                style={{ backgroundColor: item.color }}
-                title={item.color}
-              />
-            )}
+          <div title={item.color || "Default color"}>
+            <Folder 
+              className="h-4 w-4" 
+              style={{ color: item.color || 'hsl(var(--primary) / 0.7)' }}
+            />
           </div>
         )}
         
@@ -98,6 +96,20 @@ export function FolderItem({
         {/* Action icons for folders on hover */}
         {isFolder && isHovered && (
           <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
+            {onEditFolder && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditFolder(item.id);
+                }}
+                title="Edit folder"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {onAddFolder && (
               <Button
                 size="icon"
@@ -143,6 +155,7 @@ export function FolderItem({
               selectedId={selectedId}
               onAddFolder={onAddFolder}
               onAddNote={onAddNote}
+              onEditFolder={onEditFolder}
             />
           ))}
         </div>

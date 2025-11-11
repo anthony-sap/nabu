@@ -54,9 +54,11 @@ export default function NotesActivityPage() {
   // Array of all saved thoughts, sorted by creation date (newest first)
   const [thoughts, setThoughts] = useState<SavedThought[]>([]);
 
-  // Modal state for creating folders
+  // Modal state for creating/editing folders
   const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [folderModalMode, setFolderModalMode] = useState<"create" | "edit">("create");
   const [folderModalParentId, setFolderModalParentId] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderColor, setNewFolderColor] = useState("#00B3A6");
   const [folderNameError, setFolderNameError] = useState("");
@@ -243,9 +245,29 @@ export default function NotesActivityPage() {
    */
   const handleAddFolderRequest = (parentId: string | null) => {
     const parentFolder = parentId ? findFolderById(folders, parentId) : undefined;
+    setFolderModalMode("create");
     setFolderModalParentId(parentId);
+    setEditingFolderId(null);
     setNewFolderName("");
     setNewFolderColor(parentFolder?.color || "#00B3A6");
+    setFolderNameError("");
+    setFolderColorError(null);
+    setFolderCreateError(null);
+    setFolderModalOpen(true);
+  };
+
+  /**
+   * Handles editing an existing folder
+   */
+  const handleEditFolderRequest = (folderId: string) => {
+    const folder = findFolderById(folders, folderId);
+    if (!folder) return;
+
+    setFolderModalMode("edit");
+    setEditingFolderId(folderId);
+    setFolderModalParentId(null);
+    setNewFolderName(folder.name);
+    setNewFolderColor(folder.color || "#00B3A6");
     setFolderNameError("");
     setFolderColorError(null);
     setFolderCreateError(null);
@@ -311,7 +333,9 @@ export default function NotesActivityPage() {
 
   const closeFolderModal = () => {
     setFolderModalOpen(false);
+    setFolderModalMode("create");
     setFolderModalParentId(null);
+    setEditingFolderId(null);
     setNewFolderName("");
     setFolderNameError("");
     setFolderColorError(null);
@@ -320,7 +344,7 @@ export default function NotesActivityPage() {
     setNewFolderColor("#00B3A6");
   };
 
-  const handleFolderCreate = async (event: FormEvent<HTMLFormElement>) => {
+  const handleFolderSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isCreatingFolder) {
       return;
@@ -344,55 +368,100 @@ export default function NotesActivityPage() {
     setIsCreatingFolder(true);
     setFolderCreateError(null);
 
-    const parentId = folderModalParentId;
-
     try {
-      const requestBody = {
-        name: trimmedName,
-        color: normalizedHex,
-        ...(parentId ? { parentId } : {}),
-      };
+      if (folderModalMode === "edit" && editingFolderId) {
+        // Update existing folder
+        const requestBody = {
+          name: trimmedName,
+          color: normalizedHex,
+        };
 
-      const response = await fetch("/api/nabu/folders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+        const response = await fetch(`/api/nabu/folders/${editingFolderId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
 
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.error || "Failed to create folder.");
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to update folder.");
+        }
+
+        const updatedFolder = payload?.data;
+        if (!updatedFolder) {
+          throw new Error("Unexpected response from server.");
+        }
+
+        // Update folder in the tree
+        const updateFolderInTree = (items: FolderItem[]): FolderItem[] => {
+          return items.map((item) => {
+            if (item.id === editingFolderId) {
+              return {
+                ...item,
+                name: updatedFolder.name,
+                color: updatedFolder.color || undefined,
+              };
+            }
+            if (item.children) {
+              return { ...item, children: updateFolderInTree(item.children) };
+            }
+            return item;
+          });
+        };
+
+        setFolders((current) => sortFolderItems(updateFolderInTree(current)));
+      } else {
+        // Create new folder
+        const parentId = folderModalParentId;
+        const requestBody = {
+          name: trimmedName,
+          color: normalizedHex,
+          ...(parentId ? { parentId } : {}),
+        };
+
+        const response = await fetch("/api/nabu/folders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to create folder.");
+        }
+
+        const createdFolder = payload?.data;
+        if (!createdFolder) {
+          throw new Error("Unexpected response from server.");
+        }
+
+        const newFolder: FolderItem = {
+          id: createdFolder.id,
+          name: createdFolder.name,
+          type: "folder",
+          expanded: false,
+          children: [],
+          color: createdFolder.color || undefined,
+          hasLoadedChildren: true, // New folder has no children yet
+          childCount: 0,
+        };
+
+        const parentIdFromResponse: string | null =
+          createdFolder.parentId ?? parentId ?? null;
+
+        setFolders((current) =>
+          insertFolderSorted(current, parentIdFromResponse, newFolder),
+        );
       }
-
-      const createdFolder = payload?.data;
-      if (!createdFolder) {
-        throw new Error("Unexpected response from server.");
-      }
-
-      const newFolder: FolderItem = {
-        id: createdFolder.id,
-        name: createdFolder.name,
-        type: "folder",
-        expanded: false,
-        children: [],
-        color: createdFolder.color || undefined,
-        hasLoadedChildren: true, // New folder has no children yet
-        childCount: 0,
-      };
-
-      const parentIdFromResponse: string | null =
-        createdFolder.parentId ?? parentId ?? null;
-
-      setFolders((current) =>
-        insertFolderSorted(current, parentIdFromResponse, newFolder),
-      );
 
       closeFolderModal();
     } catch (error) {
       setFolderCreateError(
-        error instanceof Error ? error.message : "Failed to create folder.",
+        error instanceof Error ? error.message : folderModalMode === "edit" ? "Failed to update folder." : "Failed to create folder.",
       );
     } finally {
       setIsCreatingFolder(false);
@@ -412,6 +481,7 @@ export default function NotesActivityPage() {
           onNoteSelect={setSelectedNote}
           onAddFolder={handleAddFolderRequest}
           onAddNote={handleAddNote}
+          onEditFolder={handleEditFolderRequest}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
         />
@@ -431,11 +501,13 @@ export default function NotesActivityPage() {
 
       <Dialog open={folderModalOpen} onOpenChange={(open) => (open ? setFolderModalOpen(true) : closeFolderModal())}>
         <DialogContent className="max-w-sm">
-          <form onSubmit={handleFolderCreate} className="space-y-6">
+          <form onSubmit={handleFolderSubmit} className="space-y-6">
             <DialogHeader>
-              <DialogTitle>Create a new folder</DialogTitle>
+              <DialogTitle>{folderModalMode === "edit" ? "Edit folder" : "Create a new folder"}</DialogTitle>
               <DialogDescription>
-                Give your folder a name and colour to organise your notes.
+                {folderModalMode === "edit" 
+                  ? "Update the folder name and colour."
+                  : "Give your folder a name and colour to organise your notes."}
               </DialogDescription>
             </DialogHeader>
 
@@ -507,7 +579,7 @@ export default function NotesActivityPage() {
                 {isCreatingFolder && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Create folder
+                {folderModalMode === "edit" ? "Update folder" : "Create folder"}
               </Button>
             </div>
           </form>

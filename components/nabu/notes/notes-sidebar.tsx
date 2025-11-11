@@ -18,6 +18,7 @@ interface NotesSidebarProps {
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
+  onEditFolder?: (folderId: string) => void;
   isLoadingFolders?: boolean;
   folderLoadError?: string | null;
 }
@@ -35,6 +36,7 @@ export function NotesSidebar({
   onNoteSelect,
   onAddFolder,
   onAddNote,
+  onEditFolder,
   isLoadingFolders,
   folderLoadError,
 }: NotesSidebarProps) {
@@ -118,6 +120,7 @@ export function NotesSidebar({
                     selectedId={selectedNote?.id || null}
                     onAddFolder={onAddFolder}
                     onAddNote={onAddNote}
+                    onEditFolder={onEditFolder}
                   />
                 ))}
               </div>
