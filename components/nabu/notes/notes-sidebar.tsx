@@ -10,9 +10,9 @@ import { FolderItem as FolderItemType } from "./types";
  */
 interface NotesSidebarProps {
   folders: FolderItemType[];
-  view: "feed" | "folders";
+  view: "feed" | "folders" | "editor";
   selectedNote: FolderItemType | null;
-  onViewChange: (view: "feed" | "folders") => void;
+  onViewChange: (view: "feed" | "folders" | "editor") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;

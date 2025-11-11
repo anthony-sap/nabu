@@ -237,6 +237,7 @@ model Note {
   folder         Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   title          String
   content        String         @db.Text
+  contentState   String?        @db.Text // Lexical editor serialized state (JSON)
   sourceThoughts String[]
   summary        String?        @db.Text
   embedding      Bytes?

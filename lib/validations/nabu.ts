@@ -85,7 +85,7 @@ export const tagResponseSchema = z.object({
 
 export const noteCreateSchema = z.object({
   title: z.string().min(1, "Title is required").max(500),
-  content: z.string().min(1, "Content is required"),
+  content: z.string().optional().default(""), // Content is optional, defaults to empty string
   contentState: z.string().optional(), // Lexical JSON state
   folderId: z.string().cuid().optional(),
   summary: z.string().max(2000).optional(),

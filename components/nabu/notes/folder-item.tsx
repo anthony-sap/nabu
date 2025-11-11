@@ -143,9 +143,10 @@ export function FolderItem({
       </div>
       
       {/* Recursively render children when folder is expanded */}
-      {isFolder && hasChildren && item.expanded && (
+      {isFolder && item.expanded && (
         <div>
-          {item.children!.map((child) => (
+          {/* Render subfolder children */}
+          {hasChildren && item.children!.map((child) => (
             <FolderItem
               key={child.id}
               item={child}
@@ -158,6 +159,35 @@ export function FolderItem({
               onEditFolder={onEditFolder}
             />
           ))}
+          
+          {/* Render notes within this folder */}
+          {item.notes && item.notes.length > 0 && (
+            <div className="space-y-0.5">
+              {item.notes.map((note) => (
+                <div
+                  key={note.id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-foreground/60 hover:bg-muted/30 hover:text-foreground"
+                  style={{ paddingLeft: `${(level + 1) * 12 + 12}px` }}
+                  onClick={() => {
+                    onSelect({
+                      id: note.id,
+                      name: note.title,
+                      type: "note",
+                    });
+                  }}
+                >
+                  <FileText className="h-4 w-4 text-primary/70" />
+                  <span className="text-sm flex-1 truncate">{note.title}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(note.updatedAt).toLocaleDateString('en-GB', { 
+                      day: '2-digit', 
+                      month: '2-digit' 
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

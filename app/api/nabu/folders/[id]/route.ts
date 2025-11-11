@@ -16,16 +16,17 @@ import {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
     const { searchParams } = new URL(req.url);
     const includeChildren = searchParams.get("includeChildren") === "true";
 
     const folder = await prisma.folder.findFirst({
       where: {
-        id: params.id,
+        id,
         userId,
         tenantId,
         deletedAt: null,

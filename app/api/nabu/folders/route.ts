@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         ...(includeNotes && {
           notes: {
             where: { deletedAt: null },
-            orderBy: { createdAt: "desc" },
+            orderBy: { updatedAt: "desc" },
             select: {
               id: true,
               title: true,

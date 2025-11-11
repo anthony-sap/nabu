@@ -16,14 +16,15 @@ import {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
 
     const note = await prisma.note.findFirst({
       where: {
-        id: params.id,
+        id,
         userId,
         tenantId,
         deletedAt: null,
@@ -122,13 +123,14 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
 
     // Verify ownership
-    const isOwner = await validateOwnership("note", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("note", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Note not found or access denied", 404);
     }
@@ -183,7 +185,7 @@ export async function PATCH(
     const note = await prisma.$transaction(async (tx) => {
       // Update note
       const updatedNote = await tx.note.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           ...noteData,
           updatedBy: userId,
@@ -194,14 +196,14 @@ export async function PATCH(
       if (tagIds !== undefined) {
         // Remove existing tags
         await tx.noteTag.deleteMany({
-          where: { noteId: params.id },
+          where: { noteId: id },
         });
 
         // Add new tags
         if (tagIds.length > 0) {
           await tx.noteTag.createMany({
             data: tagIds.map((tagId) => ({
-              noteId: params.id,
+              noteId: id,
               tagId,
               createdBy: userId,
             })),
@@ -211,7 +213,7 @@ export async function PATCH(
 
       // Fetch note with relations
       return await tx.note.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           folder: {
             select: {
@@ -261,20 +263,21 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
 
     // Verify ownership
-    const isOwner = await validateOwnership("note", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("note", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Note not found or access denied", 404);
     }
 
     // Soft delete note (thoughts relation preserved)
     await prisma.note.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         deletedAt: new Date(),
         updatedBy: userId,

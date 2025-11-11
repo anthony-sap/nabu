@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
+import { NoteEditor } from "./note-editor";
 import { SavedThought, FolderItem } from "./types";
 import { exampleThoughts, STORAGE_KEY } from "./constants";
 import { fetchRootFolders, fetchFolderChildren } from "./api";
@@ -38,8 +39,8 @@ import {
  * - Auto-sync across browser tabs
  */
 export default function NotesActivityPage() {
-  // View state: "feed" shows activity feed, "folders" shows selected note detail
-  const [view, setView] = useState<"feed" | "folders">("feed");
+  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor
+  const [view, setView] = useState<"feed" | "folders" | "editor">("feed");
   
   // Folder structure with expand/collapse state
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -50,6 +51,9 @@ export default function NotesActivityPage() {
   
   // Currently selected note in folder view
   const [selectedNote, setSelectedNote] = useState<FolderItem | null>(null);
+  
+  // Note being edited in editor view
+  const [editingNote, setEditingNote] = useState<{ id: string; folderId: string } | null>(null);
   
   // Array of all saved thoughts, sorted by creation date (newest first)
   const [thoughts, setThoughts] = useState<SavedThought[]>([]);
@@ -233,10 +237,26 @@ export default function NotesActivityPage() {
   /**
    * Handles view changes and clears selected note when returning to feed
    */
-  const handleViewChange = (newView: "feed" | "folders") => {
+  const handleViewChange = (newView: "feed" | "folders" | "editor") => {
     setView(newView);
     if (newView === "feed") {
       setSelectedNote(null);
+      setEditingNote(null);
+    }
+  };
+
+  /**
+   * Handles selecting a note - opens it in the editor
+   */
+  const handleNoteSelect = (item: FolderItem) => {
+    if (item.type === "note") {
+      // Open note in editor
+      setView("editor");
+      setEditingNote({ id: item.id, folderId: "" }); // We'll need to get folderId from the note
+    } else {
+      // Folder selection for detail view
+      setView("folders");
+      setSelectedNote(item);
     }
   };
 
@@ -276,34 +296,47 @@ export default function NotesActivityPage() {
 
   /**
    * Handles adding a new note to a folder
+   * Creates note on server with timestamp title and opens editor
    */
-  const handleAddNote = (folderId: string) => {
-    const noteName = prompt("Enter note title:");
-    if (!noteName?.trim()) return;
-
-    const addNote = (items: FolderItem[]): FolderItem[] => {
-      return items.map((item) => {
-        if (item.id === folderId && item.type === "folder") {
-          const newNote: FolderItem = {
-            id: `note-${Date.now()}`,
-            name: noteName.trim(),
-            type: "note",
-            tags: [],
-          };
-          return {
-            ...item,
-            children: [...(item.children || []), newNote],
-            expanded: true, // Auto-expand to show new note
-          };
-        }
-        if (item.children) {
-          return { ...item, children: addNote(item.children) };
-        }
-        return item;
+  const handleAddNote = async (folderId: string) => {
+    try {
+      // Generate timestamp-based title: "Unsaved dd-mm-yyyy HH:MM"
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
       });
-    };
+      const timeStr = now.toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+      const title = `Unsaved ${dateStr} ${timeStr}`;
+      
+      // Create note on server
+      const response = await fetch("/api/nabu/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content: "",
+          folderId,
+        }),
+      });
 
-    setFolders(addNote(folders));
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to create note");
+      }
+      
+      // Switch to editor view
+      setView("editor");
+      setEditingNote({ id: payload.data.id, folderId });
+    } catch (error) {
+      console.error("Failed to create note:", error);
+      // TODO: Show error toast to user
+    }
   };
 
   /**
@@ -478,7 +511,7 @@ export default function NotesActivityPage() {
           selectedNote={selectedNote}
           onViewChange={handleViewChange}
           onFolderToggle={toggleFolder}
-          onNoteSelect={setSelectedNote}
+          onNoteSelect={handleNoteSelect}
           onAddFolder={handleAddFolderRequest}
           onAddNote={handleAddNote}
           onEditFolder={handleEditFolderRequest}
@@ -486,12 +519,21 @@ export default function NotesActivityPage() {
           folderLoadError={folderLoadError}
         />
 
-        {/* Main Content Area: Activity feed or note detail view */}
+        {/* Main Content Area: Activity feed, note editor, or note detail view */}
         <div className="flex-1 min-w-0 bg-muted/15 px-6">
           {view === "feed" ? (
             <ActivityFeed
               thoughts={thoughts}
               onSaveThought={handleSaveThought}
+            />
+          ) : view === "editor" && editingNote ? (
+            <NoteEditor
+              noteId={editingNote.id}
+              folderId={editingNote.folderId}
+              onClose={() => {
+                setView("feed");
+                setEditingNote(null);
+              }}
             />
           ) : (
             <NoteDetailView selectedNote={selectedNote} />
