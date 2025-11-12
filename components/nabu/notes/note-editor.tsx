@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2 } from "lucide-react";
 import { LexicalEditor } from "./lexical-editor";
+import { SourceUrlList, SourceInfo } from "./source-url-list";
 
 /**
  * Props for the NoteEditor component
@@ -36,6 +37,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [isLoading, setIsLoading] = useState(true);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState<string | null>(null);
+  const [sourceUrls, setSourceUrls] = useState<SourceInfo[]>([]);
   
   // Track initial values to detect changes (dirty state)
   const [initialTitle, setInitialTitle] = useState("");
@@ -251,30 +253,36 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       {/* Scrollable content area */}
       <ScrollArea className="flex-1 overflow-y-auto">
         <div className="px-6 py-6 space-y-6">
-          {/* Title input */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Note title..."
+      {/* Title input */}
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Note title..."
             className="w-full text-2xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-none focus:outline-none"
-          />
+      />
 
-          {/* Lexical editor */}
+      {/* Lexical editor */}
           <div>
-            <LexicalEditor
-              value={content}
-              editorState={editorState}
-              onChange={(plainText, serializedState) => {
-                setContent(plainText);
-                setEditorState(serializedState);
-              }}
-              placeholder="Start writing your note..."
-              showToolbar={true}
-              autoFocus={true}
+        <LexicalEditor
+          value={content}
+          editorState={editorState}
+          onChange={(plainText, serializedState) => {
+            setContent(plainText);
+            setEditorState(serializedState);
+          }}
+          onSourceUrlsChanged={setSourceUrls}
+          placeholder="Start writing your note..."
+          showToolbar={true}
+          autoFocus={true}
               className="min-h-[400px]"
-            />
-          </div>
+        />
+        
+        {/* Display captured source URLs */}
+        {sourceUrls.length > 0 && (
+          <SourceUrlList sources={sourceUrls} className="mt-3" />
+        )}
+      </div>
         </div>
       </ScrollArea>
     </div>

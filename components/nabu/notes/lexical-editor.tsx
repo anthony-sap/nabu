@@ -54,6 +54,8 @@ import {
 import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor } from "lexical";
 import { useEffect, useRef, useState } from "react";
 import { LexicalToolbar } from "./lexical-toolbar";
+import { SourceUrlCapturePlugin } from "./lexical-source-capture-plugin";
+import { SourceUrlDisplayPlugin, SourceInfo } from "./lexical-source-display-plugin";
 
 /**
  * Custom mention component with tooltip
@@ -141,6 +143,7 @@ interface LexicalEditorProps {
   autoFocus?: boolean;
   className?: string;
   showToolbar?: boolean;
+  onSourceUrlsChanged?: (sources: SourceInfo[]) => void;
 }
 
 /**
@@ -166,9 +169,10 @@ const MARKDOWN_TRANSFORMERS = [
 
 /**
  * URL matchers for AutoLinkPlugin
+ * Includes support for localhost URLs
  */
 const URL_MATCHER =
-  /((https?:\/\/(www\.)?)|(www\.))[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/;
+  /((https?:\/\/(www\.|localhost|127\.0\.0\.1))|(www\.))[-a-zA-Z0-9@:%._+~#=]{0,256}(\.[-a-zA-Z0-9()]{1,6})?\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/;
 
 const EMAIL_MATCHER =
   /(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))/;
@@ -284,6 +288,7 @@ export function LexicalEditor({
   autoFocus = false,
   className = "",
   showToolbar = false,
+  onSourceUrlsChanged,
 }: LexicalEditorProps) {
   /**
    * Mention items - folders, notes, thoughts for @, and tags for #
@@ -460,6 +465,10 @@ export function LexicalEditor({
         
         {/* Markdown Plugin - enables Markdown paste and shortcuts */}
         <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
+        
+        {/* Source URL Capture Plugins */}
+        <SourceUrlCapturePlugin />
+        <SourceUrlDisplayPlugin onSourceUrlsChanged={onSourceUrlsChanged} />
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin

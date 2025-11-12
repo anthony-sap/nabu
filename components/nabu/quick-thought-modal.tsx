@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useQuickThought, ThoughtDraft } from "./quick-thought-context";
 import { LexicalEditor } from "./notes/lexical-editor";
 import { toast } from "sonner";
+import { SourceUrlList, SourceInfo } from "./notes/source-url-list";
 
 /**
  * Props for the QuickThoughtModal component
@@ -42,6 +43,7 @@ const availableTags = ["idea", "todo", "meeting", "research", "planning", "perso
 export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
   const { updateDraft, deleteDraft, minimizeDraft } = useQuickThought();
   const [isSaving, setIsSaving] = useState(false);
+  const [sourceUrls, setSourceUrls] = useState<SourceInfo[]>([]);
 
   /**
    * Handle keyboard shortcuts within the modal
@@ -92,11 +94,11 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         source: "WEB" as const,
         suggestedTags: draft.selectedTags,
         meta: {
-          title: draft.title.trim() || "Untitled",
-          folder: draft.selectedFolder,
+      title: draft.title.trim() || "Untitled",
+      folder: draft.selectedFolder,
           contentState: draft.editorState || undefined, // Store Lexical state in meta
         },
-      };
+    };
 
       // Call API to create thought
       const response = await fetch("/api/nabu/thoughts", {
@@ -133,38 +135,38 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
       <DialogContent className="max-w-[95vw] w-full lg:max-w-6xl max-h-[90vh] bg-card border-border flex flex-col p-0" showCloseButton={false}>
           {/* Header - fixed at top */}
           <div className="px-6 pt-6 pb-4 border-b border-border/50 flex-shrink-0">
-            <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="flex items-center gap-2 text-foreground">
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                  Quick Thought
-                </DialogTitle>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => minimizeDraft(draft.id)}
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  >
-                    <Minimize2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteDraft(draft.id)}
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-foreground">
+                <Lightbulb className="h-5 w-5 text-primary" />
+                Quick Thought
+              </DialogTitle>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => minimizeDraft(draft.id)}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteDraft(draft.id)}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Capture your ideas quickly. 
-                <kbd className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+K</kbd> to open • 
-                <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+S</kbd> to save • 
-                <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">Esc</kbd> to minimize
-              </p>
-            </DialogHeader>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Capture your ideas quickly. 
+              <kbd className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+K</kbd> to open • 
+              <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+S</kbd> to save • 
+              <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">Esc</kbd> to minimize
+            </p>
+          </DialogHeader>
           </div>
 
         {/* Scrollable content area */}
@@ -189,7 +191,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
             <label className="text-sm font-medium text-foreground mb-2 block">
               Content <span className="text-destructive">*</span>
             </label>
-              <LexicalEditor
+            <LexicalEditor
               value={draft.content}
               editorState={draft.editorState}
               onChange={(plainText, serializedState) => 
@@ -198,11 +200,17 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
                   editorState: serializedState 
                 })
               }
+              onSourceUrlsChanged={setSourceUrls}
               placeholder="What's on your mind?"
               autoFocus
               showToolbar
               className="min-h-[300px]"
             />
+            
+            {/* Display captured source URLs */}
+            {sourceUrls.length > 0 && (
+              <SourceUrlList sources={sourceUrls} className="mt-3" />
+            )}
           </div>
 
           {/* Folder selection */}
@@ -254,7 +262,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
               ))}
             </div>
           </div>
-          </div>
+        </div>
         </ScrollArea>
 
         {/* Action buttons - fixed at bottom */}
@@ -277,8 +285,8 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
               </>
             ) : (
               <>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                Save Thought
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Save Thought
               </>
             )}
           </Button>
