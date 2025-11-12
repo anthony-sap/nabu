@@ -16,6 +16,16 @@ export interface SavedThought {
 }
 
 /**
+ * Represents a note item within a folder (title only, no content)
+ */
+export interface NoteItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Represents a folder or note item in the folder tree structure
  */
 export interface FolderItem {
@@ -26,5 +36,10 @@ export interface FolderItem {
   expanded?: boolean;
   children?: FolderItem[];
   tags?: string[];
+  isLoading?: boolean; // true while fetching children from API
+  hasLoadedChildren?: boolean; // true if children have been fetched from API
+  childCount?: number; // total count of children from API _count.children
+  notes?: NoteItem[]; // notes within this folder (titles only, all notes loaded)
+  notesLoading?: boolean; // true while fetching notes
 }
 

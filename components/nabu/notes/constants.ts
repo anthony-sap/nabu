@@ -35,65 +35,11 @@ export const exampleThoughts: SavedThought[] = [
 ];
 
 /**
- * Static folder structure for organizing notes
- * TODO: Make this dynamic and user-editable in future versions
+ * Static folder structure - NO LONGER USED
+ * Folders are now loaded from the API
+ * Kept for reference only
  */
-export const folderStructure: FolderItem[] = [
-  {
-    id: "1",
-    name: "Product Strategy",
-    type: "folder",
-    color: "#00B3A6", // Nabu mint
-    expanded: true,
-    children: [
-      {
-        id: "1-1",
-        name: "Roadmap 2024",
-        type: "folder",
-        color: "#00B3A6",
-        expanded: false,
-        children: [
-          { id: "1-1-1", name: "Q1 Planning.md", type: "note", tags: ["planning", "strategy"] },
-          { id: "1-1-2", name: "Feature Prioritization.md", type: "note", tags: ["roadmap"] },
-        ],
-      },
-      { id: "1-2", name: "Market Research.md", type: "note", tags: ["research", "competitive"] },
-      { id: "1-3", name: "User Personas.md", type: "note", tags: ["ux", "research"] },
-    ],
-  },
-  {
-    id: "2",
-    name: "Engineering",
-    type: "folder",
-    color: "#1E40AF", // Lapis
-    expanded: false,
-    children: [
-      { id: "2-1", name: "Architecture Decisions.md", type: "note", tags: ["technical", "architecture"] },
-      { id: "2-2", name: "API Documentation.md", type: "note", tags: ["api", "docs"] },
-      {
-        id: "2-3",
-        name: "Sprint Notes",
-        type: "folder",
-        color: "#1E40AF",
-        children: [
-          { id: "2-3-1", name: "Sprint 23.md", type: "note", tags: ["sprint"] },
-          { id: "2-3-2", name: "Sprint 24.md", type: "note", tags: ["sprint"] },
-        ],
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "Team Meetings",
-    type: "folder",
-    color: "#E0C36A", // Gold access
-    expanded: false,
-    children: [
-      { id: "3-1", name: "Weekly Standups.md", type: "note", tags: ["meetings"] },
-      { id: "3-2", name: "All-Hands May 2024.md", type: "note", tags: ["meetings", "company"] },
-    ],
-  },
-];
+// export const folderStructure: FolderItem[] = [];
 
 /**
  * LocalStorage key for persisting saved thoughts

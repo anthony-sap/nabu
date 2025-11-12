@@ -71,6 +71,18 @@ enum SharePermission {
   EDIT
 }
 
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TagSource {
+  USER_ADDED
+  AI_SUGGESTED
+}
+
 model Tenant {
   id         String       @id @default(cuid())
   status     StatusEnum   @default(ENABLE)
@@ -228,55 +240,64 @@ model Tag {
 }
 
 model Note {
-  id             String         @id @default(cuid())
-  tenantId       String?
-  tenant         Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  folderId       String?
-  folder         Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  title          String
-  content        String         @db.Text
-  sourceThoughts String[]
-  summary        String?        @db.Text
-  embedding      Bytes?
-  visibility     NoteVisibility @default(PRIVATE)
-  status         StatusEnum     @default(ENABLE)
-  createdAt      DateTime       @default(now())
-  createdBy      String?
-  updatedAt      DateTime       @default(now()) @updatedAt
-  updatedBy      String?
-  deletedAt      DateTime?
-  noteTags       NoteTag[]
-  attachments    Attachment[]
-  outgoingLinks  NoteLink[]     @relation("NoteOutgoing")
-  incomingLinks  NoteLink[]     @relation("NoteIncoming")
-  thoughts       Thought[]
+  id                   String         @id @default(cuid())
+  tenantId             String?
+  tenant               Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId             String?
+  folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  title                String
+  content              String         @db.Text
+  contentState         String?        @db.Text // Lexical editor serialized state (JSON)
+  sourceThoughts       String[]
+  summary              String?        @db.Text
+  embedding            Bytes?
+  visibility           NoteVisibility @default(PRIVATE)
+  status               StatusEnum     @default(ENABLE)
+  tagSuggestionStatus  String?        // "pending", "completed", null
+  lastTagSuggestionAt  DateTime?      // When last suggestion was made (cooldown)
+  lastTagModifiedAt    DateTime?      // When user last manually modified tags
+  pendingJobId         String?        // Current pending job ID
+  createdAt            DateTime       @default(now())
+  createdBy            String?
+  updatedAt            DateTime       @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+  noteTags             NoteTag[]
+  attachments          Attachment[]
+  outgoingLinks        NoteLink[]     @relation("NoteOutgoing")
+  incomingLinks        NoteLink[]     @relation("NoteIncoming")
+  thoughts             Thought[]
 
   @@index([tenantId, userId])
   @@index([folderId])
 }
 
 model Thought {
-  id            String        @id @default(cuid())
-  tenantId      String?
-  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  noteId        String?
-  note          Note?         @relation(fields: [noteId], references: [id], onDelete: SetNull)
-  content       String        @db.Text
-  source        ThoughtSource
-  state         ThoughtState  @default(NEW)
-  suggestedTags String[]
-  embedding     Bytes?
-  meta          Json?
-  createdAt     DateTime      @default(now())
-  createdBy     String?
-  updatedAt     DateTime      @default(now()) @updatedAt
-  updatedBy     String?
-  deletedAt     DateTime?
-  attachments   Attachment[]
+  id                   String        @id @default(cuid())
+  tenantId             String?
+  tenant               Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId               String?
+  note                 Note?         @relation(fields: [noteId], references: [id], onDelete: SetNull)
+  content              String        @db.Text
+  source               ThoughtSource
+  state                ThoughtState  @default(NEW)
+  suggestedTags        String[]
+  embedding            Bytes?
+  meta                 Json?
+  tagSuggestionStatus  String?       // "pending", "completed", null
+  lastTagSuggestionAt  DateTime?     // When last suggestion was made (cooldown)
+  lastTagModifiedAt    DateTime?     // When user last manually modified tags
+  pendingJobId         String?       // Current pending job ID
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+  attachments          Attachment[]
 
   @@index([tenantId, userId])
   @@index([noteId])
@@ -286,7 +307,8 @@ model NoteTag {
   noteId     String
   tagId      String
   confidence Float?
-  createdAt  DateTime @default(now())
+  source     TagSource @default(USER_ADDED)
+  createdAt  DateTime  @default(now())
   createdBy  String?
 
   note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -311,6 +333,37 @@ model NoteLink {
   @@index([tenantId])
   @@index([fromNoteId])
   @@index([toNoteId])
+}
+
+model TagSuggestionJob {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  userId        String
+  entityType    String    // "NOTE" or "THOUGHT"
+  entityId      String
+  content       String    @db.Text
+  status        JobStatus @default(PENDING)
+  
+  // Results
+  suggestedTags String[]  // Tag names suggested by AI
+  confidence    Float?    // Overall confidence score
+  
+  // Metadata
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  error         String?   @db.Text
+  consumed      Boolean   @default(false) // Prevents reuse
+  
+ createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([consumed])
 }
 
 model Attachment {

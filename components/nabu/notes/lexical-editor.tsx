@@ -16,6 +16,7 @@ import { AutoLinkPlugin } from "@lexical/react/LexicalAutoLinkPlugin";
 import { ClickableLinkPlugin } from "@lexical/react/LexicalClickableLinkPlugin";
 import { TablePlugin } from "@lexical/react/LexicalTablePlugin";
 import { TableOfContentsPlugin } from "@lexical/react/LexicalTableOfContentsPlugin";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { 
   BeautifulMentionsPlugin, 
   BeautifulMentionNode,
@@ -32,10 +33,29 @@ import { LinkNode, AutoLinkNode } from "@lexical/link";
 import { HashtagNode } from "@lexical/hashtag";
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
 import { CodeNode, CodeHighlightNode } from "@lexical/code";
+import {
+  HEADING,
+  QUOTE,
+  CODE,
+  UNORDERED_LIST,
+  ORDERED_LIST,
+  CHECK_LIST,
+  LINK,
+  BOLD_ITALIC_STAR,
+  BOLD_ITALIC_UNDERSCORE,
+  BOLD_STAR,
+  BOLD_UNDERSCORE,
+  INLINE_CODE,
+  ITALIC_STAR,
+  ITALIC_UNDERSCORE,
+  STRIKETHROUGH,
+} from "@lexical/markdown";
 
 import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor } from "lexical";
 import { useEffect, useRef, useState } from "react";
 import { LexicalToolbar } from "./lexical-toolbar";
+import { SourceUrlCapturePlugin } from "./lexical-source-capture-plugin";
+import { SourceUrlDisplayPlugin, SourceInfo } from "./lexical-source-display-plugin";
 
 /**
  * Custom mention component with tooltip
@@ -123,13 +143,36 @@ interface LexicalEditorProps {
   autoFocus?: boolean;
   className?: string;
   showToolbar?: boolean;
+  onSourceUrlsChanged?: (sources: SourceInfo[]) => void;
 }
 
 /**
+ * Markdown transformers for paste and typing shortcuts
+ */
+const MARKDOWN_TRANSFORMERS = [
+  HEADING,
+  QUOTE,
+  CODE,
+  UNORDERED_LIST,
+  ORDERED_LIST,
+  CHECK_LIST,
+  LINK,
+  BOLD_ITALIC_STAR,
+  BOLD_ITALIC_UNDERSCORE,
+  BOLD_STAR,
+  BOLD_UNDERSCORE,
+  INLINE_CODE,
+  ITALIC_STAR,
+  ITALIC_UNDERSCORE,
+  STRIKETHROUGH,
+];
+
+/**
  * URL matchers for AutoLinkPlugin
+ * Includes support for localhost URLs
  */
 const URL_MATCHER =
-  /((https?:\/\/(www\.)?)|(www\.))[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/;
+  /((https?:\/\/(www\.|localhost|127\.0\.0\.1))|(www\.))[-a-zA-Z0-9@:%._+~#=]{0,256}(\.[-a-zA-Z0-9()]{1,6})?\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/;
 
 const EMAIL_MATCHER =
   /(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))/;
@@ -186,6 +229,16 @@ function ContentSyncPlugin({
         try {
           const parsedState = editor.parseEditorState(serializedState);
           editor.setEditorState(parsedState);
+          
+          // Restore source URLs from serialized state to root node
+          const stateJSON = JSON.parse(serializedState);
+          if (stateJSON.root?.__sourceUrls) {
+            editor.update(() => {
+              const root = $getRoot();
+              const writableRoot = root.getWritable() as any;
+              writableRoot.__sourceUrls = stateJSON.root.__sourceUrls;
+            });
+          }
         } catch (error) {
           console.error("Failed to parse editor state:", error);
           // Fall back to plain text
@@ -245,7 +298,11 @@ export function LexicalEditor({
   autoFocus = false,
   className = "",
   showToolbar = false,
+  onSourceUrlsChanged,
 }: LexicalEditorProps) {
+  // Store source URLs outside editor state to prevent loss on edits
+  const sourceUrlsRef = useRef<string[]>([]);
+  
   /**
    * Mention items - folders, notes, thoughts for @, and tags for #
    */
@@ -347,7 +404,7 @@ export function LexicalEditor({
         listitemChecked: "line-through opacity-60",
         listitemUnchecked: "list-item",
       },
-      link: "text-primary hover:text-primary/80 underline cursor-pointer",
+      link: "text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline",
       hashtag: "text-primary/80 font-medium",
       text: {
         bold: "font-bold",
@@ -356,7 +413,7 @@ export function LexicalEditor({
         strikethrough: "line-through",
         code: "bg-muted px-1.5 py-0.5 rounded text-sm font-mono",
       },
-      code: "bg-muted p-4 rounded-lg font-mono text-sm block my-4 overflow-x-auto",
+      code: "bg-muted p-4 rounded-lg font-mono text-sm block my-4 overflow-x-auto max-w-full whitespace-pre-wrap break-words",
       table: "border-collapse table-auto w-full my-4",
       tableCell: "border border-border p-2",
       tableCellHeader: "border border-border p-2 bg-muted font-semibold",
@@ -368,12 +425,26 @@ export function LexicalEditor({
 
   /**
    * Handle content changes - extract both plain text and serialized state
+   * Also preserve source URLs in the serialized state
    */
   const handleChange = (editorState: EditorState, editor: LexicalEditor) => {
     editorState.read(() => {
       const root = $getRoot();
       const plainText = root.getTextContent();
-      const serialized = JSON.stringify(editorState.toJSON());
+      
+      // Get the standard serialized state
+      const stateJSON = editorState.toJSON();
+      
+      // Add source URLs from root node to the serialized state
+      const sourceUrls = (root as any).__sourceUrls;
+      if (sourceUrls && Array.isArray(sourceUrls) && sourceUrls.length > 0) {
+        stateJSON.root = {
+          ...stateJSON.root,
+          __sourceUrls: sourceUrls,
+        };
+      }
+      
+      const serialized = JSON.stringify(stateJSON);
       onChange(plainText, serialized);
     });
   };
@@ -386,7 +457,7 @@ export function LexicalEditor({
           <RichTextPlugin
             contentEditable={
               <ContentEditable
-                className="w-full px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none resize-none min-h-[120px] overflow-auto bg-transparent"
+                className="w-full px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none resize-none min-h-[120px] overflow-y-visible bg-transparent"
                 aria-placeholder={placeholder}
               />
             }
@@ -418,6 +489,13 @@ export function LexicalEditor({
         <TabIndentationPlugin />
         <HashtagPlugin />
         <TablePlugin />
+        
+        {/* Markdown Plugin - enables Markdown paste and shortcuts */}
+        <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
+        
+        {/* Source URL Capture Plugins */}
+        <SourceUrlCapturePlugin sourceUrlsRef={sourceUrlsRef} />
+        <SourceUrlDisplayPlugin sourceUrlsRef={sourceUrlsRef} onSourceUrlsChanged={onSourceUrlsChanged} />
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin

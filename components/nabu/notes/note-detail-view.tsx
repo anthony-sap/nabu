@@ -5,7 +5,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Edit, Save, X } from "lucide-react";
+import { FileText, Edit, Save, X, Folder } from "lucide-react";
 import { FolderItem } from "./types";
 import { LexicalEditor } from "./lexical-editor";
 

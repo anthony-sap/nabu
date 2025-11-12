@@ -1,23 +1,47 @@
-import { Card, CardHeader } from "@/components/ui/card";
+import { useRef, useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Home } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Home, AlertCircle, FileText, Trash2, Lightbulb } from "lucide-react";
+import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
-import { FolderItem as FolderItemType } from "./types";
+import { FolderItem as FolderItemType, NoteItem } from "./types";
+import { DragData } from "./drag-drop-utils";
 
 /**
  * Props for the NotesSidebar component
  */
 interface NotesSidebarProps {
   folders: FolderItemType[];
-  view: "feed" | "folders";
+  rootNotes: NoteItem[];
+  view: "feed" | "folders" | "editor" | "thoughts";
   selectedNote: FolderItemType | null;
-  onViewChange: (view: "feed" | "folders") => void;
+  editingNoteId?: string | null;
+  onViewChange: (view: "feed" | "folders" | "editor" | "thoughts") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
-  onAddFolder?: (parentId: string) => void;
+  onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
+  onEditFolder?: (folderId: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  onDeleteNote?: (noteId: string) => void;
+  onMoveFolder?: (folderId: string, newParentId: string | null) => void;
+  onMoveNote?: (noteId: string, newFolderId: string | null) => void;
+  isLoadingFolders?: boolean;
+  folderLoadError?: string | null;
 }
+
+/**
+ * Format date for display in tree
+ */
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB', { 
+    day: '2-digit', 
+    month: '2-digit' 
+  });
+};
 
 /**
  * Sidebar component for notes navigation
@@ -25,48 +49,157 @@ interface NotesSidebarProps {
  */
 export function NotesSidebar({
   folders,
+  rootNotes,
   view,
   selectedNote,
+  editingNoteId,
   onViewChange,
   onFolderToggle,
   onNoteSelect,
   onAddFolder,
   onAddNote,
+  onEditFolder,
+  onDeleteFolder,
+  onDeleteNote,
+  onMoveFolder,
+  onMoveNote,
+  isLoadingFolders,
+  folderLoadError,
 }: NotesSidebarProps) {
+  const [isRootDropTarget, setIsRootDropTarget] = useState(false);
+  const uncategorisedRef = useRef<HTMLDivElement>(null);
+  const rootDropZoneRef = useRef<HTMLButtonElement>(null);
+
+  // Setup drop target for Uncategorised section (notes only)
+  useEffect(() => {
+    const element = uncategorisedRef.current;
+    if (!element) return;
+
+    const cleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = source.data as DragData;
+        // Only notes can be dropped in uncategorised
+        return data.type === "note";
+      },
+      onDragEnter: () => setIsRootDropTarget(true),
+      onDragLeave: () => setIsRootDropTarget(false),
+      onDrop: ({ source }) => {
+        setIsRootDropTarget(false);
+        const data = source.data as DragData;
+        if (data.type === "note" && onMoveNote) {
+          onMoveNote(data.id, null); // null means root level
+        }
+      },
+    });
+
+    return cleanup;
+  }, [onMoveNote]);
+
+  // Setup drop target for root folder drop zone
+  useEffect(() => {
+    const element = rootDropZoneRef.current;
+    if (!element) return;
+
+    const cleanup = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = source.data as DragData;
+        // Only folders can be moved to root
+        return data.type === "folder";
+      },
+      onDragEnter: () => setIsRootDropTarget(true),
+      onDragLeave: () => setIsRootDropTarget(false),
+      onDrop: ({ source }) => {
+        setIsRootDropTarget(false);
+        const data = source.data as DragData;
+        if (data.type === "folder" && onMoveFolder) {
+          onMoveFolder(data.id, null); // null means root level
+        }
+      },
+    });
+
+    return cleanup;
+  }, [onMoveFolder]);
   return (
-    <div className="w-72 flex-shrink-0">
-      <Card className="h-full bg-card border-border shadow-nabu-card flex flex-col">
-        {/* Header */}
-        <CardHeader className="pb-4 border-b border-border/50">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="font-serif font-bold text-lg text-foreground">Knowledge Hub</h2>
+    <div className="w-72 flex-shrink-0 h-full border-r border-border/20 flex flex-col">
+   
+      
+      {/* Navigation content */}
+      <ScrollArea className="flex-1">
+        <div className="p-3 pb-6 space-y-1">
+          {/* Feed navigation option */}
+          <div
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              view === "feed"
+                ? "bg-primary/10 text-primary font-medium"
+                : "hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => {
+              onViewChange("feed");
+            }}
+          >
+            <Home className="h-4 w-4" />
+            <span className="text-sm">Feed</span>
           </div>
-          <p className="text-xs text-muted-foreground">Explore feed or browse notes</p>
-        </CardHeader>
-        
-        {/* Navigation content */}
-        <ScrollArea className="flex-1">
-          <div className="p-3 space-y-1">
-            {/* Feed navigation option */}
-            <div
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                view === "feed"
-                  ? "bg-primary/15 text-primary font-medium border border-primary/20 shadow-sm"
-                  : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+
+          {/* Thoughts navigation option */}
+          <div
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              view === "thoughts"
+                ? "bg-primary/10 text-primary font-medium"
+                : "hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => {
+              onViewChange("thoughts");
+            }}
+          >
+            <Lightbulb className="h-4 w-4" />
+            <span className="text-sm">Thoughts</span>
+          </div>
+          
+          <Separator className="my-2 bg-border/20" />
+
+          {/* Root-level new folder - also serves as drop zone for moving folders to root */}
+          {onAddFolder && !isLoadingFolders && (
+            <button
+              ref={rootDropZoneRef}
+              type="button"
+              onClick={() => onAddFolder(null)}
+              className={`flex w-full items-center justify-center gap-2 rounded-md border border-dashed px-3 py-1.5 text-xs font-medium transition ${
+                isRootDropTarget
+                  ? "border-primary bg-primary/20 text-primary"
+                  : "border-border/40 bg-muted/30 text-foreground/70 hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
               }`}
-              onClick={() => {
-                onViewChange("feed");
-              }}
             >
-              <Home className="h-4 w-4" />
-              <span className="text-sm">Feed</span>
+              <Sparkles className="h-3.5 w-3.5" />
+              New Folder
+            </button>
+          )}
+          
+          {/* Loading state - 5 skeleton folders */}
+          {isLoadingFolders && (
+            <div className="space-y-1.5 mt-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2">
+                  <Skeleton className="h-4 w-4 rounded" />
+                  <Skeleton className="h-3.5 flex-1" />
+                </div>
+              ))}
             </div>
-            
-            <Separator className="my-3 bg-border/50" />
-            
-            {/* Folder hierarchy */}
-            <div className="space-y-0.5">
+          )}
+
+          {/* Error state */}
+          {folderLoadError && !isLoadingFolders && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive mt-2">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{folderLoadError}</span>
+            </div>
+          )}
+
+          {/* Folder hierarchy */}
+          {!isLoadingFolders && !folderLoadError && (
+            <div className="space-y-0.5 mt-2">
               {folders.map((folder) => (
                 <FolderItem
                   key={folder.id}
@@ -77,15 +210,76 @@ export function NotesSidebar({
                     onViewChange("folders");
                     onNoteSelect(item);
                   }}
-                  selectedId={selectedNote?.id || null}
-                  onAddFolder={onAddFolder}
-                  onAddNote={onAddNote}
-                />
+                    selectedId={selectedNote?.id || null}
+                    editingNoteId={editingNoteId}
+                    onAddFolder={onAddFolder}
+                    onAddNote={onAddNote}
+                    onEditFolder={onEditFolder}
+                    onDeleteFolder={onDeleteFolder}
+                    onDeleteNote={onDeleteNote}
+                  onMoveFolder={onMoveFolder}
+                  onMoveNote={onMoveNote}
+                  allFolders={folders}
+                  />
               ))}
             </div>
-          </div>
-        </ScrollArea>
-      </Card>
+          )}
+
+          {/* Uncategorised section for root-level notes */}
+          {!isLoadingFolders && rootNotes.length > 0 && (
+            <>
+              <Separator className="my-3 bg-border/20" />
+              <div className="space-y-0.5" ref={uncategorisedRef}>
+                <div className={`text-xs font-medium text-muted-foreground px-3 py-1.5 rounded-md transition-colors ${
+                  isRootDropTarget ? "bg-primary/20" : ""
+                }`}>
+                  Uncategorised
+                </div>
+                {rootNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors group h-8 ${
+                      editingNoteId === note.id
+                        ? "bg-primary/20 text-foreground font-medium"
+                        : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
+                    }`}
+                    style={{ paddingLeft: '24px' }}
+                    onClick={() => {
+                      onNoteSelect({
+                        id: note.id,
+                        name: note.title,
+                        type: "note",
+                      });
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm flex-1 truncate">{note.title}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+                        {formatDate(note.updatedAt)}
+                      </span>
+                      {onDeleteNote && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteNote(note.id);
+                          }}
+                          title="Delete note"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }
