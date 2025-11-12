@@ -18,6 +18,8 @@ interface NotesSidebarProps {
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
   onEditFolder?: (folderId: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  onDeleteNote?: (noteId: string) => void;
   isLoadingFolders?: boolean;
   folderLoadError?: string | null;
 }
@@ -36,6 +38,8 @@ export function NotesSidebar({
   onAddFolder,
   onAddNote,
   onEditFolder,
+  onDeleteFolder,
+  onDeleteNote,
   isLoadingFolders,
   folderLoadError,
 }: NotesSidebarProps) {
@@ -108,11 +112,13 @@ export function NotesSidebar({
                     onViewChange("folders");
                     onNoteSelect(item);
                   }}
-                  selectedId={selectedNote?.id || null}
-                  onAddFolder={onAddFolder}
-                  onAddNote={onAddNote}
-                  onEditFolder={onEditFolder}
-                />
+                    selectedId={selectedNote?.id || null}
+                    onAddFolder={onAddFolder}
+                    onAddNote={onAddNote}
+                    onEditFolder={onEditFolder}
+                    onDeleteFolder={onDeleteFolder}
+                    onDeleteNote={onDeleteNote}
+                  />
               ))}
             </div>
           )}

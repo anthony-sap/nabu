@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Folder, Loader2, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2 } from "lucide-react";
 import { LexicalEditor } from "./lexical-editor";
 
 /**
@@ -13,6 +13,7 @@ interface NoteEditorProps {
   noteId: string;
   folderId: string;
   onClose?: () => void;
+  onDelete?: () => void;
 }
 
 /**
@@ -25,7 +26,7 @@ interface NoteEditorProps {
  * - Visual save status indicator
  * - Folder context badge
  */
-export function NoteEditor({ noteId, folderId, onClose }: NoteEditorProps) {
+export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [editorState, setEditorState] = useState("");
@@ -189,7 +190,7 @@ export function NoteEditor({ noteId, folderId, onClose }: NoteEditorProps) {
     <div className="h-full flex flex-col pt-6">
       {/* Header with back button, folder badge, and save status */}
       <div className="flex items-center justify-between pb-4 mb-6 border-b border-border/20">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button 
             variant="ghost" 
             size="sm"
@@ -200,10 +201,22 @@ export function NoteEditor({ noteId, folderId, onClose }: NoteEditorProps) {
             Back
           </Button>
           
+          {onDelete && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Note
+            </Button>
+          )}
+          
           {folderName && (
             <Badge 
               variant="secondary" 
-              className="gap-1.5 bg-secondary/15 text-secondary border-secondary/20 font-normal"
+              className="gap-1.5 bg-secondary/15 text-secondary border-secondary/20 font-normal ml-2"
             >
               <Folder className="h-3 w-3" style={{ color: folderColor || undefined }} />
               {folderName}

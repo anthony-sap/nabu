@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2, Edit } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FolderItem as FolderItemType } from "./types";
@@ -18,6 +18,8 @@ interface FolderItemProps {
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
   onEditFolder?: (folderId: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  onDeleteNote?: (noteId: string) => void;
 }
 
 /**
@@ -43,7 +45,9 @@ export function FolderItem({
   selectedId,
   onAddFolder,
   onAddNote,
-  onEditFolder
+  onEditFolder,
+  onDeleteFolder,
+  onDeleteNote
 }: FolderItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isFolder = item.type === "folder";
@@ -150,6 +154,20 @@ export function FolderItem({
                 <FilePlus className="h-4 w-4" />
               </Button>
             )}
+            {onDeleteFolder && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteFolder(item.id);
+                }}
+                title="Delete folder"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -169,6 +187,8 @@ export function FolderItem({
               onAddFolder={onAddFolder}
               onAddNote={onAddNote}
               onEditFolder={onEditFolder}
+              onDeleteFolder={onDeleteFolder}
+              onDeleteNote={onDeleteNote}
             />
           ))}
           
@@ -190,9 +210,25 @@ export function FolderItem({
                 >
                   <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                   <span className="text-sm flex-1 truncate">{note.title}</span>
-                  <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
-                    {formatDate(note.updatedAt)}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+                      {formatDate(note.updatedAt)}
+                    </span>
+                    {onDeleteNote && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteNote(note.id);
+                        }}
+                        title="Delete note"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </>

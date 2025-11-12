@@ -7,7 +7,8 @@ import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
 import { NoteEditor } from "./note-editor";
-import { SavedThought, FolderItem } from "./types";
+import { DeleteConfirmationModal } from "./delete-confirmation-modal";
+import { SavedThought, FolderItem, NoteItem } from "./types";
 import { exampleThoughts, STORAGE_KEY } from "./constants";
 import { fetchRootFolders, fetchFolderChildren } from "./api";
 import {
@@ -69,6 +70,17 @@ export default function NotesActivityPage() {
   const [folderColorError, setFolderColorError] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
+
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<"folder" | "note" | null>(null);
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [deleteItemName, setDeleteItemName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showMoveOption, setShowMoveOption] = useState(false);
+  const [moveAction, setMoveAction] = useState<"delete" | "move">("delete");
+  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+  const [availableFolders, setAvailableFolders] = useState<FolderItem[]>([]);
 
   /**
    * Load folders from API on component mount
@@ -295,6 +307,30 @@ export default function NotesActivityPage() {
   };
 
   /**
+   * Adds a note to a folder's notes array in the tree
+   */
+  const addNoteToFolder = (folderId: string, note: NoteItem) => {
+    const updateFolderInTree = (items: FolderItem[]): FolderItem[] => {
+      return items.map((item) => {
+        if (item.id === folderId) {
+          // Add the new note to the folder's notes array
+          const existingNotes = item.notes || [];
+          return {
+            ...item,
+            notes: [...existingNotes, note],
+          };
+        }
+        if (item.children) {
+          return { ...item, children: updateFolderInTree(item.children) };
+        }
+        return item;
+      });
+    };
+    
+    setFolders((current) => updateFolderInTree(current));
+  };
+
+  /**
    * Handles adding a new note to a folder
    * Creates note on server with timestamp title and opens editor
    */
@@ -330,6 +366,15 @@ export default function NotesActivityPage() {
         throw new Error(payload?.error || "Failed to create note");
       }
       
+      // Add the new note to the folder tree immediately
+      const newNote: NoteItem = {
+        id: payload.data.id,
+        title: payload.data.title,
+        createdAt: payload.data.createdAt,
+        updatedAt: payload.data.updatedAt,
+      };
+      addNoteToFolder(folderId, newNote);
+      
       // Switch to editor view
       setView("editor");
       setEditingNote({ id: payload.data.id, folderId });
@@ -356,6 +401,237 @@ export default function NotesActivityPage() {
     }
     return undefined;
   }
+
+  /**
+   * Helper to find a note's name by ID within the folder tree
+   */
+  function findNoteNameById(items: FolderItem[], noteId: string): string | null {
+    for (const item of items) {
+      if (item.notes) {
+        const note = item.notes.find(n => n.id === noteId);
+        if (note) return note.title;
+      }
+      if (item.children) {
+        const found = findNoteNameById(item.children, noteId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Helper to remove a folder from the tree
+   */
+  function removeFolderFromTree(items: FolderItem[], folderId: string): FolderItem[] {
+    return items
+      .filter(item => item.id !== folderId)
+      .map(item => ({
+        ...item,
+        children: item.children ? removeFolderFromTree(item.children, folderId) : undefined
+      }));
+  }
+
+  /**
+   * Helper to remove a note from the tree
+   */
+  function removeNoteFromTree(items: FolderItem[], noteId: string): FolderItem[] {
+    return items.map(item => ({
+      ...item,
+      notes: item.notes?.filter(note => note.id !== noteId),
+      children: item.children ? removeNoteFromTree(item.children, noteId) : undefined
+    }));
+  }
+
+  /**
+   * Flatten folder tree to a list
+   */
+  function flattenFolders(items: FolderItem[], result: FolderItem[] = []): FolderItem[] {
+    items.forEach(item => {
+      if (item.type === "folder") {
+        result.push(item);
+        if (item.children) {
+          flattenFolders(item.children, result);
+        }
+      }
+    });
+    return result;
+  }
+
+  /**
+   * Get all descendant IDs of a folder
+   */
+  function getAllDescendantIds(items: FolderItem[], folderId: string): string[] {
+    const folder = findFolderById(items, folderId);
+    if (!folder || !folder.children) return [];
+    
+    const ids: string[] = [];
+    function collectIds(children: FolderItem[]) {
+      children.forEach(child => {
+        ids.push(child.id);
+        if (child.children) {
+          collectIds(child.children);
+        }
+      });
+    }
+    collectIds(folder.children);
+    return ids;
+  }
+
+  /**
+   * Get list of folders excluding the one being deleted and its descendants
+   */
+  function getAvailableFoldersForMove(allFolders: FolderItem[], excludeId: string): FolderItem[] {
+    const descendants = getAllDescendantIds(allFolders, excludeId);
+    return flattenFolders(allFolders).filter(
+      f => f.id !== excludeId && !descendants.includes(f.id)
+    );
+  }
+
+  /**
+   * Handles delete folder request - opens confirmation modal
+   */
+  const handleDeleteFolderRequest = (folderId: string) => {
+    const folder = findFolderById(folders, folderId);
+    if (!folder) return;
+    
+    // Check if folder has notes or children
+    const hasNotes = (folder.notes?.length ?? 0) > 0;
+    const hasChildren = (folder.childCount ?? 0) > 0 || (folder.children?.length ?? 0) > 0;
+    const hasContents = hasNotes || hasChildren;
+    
+    // If folder has contents, prepare available folders for moving
+    if (hasContents) {
+      const available = getAvailableFoldersForMove(folders, folderId);
+      setAvailableFolders(available);
+      setShowMoveOption(true);
+      setMoveAction("delete");
+      setTargetFolderId(null);
+    } else {
+      setShowMoveOption(false);
+    }
+    
+    setDeleteType("folder");
+    setDeleteItemId(folderId);
+    setDeleteItemName(folder.name);
+    setDeleteModalOpen(true);
+  };
+
+  /**
+   * Handles delete note request - opens confirmation modal
+   */
+  const handleDeleteNoteRequest = (noteId: string) => {
+    const noteName = findNoteNameById(folders, noteId) || "this note";
+    
+    setDeleteType("note");
+    setDeleteItemId(noteId);
+    setDeleteItemName(noteName);
+    setDeleteModalOpen(true);
+  };
+
+  /**
+   * Move folder contents (notes and subfolders) to another folder
+   */
+  async function moveFolderContents(fromFolderId: string, toFolderId: string) {
+    const folder = findFolderById(folders, fromFolderId);
+    if (!folder) return;
+    
+    // Move all notes
+    if (folder.notes) {
+      for (const note of folder.notes) {
+        await fetch(`/api/nabu/notes/${note.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folderId: toFolderId })
+        });
+      }
+    }
+    
+    // Move all child folders
+    if (folder.children) {
+      for (const child of folder.children) {
+        await fetch(`/api/nabu/folders/${child.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ parentId: toFolderId })
+        });
+      }
+    }
+  }
+
+  /**
+   * Handles confirmed deletion - calls API and updates UI
+   */
+  const handleDeleteConfirm = async () => {
+    if (!deleteItemId || !deleteType) return;
+    
+    // Validate move target if moving
+    if (deleteType === "folder" && moveAction === "move" && !targetFolderId) {
+      alert("Please select a target folder");
+      return;
+    }
+    
+    setIsDeleting(true);
+    
+    try {
+      if (deleteType === "folder") {
+        // If moving contents, update children and notes first
+        if (moveAction === "move" && targetFolderId) {
+          await moveFolderContents(deleteItemId, targetFolderId);
+        }
+        
+        // Then delete the folder
+        const response = await fetch(`/api/nabu/folders/${deleteItemId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload?.error || "Failed to delete folder");
+        }
+        
+        setFolders(current => removeFolderFromTree(current, deleteItemId));
+      } else {
+        // Delete note (simple soft delete)
+        const response = await fetch(`/api/nabu/notes/${deleteItemId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload?.error || "Failed to delete note");
+        }
+        
+        setFolders(current => removeNoteFromTree(current, deleteItemId));
+        
+        // If we're editing this note, go back to feed
+        if (editingNote?.id === deleteItemId) {
+          setView("feed");
+          setEditingNote(null);
+        }
+      }
+      
+      // Close modal and reset state
+      setDeleteModalOpen(false);
+      setDeleteType(null);
+      setDeleteItemId(null);
+      setDeleteItemName("");
+      setShowMoveOption(false);
+      setMoveAction("delete");
+      setTargetFolderId(null);
+      setAvailableFolders([]);
+      
+      // Reload folders to get updated tree
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+    } catch (error) {
+      console.error(`Failed to delete ${deleteType}:`, error);
+      alert(error instanceof Error ? error.message : `Failed to delete ${deleteType}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleFolderNameChange = (value: string) => {
     setNewFolderName(value);
@@ -515,6 +791,8 @@ export default function NotesActivityPage() {
           onAddFolder={handleAddFolderRequest}
           onAddNote={handleAddNote}
           onEditFolder={handleEditFolderRequest}
+          onDeleteFolder={handleDeleteFolderRequest}
+          onDeleteNote={handleDeleteNoteRequest}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
         />
@@ -534,6 +812,7 @@ export default function NotesActivityPage() {
                 setView("feed");
                 setEditingNote(null);
               }}
+              onDelete={() => handleDeleteNoteRequest(editingNote.id)}
             />
           ) : (
             <NoteDetailView selectedNote={selectedNote} />
@@ -627,6 +906,36 @@ export default function NotesActivityPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setDeleteType(null);
+          setDeleteItemId(null);
+          setDeleteItemName("");
+          setShowMoveOption(false);
+          setMoveAction("delete");
+          setTargetFolderId(null);
+          setAvailableFolders([]);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title={deleteType === "folder" ? "Delete Folder?" : "Delete Note?"}
+        description={
+          deleteType === "folder"
+            ? "This folder will be archived and can be recovered later. You can also move its contents to another folder."
+            : "This note will be archived and can be recovered later."
+        }
+        itemName={deleteItemName}
+        isDeleting={isDeleting}
+        showMoveOption={showMoveOption}
+        folders={availableFolders}
+        selectedMoveFolder={targetFolderId}
+        onMoveFolderChange={setTargetFolderId}
+        moveAction={moveAction}
+        onMoveActionChange={setMoveAction}
+      />
     </>
   );
 }
