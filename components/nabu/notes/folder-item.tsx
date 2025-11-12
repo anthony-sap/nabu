@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Loader2, Edit, Trash2 } from "lucide-react";
+import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FolderItem as FolderItemType } from "./types";
+import { DragData } from "./drag-drop-utils";
 
 /**
  * Props for the FolderItem component
@@ -20,6 +22,9 @@ interface FolderItemProps {
   onEditFolder?: (folderId: string) => void;
   onDeleteFolder?: (folderId: string) => void;
   onDeleteNote?: (noteId: string) => void;
+  onMoveFolder?: (folderId: string, newParentId: string | null) => void;
+  onMoveNote?: (noteId: string, newFolderId: string | null) => void;
+  allFolders?: FolderItemType[]; // Full folder tree for validation
 }
 
 /**
@@ -32,6 +37,87 @@ const formatDate = (dateString: string) => {
     month: '2-digit' 
   });
 };
+
+/**
+ * Note row component with drag functionality
+ */
+function NoteRow({ 
+  note, 
+  folderId, 
+  paddingLeft, 
+  onSelect, 
+  onDeleteNote 
+}: {
+  note: { id: string; title: string; updatedAt: string };
+  folderId: string;
+  paddingLeft: string;
+  onSelect: (item: FolderItemType) => void;
+  onDeleteNote?: (noteId: string) => void;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const noteRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = noteRef.current;
+    if (!element) return;
+
+    const cleanup = draggable({
+      element,
+      getInitialData: () => {
+        const dragData: DragData = {
+          type: "note",
+          id: note.id,
+          name: note.title,
+          folderId: folderId,
+        };
+        return dragData;
+      },
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    return cleanup;
+  }, [note.id, note.title, folderId]);
+
+  return (
+    <div
+      ref={noteRef}
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-foreground/60 hover:bg-muted/30 hover:text-foreground group h-8 ${
+        isDragging ? "opacity-50" : ""
+      }`}
+      style={{ paddingLeft }}
+      onClick={() => {
+        onSelect({
+          id: note.id,
+          name: note.title,
+          type: "note",
+        });
+      }}
+    >
+      <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+      <span className="text-sm flex-1 truncate">{note.title}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+          {formatDate(note.updatedAt)}
+        </span>
+        {onDeleteNote && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteNote(note.id);
+            }}
+            title="Delete note"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Recursive component for rendering folder tree items
@@ -47,21 +133,153 @@ export function FolderItem({
   onAddNote,
   onEditFolder,
   onDeleteFolder,
-  onDeleteNote
+  onDeleteNote,
+  onMoveFolder,
+  onMoveNote,
+  allFolders = []
 }: FolderItemProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const folderRef = useRef<HTMLDivElement>(null);
+  
   const isFolder = item.type === "folder";
   const hasChildren = item.children && item.children.length > 0;
   const isSelected = selectedId === item.id;
   const hasUnloadedChildren = isFolder && !item.hasLoadedChildren && (item.childCount ?? 0) > 0;
   const canExpand = hasChildren || hasUnloadedChildren;
 
+  // Setup drag and drop for folders
+  useEffect(() => {
+    const element = folderRef.current;
+    if (!element || !isFolder) return;
+
+    // Make folder draggable
+    const cleanup1 = draggable({
+      element,
+      getInitialData: () => {
+        const dragData: DragData = {
+          type: "folder",
+          id: item.id,
+          name: item.name,
+          parentId: getParentId(allFolders, item.id),
+        };
+        return dragData;
+      },
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    // Make folder a drop target
+    const cleanup2 = dropTargetForElements({
+      element,
+      canDrop: ({ source }) => {
+        const data = source.data as unknown as DragData;
+        
+        // Can't drop on yourself
+        if (data.id === item.id) {
+          return false;
+        }
+
+        // If dropping a folder, check for circular references
+        if (data.type === "folder") {
+          const descendants = getAllDescendantIds(allFolders, data.id);
+          if (descendants.includes(item.id)) {
+            return false;
+          }
+        }
+
+        return true;
+      },
+      onDragEnter: () => setIsDragOver(true),
+      onDragLeave: () => setIsDragOver(false),
+      onDrop: ({ source }) => {
+        setIsDragOver(false);
+        const data = source.data as unknown as DragData;
+        
+        if (data.type === "folder" && onMoveFolder) {
+          onMoveFolder(data.id, item.id);
+        } else if (data.type === "note" && onMoveNote) {
+          onMoveNote(data.id, item.id);
+        }
+      },
+    });
+
+    return () => {
+      cleanup1();
+      cleanup2();
+    };
+  }, [item.id, item.name, isFolder, onMoveFolder, onMoveNote, allFolders]);
+
+  /**
+   * Get parent ID of a folder
+   */
+  function getParentId(items: FolderItemType[], targetId: string, currentParentId: string | null = null): string | null {
+    for (const folder of items) {
+      if (folder.id === targetId) {
+        return currentParentId;
+      }
+      if (folder.children) {
+        const found = getParentId(folder.children, targetId, folder.id);
+        if (found !== undefined) {
+          return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get all descendant folder IDs
+   */
+  function getAllDescendantIds(items: FolderItemType[], folderId: string): string[] {
+    const folder = findFolderById(items, folderId);
+    if (!folder || !folder.children) return [];
+
+    const ids: string[] = [];
+    function collectIds(children: FolderItemType[]) {
+      children.forEach((child) => {
+        if (child.type === "folder") {
+          ids.push(child.id);
+          if (child.children) {
+            collectIds(child.children);
+          }
+        }
+      });
+    }
+    collectIds(folder.children);
+    return ids;
+  }
+
+  /**
+   * Find folder by ID
+   */
+  function findFolderById(items: FolderItemType[], id: string): FolderItemType | undefined {
+    for (const item of items) {
+      if (item.id === id) {
+        return item;
+      }
+      if (item.children) {
+        const found = findFolderById(item.children, id);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  }
+
   return (
     <div>
       <div
+        ref={folderRef}
         className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors relative group h-8 ${
           isSelected
             ? "bg-primary/10 text-primary font-medium"
+            : isDragOver
+            ? "bg-primary/20 text-foreground"
+            : isDragging
+            ? "opacity-50"
             : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
         }`}
         style={{ paddingLeft: `${8 + (level * 16)}px` }}
@@ -189,6 +407,9 @@ export function FolderItem({
               onEditFolder={onEditFolder}
               onDeleteFolder={onDeleteFolder}
               onDeleteNote={onDeleteNote}
+              onMoveFolder={onMoveFolder}
+              onMoveNote={onMoveNote}
+              allFolders={allFolders}
             />
           ))}
           
@@ -196,40 +417,14 @@ export function FolderItem({
           {item.notes && item.notes.length > 0 && (
             <>
               {item.notes.map((note) => (
-                <div
+                <NoteRow
                   key={note.id}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-foreground/60 hover:bg-muted/30 hover:text-foreground group h-8"
-                  style={{ paddingLeft: `${8 + ((level + 1) * 16) + 16 + 10}px` }}
-                  onClick={() => {
-                    onSelect({
-                      id: note.id,
-                      name: note.title,
-                      type: "note",
-                    });
-                  }}
-                >
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm flex-1 truncate">{note.title}</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
-                      {formatDate(note.updatedAt)}
-                    </span>
-                    {onDeleteNote && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteNote(note.id);
-                        }}
-                        title="Delete note"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                  note={note}
+                  folderId={item.id}
+                  paddingLeft={`${8 + ((level + 1) * 16) + 16 + 10}px`}
+                  onSelect={onSelect}
+                  onDeleteNote={onDeleteNote}
+                />
               ))}
             </>
           )}

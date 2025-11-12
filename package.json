@@ -24,6 +24,8 @@
     "seed": "tsx run.ts scripts/seed.ts"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^1.7.7",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@auth/prisma-adapter": "^2.9.1",
     "@hookform/resolvers": "^5.1.1",
     "@kinde-oss/kinde-auth-nextjs": "^2.7.0",

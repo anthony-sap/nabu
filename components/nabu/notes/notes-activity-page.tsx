@@ -46,6 +46,9 @@ export default function NotesActivityPage() {
   // Folder structure with expand/collapse state
   const [folders, setFolders] = useState<FolderItem[]>([]);
   
+  // Root-level notes (uncategorised)
+  const [rootNotes, setRootNotes] = useState<NoteItem[]>([]);
+  
   // Loading state for initial folder fetch
   const [isLoadingFolders, setIsLoadingFolders] = useState(true);
   const [folderLoadError, setFolderLoadError] = useState<string | null>(null);
@@ -102,6 +105,33 @@ export default function NotesActivityPage() {
     };
 
     loadFolders();
+  }, []);
+
+  /**
+   * Load root-level notes (uncategorised) on component mount
+   */
+  useEffect(() => {
+    const loadRootNotes = async () => {
+      try {
+        const response = await fetch('/api/nabu/notes?folderId=null');
+        if (!response.ok) {
+          throw new Error('Failed to fetch root notes');
+        }
+        const data = await response.json();
+        if (data.success && data.data.notes) {
+          setRootNotes(data.data.notes.map((note: any) => ({
+            id: note.id,
+            title: note.title,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load root notes:', error);
+      }
+    };
+
+    loadRootNotes();
   }, []);
 
   /**
@@ -328,6 +358,77 @@ export default function NotesActivityPage() {
     };
     
     setFolders((current) => updateFolderInTree(current));
+  };
+
+  /**
+   * Handles moving a folder to a new parent
+   */
+  const handleMoveFolder = async (folderId: string, newParentId: string | null) => {
+    try {
+      // Optimistically update UI by removing folder from old location
+      const folderToMove = findFolderById(folders, folderId);
+      if (!folderToMove) return;
+
+      // Call API to update parentId
+      const response = await fetch(`/api/nabu/folders/${folderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentId: newParentId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to move folder");
+      }
+
+      // Reload folders to get updated structure
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+    } catch (error) {
+      console.error("Failed to move folder:", error);
+      // TODO: Show error toast
+      // Reload folders on error to revert optimistic update
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+    }
+  };
+
+  /**
+   * Handles moving a note to a new folder (or root level)
+   */
+  const handleMoveNote = async (noteId: string, newFolderId: string | null) => {
+    try {
+      // Call API to update folderId
+      const response = await fetch(`/api/nabu/notes/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId: newFolderId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to move note");
+      }
+
+      // Reload folders and root notes to get updated structure
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+      
+      // Reload root notes
+      const notesResponse = await fetch('/api/nabu/notes?folderId=null');
+      if (notesResponse.ok) {
+        const data = await notesResponse.json();
+        if (data.success && data.data.notes) {
+          setRootNotes(data.data.notes.map((note: any) => ({
+            id: note.id,
+            title: note.title,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          })));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to move note:", error);
+      // TODO: Show error toast
+    }
   };
 
   /**
@@ -783,6 +884,7 @@ export default function NotesActivityPage() {
         {/* Left Sidebar: Navigation and folder tree */}
         <NotesSidebar
           folders={folders}
+          rootNotes={rootNotes}
           view={view}
           selectedNote={selectedNote}
           onViewChange={handleViewChange}
@@ -793,6 +895,8 @@ export default function NotesActivityPage() {
           onEditFolder={handleEditFolderRequest}
           onDeleteFolder={handleDeleteFolderRequest}
           onDeleteNote={handleDeleteNoteRequest}
+          onMoveFolder={handleMoveFolder}
+          onMoveNote={handleMoveNote}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
         />
