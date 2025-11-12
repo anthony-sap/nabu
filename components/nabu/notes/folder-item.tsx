@@ -153,9 +153,25 @@ export function FolderItem({
   
   const isFolder = item.type === "folder";
   const hasChildren = item.children && item.children.length > 0;
+  const hasNotes = item.notes && item.notes.length > 0;
   const isSelected = selectedId === item.id;
   const hasUnloadedChildren = isFolder && !item.hasLoadedChildren && (item.childCount ?? 0) > 0;
-  const canExpand = hasChildren || hasUnloadedChildren;
+  // Folder can expand if it has loaded children, loaded notes, or indicates unloaded children
+  const canExpand = hasChildren || hasNotes || hasUnloadedChildren;
+  
+  // Debug logging
+  if (isFolder) {
+    console.log('FolderItem render:', {
+      name: item.name,
+      childCount: item.childCount,
+      notesCount: item.notes?.length || 0,
+      hasLoadedChildren: item.hasLoadedChildren,
+      hasChildren,
+      hasNotes,
+      hasUnloadedChildren,
+      canExpand,
+    });
+  }
 
   // Setup drag and drop for folders
   useEffect(() => {

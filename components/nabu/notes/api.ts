@@ -37,6 +37,31 @@ interface ApiFolderResponse {
  * Transform API folder response to FolderItem format
  */
 function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
+  // Fallback: if _count is empty/missing, calculate from actual data
+  const childCount = apiFolder._count?.children ?? apiFolder.children?.length ?? 0;
+  const notesCount = apiFolder._count?.notes ?? apiFolder.notes?.length ?? 0;
+  
+  console.log('Transforming folder:', {
+    id: apiFolder.id,
+    name: apiFolder.name,
+    _count: apiFolder._count,
+    childCount,
+    notesCount,
+    hasChildren: !!apiFolder.children,
+    childrenLength: apiFolder.children?.length || 0,
+    notesLength: apiFolder.notes?.length || 0,
+  });
+  
+  const transformedNotes = apiFolder.notes?.map(note => ({
+    id: note.id,
+    title: note.title,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  }));
+  
+  // hasLoadedChildren should be true if we have the actual children OR notes data
+  const hasLoadedChildren = !!apiFolder.children || (apiFolder.notes !== undefined);
+  
   return {
     id: apiFolder.id,
     name: apiFolder.name,
@@ -44,14 +69,9 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
     color: apiFolder.color || undefined,
     expanded: false,
     children: apiFolder.children?.map(transformFolder) || [],
-    hasLoadedChildren: !!apiFolder.children, // if children were included, mark as loaded
-    childCount: apiFolder._count?.children || 0,
-    notes: apiFolder.notes?.map(note => ({
-      id: note.id,
-      title: note.title,
-      createdAt: note.createdAt,
-      updatedAt: note.updatedAt,
-    })),
+    hasLoadedChildren: hasLoadedChildren,
+    childCount: childCount,
+    notes: transformedNotes,
   };
 }
 
@@ -76,6 +96,8 @@ export async function fetchRootFolders(includeNotes = true): Promise<FolderItem[
     }
 
     const data = await response.json();
+    
+    console.log('API Response for folders:', data);
     
     if (!data.success || !Array.isArray(data.data)) {
       throw new Error("Invalid response format from server");
