@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2 } from "lucide-react";
 import { LexicalEditor } from "./lexical-editor";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
+import { TagBadge } from "./tag-badge";
+import { TagSuggestionNotification } from "./tag-suggestion-notification";
+import { TagSuggestionModal } from "./tag-suggestion-modal";
+import { toast } from "sonner";
 
 /**
  * Props for the NoteEditor component
@@ -44,6 +48,22 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [initialContent, setInitialContent] = useState("");
   const [initialEditorState, setInitialEditorState] = useState("");
 
+  // Tag suggestion state
+  const [tags, setTags] = useState<Array<{
+    id: string;
+    name: string;
+    color?: string | null;
+    source?: "USER_ADDED" | "AI_SUGGESTED";
+    confidence?: number | null;
+  }>>([]);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [suggestedTags, setSuggestedTags] = useState<Array<{
+    name: string;
+    confidence?: number;
+  }>>([]);
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [showSuggestionNotification, setShowSuggestionNotification] = useState(false);
+
   /**
    * Load note data on mount
    */
@@ -79,11 +99,181 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         setFolderName(data.folder.name);
         setFolderColor(data.folder.color);
       }
+
+      // Load tags
+      if (data.noteTags && Array.isArray(data.noteTags)) {
+        setTags(data.noteTags.map((nt: any) => ({
+          id: nt.tag.id,
+          name: nt.tag.name,
+          color: nt.tag.color,
+          source: nt.source,
+          confidence: nt.confidence,
+        })));
+      }
+
+      // Check for pending job
+      if (data.pendingJobId) {
+        setPendingJobId(data.pendingJobId);
+      }
     } catch (error) {
       console.error("Failed to load note:", error);
       setSaveStatus("error");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  /**
+   * Request tag suggestions from AI
+   */
+  const requestTagSuggestions = useCallback(async () => {
+    if (content.length < 200 || tags.length >= 3 || pendingJobId) {
+      return; // Skip if content too short, enough tags, or job already pending
+    }
+
+    try {
+      const response = await fetch("/api/nabu/tag-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "NOTE",
+          entityId: noteId,
+          content,
+        }),
+      });
+
+      if (response.status === 429) {
+        // Cooldown active, silently skip
+        console.log("Tag suggestion cooldown active");
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        setPendingJobId(data.jobId);
+      }
+    } catch (error) {
+      console.error("Error requesting tag suggestions:", error);
+      // Fail gracefully, don't block save
+    }
+  }, [content, noteId, tags.length, pendingJobId]);
+
+  /**
+   * Poll for tag suggestion job status
+   */
+  useEffect(() => {
+    if (!pendingJobId) return;
+
+    let pollCount = 0;
+    const maxPolls = 20; // 1 minute timeout
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/nabu/tag-suggestions/${pendingJobId}`);
+        
+        if (!response.ok) {
+          clearInterval(pollInterval);
+          setPendingJobId(null);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.status === "COMPLETED") {
+          clearInterval(pollInterval);
+          setSuggestedTags(data.suggestedTags.map((name: string) => ({
+            name,
+            confidence: data.confidence,
+          })));
+          setShowSuggestionNotification(true);
+          setPendingJobId(null);
+        } else if (data.status === "FAILED") {
+          clearInterval(pollInterval);
+          setPendingJobId(null);
+        }
+
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          setPendingJobId(null);
+        }
+      } catch (error) {
+        console.error("Error polling tag suggestion:", error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [pendingJobId]);
+
+  /**
+   * Handle accepting suggested tags
+   */
+  const handleAcceptTags = async (selectedTagNames: string[]) => {
+    if (!pendingJobId) return;
+
+    try {
+      const response = await fetch(`/api/nabu/tag-suggestions/${pendingJobId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagNames: selectedTagNames }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to accept tags");
+      }
+
+      // Reload note to get updated tags
+      await loadNote();
+      setSuggestedTags([]);
+      setShowSuggestionNotification(false);
+    } catch (error) {
+      console.error("Error accepting tags:", error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle rejecting suggested tags
+   */
+  const handleRejectTags = async () => {
+    if (!pendingJobId) return;
+
+    try {
+      const response = await fetch(`/api/nabu/tag-suggestions/${pendingJobId}/reject`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reject tags");
+      }
+
+      setSuggestedTags([]);
+      setShowSuggestionNotification(false);
+      setPendingJobId(null);
+    } catch (error) {
+      console.error("Error rejecting tags:", error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle removing a tag
+   */
+  const handleRemoveTag = async (tagId: string) => {
+    try {
+      const response = await fetch(`/api/nabu/notes/${noteId}/tags/${tagId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to remove tag");
+      }
+
+      setTags(tags.filter(t => t.id !== tagId));
+      toast.success("Tag removed");
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      toast.error("Failed to remove tag");
     }
   }
 
@@ -117,6 +307,9 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       setInitialTitle(title);
       setInitialContent(content);
       setInitialEditorState(editorState);
+
+      // Request tag suggestions if eligible
+      await requestTagSuggestions();
     } catch (error) {
       console.error("Save failed:", error);
       setSaveStatus("error");
@@ -262,6 +455,33 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
             className="w-full text-2xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-none focus:outline-none"
       />
 
+      {/* Tags display */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <TagBadge
+              key={tag.id}
+              id={tag.id}
+              name={tag.name}
+              color={tag.color}
+              source={tag.source}
+              confidence={tag.confidence}
+              onRemove={handleRemoveTag}
+              removable={true}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Tag suggestion notification */}
+      {showSuggestionNotification && suggestedTags.length > 0 && (
+        <TagSuggestionNotification
+          suggestedTagsCount={suggestedTags.length}
+          onOpenModal={() => setShowSuggestionModal(true)}
+          onDismiss={() => setShowSuggestionNotification(false)}
+        />
+      )}
+
       {/* Lexical editor */}
           <div>
         <LexicalEditor
@@ -285,6 +505,18 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       </div>
         </div>
       </ScrollArea>
+
+      {/* Tag suggestion modal */}
+      {pendingJobId && suggestedTags.length > 0 && (
+        <TagSuggestionModal
+          open={showSuggestionModal}
+          onOpenChange={setShowSuggestionModal}
+          jobId={pendingJobId}
+          suggestions={suggestedTags}
+          onAccept={handleAcceptTags}
+          onReject={handleRejectTags}
+        />
+      )}
     </div>
   );
 }
