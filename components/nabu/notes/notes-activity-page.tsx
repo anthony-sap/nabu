@@ -2,14 +2,16 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Color from "color";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
 import { NoteEditor } from "./note-editor";
 import { ThoughtsActivityFeed } from "./thoughts-activity-feed";
+import { SearchDialog } from "./search-dialog";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { SavedThought, FolderItem, NoteItem } from "./types";
+import { SearchResult } from "./types-search";
 import { exampleThoughts, STORAGE_KEY } from "./constants";
 import { fetchRootFolders, fetchFolderChildren } from "./api";
 import {
@@ -86,6 +88,9 @@ export default function NotesActivityPage() {
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
   const [availableFolders, setAvailableFolders] = useState<FolderItem[]>([]);
 
+  // Search dialog state
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
+
   /**
    * Load folders from API on component mount
    */
@@ -116,7 +121,8 @@ export default function NotesActivityPage() {
       try {
         const response = await fetch('/api/nabu/notes?folderId=null');
         if (!response.ok) {
-          throw new Error('Failed to fetch root notes');
+          //throw new Error('Failed to fetch root notes');
+          
         }
         const data = await response.json();
         if (data.success && data.data.notes) {
@@ -172,6 +178,108 @@ export default function NotesActivityPage() {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  /**
+   * Setup keyboard shortcut for search (Cmd+Shift+F)
+   */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+        e.preventDefault();
+        setSearchDialogOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  /**
+   * Handle search result selection
+   */
+  const handleSearchResultSelect = async (result: SearchResult) => {
+    if (result.type === "note") {
+      // For notes: open in editor and expand folder
+      setView("editor");
+      setEditingNote({ id: result.id, folderId: result.folderId || "" });
+
+      // If note is in a folder, expand the folder path
+      if (result.folderId) {
+        await expandFolderPath(result.folderId);
+      }
+    } else if (result.type === "thought") {
+      // For thoughts: switch to thoughts view
+      setView("thoughts");
+      // Note: Scrolling to specific thought would require additional implementation
+    }
+  };
+
+  /**
+   * Expand folder path to make a specific folder visible
+   */
+  const expandFolderPath = async (targetFolderId: string) => {
+    const expandFolder = async (items: FolderItem[], folderId: string): Promise<FolderItem[]> => {
+      return Promise.all(
+        items.map(async (item) => {
+          if (item.id === folderId) {
+            // This is the target folder, expand it
+            let updatedItem = { ...item, expanded: true };
+
+            // If children haven't been loaded, load them
+            if (!item.hasLoadedChildren && (item.childCount ?? 0) > 0) {
+              try {
+                const children = await fetchFolderChildren(folderId);
+                updatedItem = {
+                  ...updatedItem,
+                  children: sortFolderItems(children),
+                  hasLoadedChildren: true,
+                };
+              } catch (error) {
+                console.error(`Failed to load children for folder ${folderId}:`, error);
+              }
+            }
+
+            return updatedItem;
+          }
+
+          // Check if target is in children
+          if (item.children) {
+            const hasTarget = findFolderById(item.children, folderId);
+            if (hasTarget) {
+              // Expand this folder and recurse into children
+              let updatedItem = { ...item, expanded: true };
+
+              // If children haven't been loaded, load them
+              if (!item.hasLoadedChildren && (item.childCount ?? 0) > 0) {
+                try {
+                  const children = await fetchFolderChildren(item.id);
+                  updatedItem = {
+                    ...updatedItem,
+                    children: await expandFolder(sortFolderItems(children), folderId),
+                    hasLoadedChildren: true,
+                  };
+                } catch (error) {
+                  console.error(`Failed to load children for folder ${item.id}:`, error);
+                }
+              } else {
+                updatedItem = {
+                  ...updatedItem,
+                  children: await expandFolder(item.children, folderId),
+                };
+              }
+
+              return updatedItem;
+            }
+          }
+
+          return item;
+        })
+      );
+    };
+
+    const expandedFolders = await expandFolder(folders, targetFolderId);
+    setFolders(expandedFolders);
+  };
 
   /**
    * Handles saving a new thought to localStorage and state
@@ -881,13 +989,32 @@ export default function NotesActivityPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-10rem)] gap-0">
+      {/* Page Header with Search */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/20">
+        <h1 className="text-2xl font-semibold text-foreground">Notes</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSearchDialogOpen(true)}
+          className="gap-2"
+        >
+          <Search className="h-4 w-4" />
+          <span>Search</span>
+          <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+            <span className="text-xs">⌘</span>
+            <span className="text-xs">⇧</span>F
+          </kbd>
+        </Button>
+      </div>
+
+      <div className="flex h-[calc(100vh-14rem)] gap-0">
         {/* Left Sidebar: Navigation and folder tree */}
         <NotesSidebar
           folders={folders}
           rootNotes={rootNotes}
           view={view}
           selectedNote={selectedNote}
+          editingNoteId={editingNote?.id || null}
           onViewChange={handleViewChange}
           onFolderToggle={toggleFolder}
           onNoteSelect={handleNoteSelect}
@@ -1013,6 +1140,13 @@ export default function NotesActivityPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Search Dialog */}
+      <SearchDialog
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        onSelectResult={handleSearchResultSelect}
+      />
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal

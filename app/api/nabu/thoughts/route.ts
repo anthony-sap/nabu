@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       state: searchParams.get("state") || undefined,
       source: searchParams.get("source") || undefined,
       noteId: searchParams.get("noteId") || undefined,
+      search: searchParams.get("search") || undefined,
       page: searchParams.get("page") || "1",
       limit: searchParams.get("limit") || "20",
     });
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       return errorResponse("Invalid query parameters", 400);
     }
 
-    const { state, source, noteId, page = 1, limit = 20 } = queryResult.data;
+    const { state, source, noteId, search, page = 1, limit = 20 } = queryResult.data;
 
     // Build query
     const where: any = {
@@ -50,6 +51,18 @@ export async function GET(req: NextRequest) {
 
     if (noteId !== undefined) {
       where.noteId = noteId;
+    }
+
+    if (search) {
+      where.OR = [
+        { content: { contains: search, mode: "insensitive" } },
+        {
+          meta: {
+            path: ["title"],
+            string_contains: search,
+          },
+        },
+      ];
     }
 
     // Calculate pagination

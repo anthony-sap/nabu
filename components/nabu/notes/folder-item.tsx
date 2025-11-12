@@ -17,6 +17,7 @@ interface FolderItemProps {
   onToggle: (id: string) => void;
   onSelect: (item: FolderItemType) => void;
   selectedId: string | null;
+  editingNoteId?: string | null;
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
   onEditFolder?: (folderId: string) => void;
@@ -46,13 +47,15 @@ function NoteRow({
   folderId, 
   paddingLeft, 
   onSelect, 
-  onDeleteNote 
+  onDeleteNote,
+  isEditing 
 }: {
   note: { id: string; title: string; updatedAt: string };
   folderId: string;
   paddingLeft: string;
   onSelect: (item: FolderItemType) => void;
   onDeleteNote?: (noteId: string) => void;
+  isEditing?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const noteRef = useRef<HTMLDivElement>(null);
@@ -82,8 +85,12 @@ function NoteRow({
   return (
     <div
       ref={noteRef}
-      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-foreground/60 hover:bg-muted/30 hover:text-foreground group h-8 ${
-        isDragging ? "opacity-50" : ""
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors group h-8 ${
+        isEditing
+          ? "bg-primary/20 text-foreground font-medium"
+          : isDragging
+          ? "opacity-50"
+          : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
       }`}
       style={{ paddingLeft }}
       onClick={() => {
@@ -129,6 +136,7 @@ export function FolderItem({
   onToggle, 
   onSelect, 
   selectedId,
+  editingNoteId,
   onAddFolder,
   onAddNote,
   onEditFolder,
@@ -402,6 +410,7 @@ export function FolderItem({
               onToggle={onToggle}
               onSelect={onSelect}
               selectedId={selectedId}
+              editingNoteId={editingNoteId}
               onAddFolder={onAddFolder}
               onAddNote={onAddNote}
               onEditFolder={onEditFolder}
@@ -424,6 +433,7 @@ export function FolderItem({
                   paddingLeft={`${8 + ((level + 1) * 16) + 16 + 10}px`}
                   onSelect={onSelect}
                   onDeleteNote={onDeleteNote}
+                  isEditing={editingNoteId === note.id}
                 />
               ))}
             </>

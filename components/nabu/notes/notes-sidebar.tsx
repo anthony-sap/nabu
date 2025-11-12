@@ -17,6 +17,7 @@ interface NotesSidebarProps {
   rootNotes: NoteItem[];
   view: "feed" | "folders" | "editor" | "thoughts";
   selectedNote: FolderItemType | null;
+  editingNoteId?: string | null;
   onViewChange: (view: "feed" | "folders" | "editor" | "thoughts") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
@@ -51,6 +52,7 @@ export function NotesSidebar({
   rootNotes,
   view,
   selectedNote,
+  editingNoteId,
   onViewChange,
   onFolderToggle,
   onNoteSelect,
@@ -209,6 +211,7 @@ export function NotesSidebar({
                     onNoteSelect(item);
                   }}
                     selectedId={selectedNote?.id || null}
+                    editingNoteId={editingNoteId}
                     onAddFolder={onAddFolder}
                     onAddNote={onAddNote}
                   onEditFolder={onEditFolder}
@@ -235,7 +238,11 @@ export function NotesSidebar({
                 {rootNotes.map((note) => (
                   <div
                     key={note.id}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-foreground/60 hover:bg-muted/30 hover:text-foreground group h-8"
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors group h-8 ${
+                      editingNoteId === note.id
+                        ? "bg-primary/20 text-foreground font-medium"
+                        : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
+                    }`}
                     style={{ paddingLeft: '24px' }}
                     onClick={() => {
                       onNoteSelect({

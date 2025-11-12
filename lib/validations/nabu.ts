@@ -197,6 +197,7 @@ export const thoughtQuerySchema = z.object({
   state: z.nativeEnum(ThoughtState).optional(),
   source: z.nativeEnum(ThoughtSource).optional(),
   noteId: z.string().cuid().optional(),
+  search: z.string().optional(),
   page: z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().min(1)).optional(),
   limit: z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().min(1).max(100)).optional(),
 });
