@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import Color from "color";
 import { Loader2, Search } from "lucide-react";
+import { toast } from "sonner";
 import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
@@ -32,6 +34,14 @@ import {
 } from "@/components/ui/color-picker";
 
 /**
+ * Props for NotesActivityPage component
+ */
+interface NotesActivityPageProps {
+  initialNoteId?: string;
+  initialThoughtId?: string;
+}
+
+/**
  * Main component for the Notes Activity Page
  * Combines activity feed, folder navigation, and note viewing functionality
  * 
@@ -41,8 +51,12 @@ import {
  * - Dual view system (feed vs folder/note detail)
  * - LocalStorage persistence for thoughts
  * - Auto-sync across browser tabs
+ * - URL-based routing for notes and thoughts
  */
-export default function NotesActivityPage() {
+export default function NotesActivityPage({ initialNoteId, initialThoughtId }: NotesActivityPageProps = {}) {
+  // Next.js navigation hooks
+  const router = useRouter();
+  const pathname = usePathname();
   // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor, "thoughts" shows thoughts feed
   const [view, setView] = useState<"feed" | "folders" | "editor" | "thoughts">("feed");
   
@@ -195,22 +209,119 @@ export default function NotesActivityPage() {
   }, []);
 
   /**
+   * Handle initial note/thought load from URL parameters
+   * Load and display the specified note or thought when component mounts or URL changes
+   */
+  useEffect(() => {
+    const loadInitialContent = async () => {
+      // Handle initial note load
+      if (initialNoteId) {
+        try {
+          const response = await fetch(`/api/nabu/notes/${initialNoteId}`);
+          if (!response.ok) {
+            if (response.status === 404) {
+              toast.error("Note not found", {
+                description: "This note may have been deleted or you don't have access to it."
+              });
+              router.push('/nabu/notes');
+              return;
+            }
+            if (response.status === 403) {
+              toast.error("Access denied", {
+                description: "You don't have permission to view this note."
+              });
+              router.push('/nabu/notes');
+              return;
+            }
+            throw new Error('Failed to fetch note');
+          }
+          
+          const { data } = await response.json();
+          
+          // Set view to editor mode
+          setView("editor");
+          setEditingNote({ id: initialNoteId, folderId: data.folder?.id || "" });
+          
+          // If note is in a folder, expand the folder path
+          if (data.folder?.id) {
+            await expandFolderPath(data.folder.id);
+          }
+        } catch (error) {
+          console.error('Failed to load initial note:', error);
+          toast.error("Failed to load note", {
+            description: "An error occurred while loading the note. Please try again."
+          });
+          router.push('/nabu/notes');
+        }
+      }
+      
+      // Handle initial thought load
+      else if (initialThoughtId) {
+        try {
+          const response = await fetch(`/api/nabu/thoughts/${initialThoughtId}`);
+          if (!response.ok) {
+            if (response.status === 404) {
+              toast.error("Thought not found", {
+                description: "This thought may have been deleted or you don't have access to it."
+              });
+              router.push('/nabu/notes');
+              return;
+            }
+            if (response.status === 403) {
+              toast.error("Access denied", {
+                description: "You don't have permission to view this thought."
+              });
+              router.push('/nabu/notes');
+              return;
+            }
+            throw new Error('Failed to fetch thought');
+          }
+          
+          // Switch to thoughts view
+          setView("thoughts");
+          // Note: Scrolling to specific thought or highlighting would be added here
+        } catch (error) {
+          console.error('Failed to load initial thought:', error);
+          toast.error("Failed to load thought", {
+            description: "An error occurred while loading the thought. Please try again."
+          });
+          router.push('/nabu/notes');
+        }
+      }
+      
+      // If no specific note/thought, show default view
+      else if (pathname === '/nabu/notes') {
+        setView("feed");
+        setEditingNote(null);
+      }
+    };
+
+    // Only load if folders have been loaded (prevents race conditions)
+    if (!isLoadingFolders) {
+      loadInitialContent();
+    }
+  }, [initialNoteId, initialThoughtId, isLoadingFolders, router, pathname]);
+
+  /**
+   * Handle browser back/forward navigation
+   * Detects URL changes from browser navigation and updates the view accordingly
+   */
+  useEffect(() => {
+    // This effect runs when pathname changes (e.g., browser back/forward)
+    // The initialNoteId/initialThoughtId props will change, triggering the previous useEffect
+    // This ensures the UI stays in sync with the URL
+  }, [pathname]);
+
+  /**
    * Handle search result selection
    */
   const handleSearchResultSelect = async (result: SearchResult) => {
     if (result.type === "note") {
-      // For notes: open in editor and expand folder
-      setView("editor");
-      setEditingNote({ id: result.id, folderId: result.folderId || "" });
-
-      // If note is in a folder, expand the folder path
-      if (result.folderId) {
-        await expandFolderPath(result.folderId);
-      }
+      // Navigate to note URL using search params
+      router.push(`/nabu/notes?noteId=${result.id}`);
     } else if (result.type === "thought") {
-      // For thoughts: switch to thoughts view
-      setView("thoughts");
-      // Note: Scrolling to specific thought would require additional implementation
+      // Navigate to thought URL using search params
+      router.push(`/nabu/notes?thoughtId=${result.id}`);
     }
   };
 
@@ -401,9 +512,8 @@ export default function NotesActivityPage() {
    */
   const handleNoteSelect = (item: FolderItem) => {
     if (item.type === "note") {
-      // Open note in editor
-      setView("editor");
-      setEditingNote({ id: item.id, folderId: "" }); // We'll need to get folderId from the note
+      // Navigate to note URL using search params (updates browser history)
+      router.push(`/nabu/notes?noteId=${item.id}`);
     } else {
       // Folder selection for detail view
       setView("folders");
@@ -585,9 +695,8 @@ export default function NotesActivityPage() {
       };
       addNoteToFolder(folderId, newNote);
       
-      // Switch to editor view
-      setView("editor");
-      setEditingNote({ id: payload.data.id, folderId });
+      // Navigate to new note URL using search params
+      router.push(`/nabu/notes?noteId=${payload.data.id}`);
     } catch (error) {
       console.error("Failed to create note:", error);
       // TODO: Show error toast to user

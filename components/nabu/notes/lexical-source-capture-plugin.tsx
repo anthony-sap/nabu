@@ -1,8 +1,8 @@
 "use client";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { useEffect } from "react";
-import { PASTE_COMMAND, COMMAND_PRIORITY_LOW, $getRoot } from "lexical";
+import { useEffect, RefObject } from "react";
+import { PASTE_COMMAND, COMMAND_PRIORITY_LOW } from "lexical";
 
 /**
  * Extract source URL from CF_HTML format

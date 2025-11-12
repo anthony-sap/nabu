@@ -229,6 +229,16 @@ function ContentSyncPlugin({
         try {
           const parsedState = editor.parseEditorState(serializedState);
           editor.setEditorState(parsedState);
+          
+          // Restore source URLs from serialized state to root node
+          const stateJSON = JSON.parse(serializedState);
+          if (stateJSON.root?.__sourceUrls) {
+            editor.update(() => {
+              const root = $getRoot();
+              const writableRoot = root.getWritable() as any;
+              writableRoot.__sourceUrls = stateJSON.root.__sourceUrls;
+            });
+          }
         } catch (error) {
           console.error("Failed to parse editor state:", error);
           // Fall back to plain text
@@ -290,6 +300,9 @@ export function LexicalEditor({
   showToolbar = false,
   onSourceUrlsChanged,
 }: LexicalEditorProps) {
+  // Store source URLs outside editor state to prevent loss on edits
+  const sourceUrlsRef = useRef<string[]>([]);
+  
   /**
    * Mention items - folders, notes, thoughts for @, and tags for #
    */
@@ -412,12 +425,26 @@ export function LexicalEditor({
 
   /**
    * Handle content changes - extract both plain text and serialized state
+   * Also preserve source URLs in the serialized state
    */
   const handleChange = (editorState: EditorState, editor: LexicalEditor) => {
     editorState.read(() => {
       const root = $getRoot();
       const plainText = root.getTextContent();
-      const serialized = JSON.stringify(editorState.toJSON());
+      
+      // Get the standard serialized state
+      const stateJSON = editorState.toJSON();
+      
+      // Add source URLs from root node to the serialized state
+      const sourceUrls = (root as any).__sourceUrls;
+      if (sourceUrls && Array.isArray(sourceUrls) && sourceUrls.length > 0) {
+        stateJSON.root = {
+          ...stateJSON.root,
+          __sourceUrls: sourceUrls,
+        };
+      }
+      
+      const serialized = JSON.stringify(stateJSON);
       onChange(plainText, serialized);
     });
   };
@@ -467,8 +494,8 @@ export function LexicalEditor({
         <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
         
         {/* Source URL Capture Plugins */}
-        <SourceUrlCapturePlugin />
-        <SourceUrlDisplayPlugin onSourceUrlsChanged={onSourceUrlsChanged} />
+        <SourceUrlCapturePlugin sourceUrlsRef={sourceUrlsRef} />
+        <SourceUrlDisplayPlugin sourceUrlsRef={sourceUrlsRef} onSourceUrlsChanged={onSourceUrlsChanged} />
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin
