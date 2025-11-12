@@ -386,7 +386,7 @@ export function LexicalEditor({
         listitemChecked: "line-through opacity-60",
         listitemUnchecked: "list-item",
       },
-      link: "text-primary hover:text-primary/80 underline cursor-pointer",
+      link: "text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline",
       hashtag: "text-primary/80 font-medium",
       text: {
         bold: "font-bold",
