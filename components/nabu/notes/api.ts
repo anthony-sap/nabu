@@ -41,17 +41,6 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
   const childCount = apiFolder._count?.children ?? apiFolder.children?.length ?? 0;
   const notesCount = apiFolder._count?.notes ?? apiFolder.notes?.length ?? 0;
   
-  console.log('Transforming folder:', {
-    id: apiFolder.id,
-    name: apiFolder.name,
-    _count: apiFolder._count,
-    childCount,
-    notesCount,
-    hasChildren: !!apiFolder.children,
-    childrenLength: apiFolder.children?.length || 0,
-    notesLength: apiFolder.notes?.length || 0,
-  });
-  
   const transformedNotes = apiFolder.notes?.map(note => ({
     id: note.id,
     title: note.title,
@@ -96,8 +85,6 @@ export async function fetchRootFolders(includeNotes = true): Promise<FolderItem[
     }
 
     const data = await response.json();
-    
-    console.log('API Response for folders:', data);
     
     if (!data.success || !Array.isArray(data.data)) {
       throw new Error("Invalid response format from server");

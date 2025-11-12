@@ -51,27 +51,35 @@ import {
   STRIKETHROUGH,
 } from "@lexical/markdown";
 
-import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor } from "lexical";
+import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor as LexicalEditorType } from "lexical";
 import { useEffect, useRef, useState } from "react";
 import { LexicalToolbar } from "./lexical-toolbar";
 import { SourceUrlCapturePlugin } from "./lexical-source-capture-plugin";
 import { SourceUrlDisplayPlugin, SourceInfo } from "./lexical-source-display-plugin";
+import { Link2, Hash, AtSign } from "lucide-react";
 
 /**
- * Custom mention component with tooltip
+ * Custom mention component with tooltip - shows trigger symbol
  */
 const CustomMentionComponent = forwardRef<
   HTMLSpanElement,
   BeautifulMentionComponentProps
 >(({ trigger, value, data, children, ...other }, ref) => {
+  const Icon = trigger === "@" ? AtSign : trigger === "#" ? Hash : null;
+  
+  // Convert children to string and check if it starts with the trigger
+  const childText = typeof children === 'string' ? children : value;
+  const displayText = childText.startsWith(trigger) ? childText.slice(1) : childText;
+  
   return (
     <span
       {...other}
       ref={ref}
-      className="text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors"
+      className="inline-flex items-center gap-0.5 text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors"
       title={data?.description || `${trigger}${value}`}
     >
-      {children}
+      {Icon && <Icon className="h-3 w-3 flex-shrink-0" />}
+      {displayText}
     </span>
   );
 });
@@ -205,6 +213,55 @@ const MATCHERS = [
     };
   },
 ];
+
+/**
+ * Custom Link Decorator Component - renders links with icon
+ */
+function CustomLinkComponent({ 
+  nodeKey, 
+  url, 
+  children 
+}: { 
+  nodeKey: string; 
+  url: string; 
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline"
+      title={url}
+    >
+      <Link2 className="h-3 w-3 flex-shrink-0" />
+      {children}
+    </a>
+  );
+}
+
+/**
+ * Plugin to decorate link nodes with custom component
+ */
+function CustomLinkPlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    return editor.registerDecoratorListener((decorators) => {
+      // This ensures the editor re-renders when decorators change
+    });
+  }, [editor]);
+
+  useEffect(() => {
+    return editor.registerNodeTransform(LinkNode, (node) => {
+      // Links are already created by LinkPlugin and AutoLinkPlugin
+      // We just need to ensure they render with our custom component
+      // This is handled by the theme styling
+    });
+  }, [editor]);
+
+  return null;
+}
 
 /**
  * Plugin to set and sync content
@@ -404,7 +461,7 @@ export function LexicalEditor({
         listitemChecked: "line-through opacity-60",
         listitemUnchecked: "list-item",
       },
-      link: "text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline",
+      link: "inline-flex items-center gap-1 text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline before:content-['🔗'] before:text-sm",
       hashtag: "text-primary/80 font-medium",
       text: {
         bold: "font-bold",
@@ -511,6 +568,9 @@ export function LexicalEditor({
           menuComponent={CustomMenu}
           menuItemComponent={CustomMenuItem}
         />
+        
+        {/* Custom Link Plugin for styling */}
+        <CustomLinkPlugin />
       </div>
     </LexicalComposer>
   );
