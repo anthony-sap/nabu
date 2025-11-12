@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lightbulb, Minimize2, X, Loader2 } from "lucide-react";
@@ -129,41 +130,46 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         minimizeDraft(draft.id);
       }
     }}>
-      <DialogContent className="max-w-[95vw] w-full lg:max-w-6xl bg-card border-border overflow-visible" showCloseButton={false}>
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2 text-foreground">
-                <Lightbulb className="h-5 w-5 text-primary" />
-                Quick Thought
-              </DialogTitle>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => minimizeDraft(draft.id)}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                >
-                  <Minimize2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deleteDraft(draft.id)}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+      <DialogContent className="max-w-[95vw] w-full lg:max-w-6xl max-h-[90vh] bg-card border-border flex flex-col p-0" showCloseButton={false}>
+          {/* Header - fixed at top */}
+          <div className="px-6 pt-6 pb-4 border-b border-border/50 flex-shrink-0">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2 text-foreground">
+                  <Lightbulb className="h-5 w-5 text-primary" />
+                  Quick Thought
+                </DialogTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => minimizeDraft(draft.id)}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <Minimize2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteDraft(draft.id)}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Capture your ideas quickly. 
-              <kbd className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+K</kbd> to open • 
-              <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+S</kbd> to save • 
-              <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">Esc</kbd> to minimize
-            </p>
-          </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Capture your ideas quickly. 
+                <kbd className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+K</kbd> to open • 
+                <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">⌘+S</kbd> to save • 
+                <kbd className="ml-1 px-1.5 py-0.5 bg-muted rounded text-[10px] border border-border">Esc</kbd> to minimize
+              </p>
+            </DialogHeader>
+          </div>
 
-        <div className="space-y-4 py-4 overflow-visible">
+        {/* Scrollable content area */}
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="space-y-4 px-6 py-4">
           {/* Title field */}
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
@@ -179,11 +185,11 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
           </div>
 
           {/* Content field */}
-          <div className="overflow-visible">
+          <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
               Content <span className="text-destructive">*</span>
             </label>
-            <LexicalEditor
+              <LexicalEditor
               value={draft.content}
               editorState={draft.editorState}
               onChange={(plainText, serializedState) => 
@@ -195,7 +201,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
               placeholder="What's on your mind?"
               autoFocus
               showToolbar
-              className="min-h-[400px]"
+              className="min-h-[300px]"
             />
           </div>
 
@@ -248,10 +254,11 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
               ))}
             </div>
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
-        {/* Action buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/50">
+        {/* Action buttons - fixed at bottom */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/50 flex-shrink-0">
           <Button
             variant="ghost"
             onClick={() => deleteDraft(draft.id)}

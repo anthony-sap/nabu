@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2 } from "lucide-react";
 import { LexicalEditor } from "./lexical-editor";
 
@@ -187,9 +188,9 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }
 
   return (
-    <div className="h-full flex flex-col pt-6">
+    <div className="h-full flex flex-col">
       {/* Header with back button, folder badge, and save status */}
-      <div className="flex items-center justify-between pb-4 mb-6 border-b border-border/20">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border/20 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button 
             variant="ghost" 
@@ -247,30 +248,35 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         </div>
       </div>
 
-      {/* Title input */}
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Note title..."
-        className="w-full text-2xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-none focus:outline-none mb-6"
-      />
+      {/* Scrollable content area */}
+      <ScrollArea className="flex-1 overflow-y-auto">
+        <div className="px-6 py-6 space-y-6">
+          {/* Title input */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Note title..."
+            className="w-full text-2xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-none focus:outline-none"
+          />
 
-      {/* Lexical editor */}
-      <div className="flex-1 min-h-0">
-        <LexicalEditor
-          value={content}
-          editorState={editorState}
-          onChange={(plainText, serializedState) => {
-            setContent(plainText);
-            setEditorState(serializedState);
-          }}
-          placeholder="Start writing your note..."
-          showToolbar={true}
-          autoFocus={true}
-          className="h-full"
-        />
-      </div>
+          {/* Lexical editor */}
+          <div>
+            <LexicalEditor
+              value={content}
+              editorState={editorState}
+              onChange={(plainText, serializedState) => {
+                setContent(plainText);
+                setEditorState(serializedState);
+              }}
+              placeholder="Start writing your note..."
+              showToolbar={true}
+              autoFocus={true}
+              className="min-h-[400px]"
+            />
+          </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

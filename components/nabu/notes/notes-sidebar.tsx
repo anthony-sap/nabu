@@ -214,13 +214,13 @@ export function NotesSidebar({
                     editingNoteId={editingNoteId}
                     onAddFolder={onAddFolder}
                     onAddNote={onAddNote}
-                  onEditFolder={onEditFolder}
-                  onDeleteFolder={onDeleteFolder}
-                  onDeleteNote={onDeleteNote}
+                    onEditFolder={onEditFolder}
+                    onDeleteFolder={onDeleteFolder}
+                    onDeleteNote={onDeleteNote}
                   onMoveFolder={onMoveFolder}
                   onMoveNote={onMoveNote}
                   allFolders={folders}
-                />
+                  />
               ))}
             </div>
           )}

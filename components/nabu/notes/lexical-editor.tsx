@@ -16,6 +16,7 @@ import { AutoLinkPlugin } from "@lexical/react/LexicalAutoLinkPlugin";
 import { ClickableLinkPlugin } from "@lexical/react/LexicalClickableLinkPlugin";
 import { TablePlugin } from "@lexical/react/LexicalTablePlugin";
 import { TableOfContentsPlugin } from "@lexical/react/LexicalTableOfContentsPlugin";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { 
   BeautifulMentionsPlugin, 
   BeautifulMentionNode,
@@ -32,6 +33,23 @@ import { LinkNode, AutoLinkNode } from "@lexical/link";
 import { HashtagNode } from "@lexical/hashtag";
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
 import { CodeNode, CodeHighlightNode } from "@lexical/code";
+import {
+  HEADING,
+  QUOTE,
+  CODE,
+  UNORDERED_LIST,
+  ORDERED_LIST,
+  CHECK_LIST,
+  LINK,
+  BOLD_ITALIC_STAR,
+  BOLD_ITALIC_UNDERSCORE,
+  BOLD_STAR,
+  BOLD_UNDERSCORE,
+  INLINE_CODE,
+  ITALIC_STAR,
+  ITALIC_UNDERSCORE,
+  STRIKETHROUGH,
+} from "@lexical/markdown";
 
 import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor } from "lexical";
 import { useEffect, useRef, useState } from "react";
@@ -124,6 +142,27 @@ interface LexicalEditorProps {
   className?: string;
   showToolbar?: boolean;
 }
+
+/**
+ * Markdown transformers for paste and typing shortcuts
+ */
+const MARKDOWN_TRANSFORMERS = [
+  HEADING,
+  QUOTE,
+  CODE,
+  UNORDERED_LIST,
+  ORDERED_LIST,
+  CHECK_LIST,
+  LINK,
+  BOLD_ITALIC_STAR,
+  BOLD_ITALIC_UNDERSCORE,
+  BOLD_STAR,
+  BOLD_UNDERSCORE,
+  INLINE_CODE,
+  ITALIC_STAR,
+  ITALIC_UNDERSCORE,
+  STRIKETHROUGH,
+];
 
 /**
  * URL matchers for AutoLinkPlugin
@@ -356,7 +395,7 @@ export function LexicalEditor({
         strikethrough: "line-through",
         code: "bg-muted px-1.5 py-0.5 rounded text-sm font-mono",
       },
-      code: "bg-muted p-4 rounded-lg font-mono text-sm block my-4 overflow-x-auto",
+      code: "bg-muted p-4 rounded-lg font-mono text-sm block my-4 overflow-x-auto max-w-full whitespace-pre-wrap break-words",
       table: "border-collapse table-auto w-full my-4",
       tableCell: "border border-border p-2",
       tableCellHeader: "border border-border p-2 bg-muted font-semibold",
@@ -386,7 +425,7 @@ export function LexicalEditor({
           <RichTextPlugin
             contentEditable={
               <ContentEditable
-                className="w-full px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none resize-none min-h-[120px] overflow-auto bg-transparent"
+                className="w-full px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none resize-none min-h-[120px] overflow-y-visible bg-transparent"
                 aria-placeholder={placeholder}
               />
             }
@@ -418,6 +457,9 @@ export function LexicalEditor({
         <TabIndentationPlugin />
         <HashtagPlugin />
         <TablePlugin />
+        
+        {/* Markdown Plugin - enables Markdown paste and shortcuts */}
+        <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin
