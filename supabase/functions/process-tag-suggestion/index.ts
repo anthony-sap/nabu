@@ -5,8 +5,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
+const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-5-nano";
 const DATABASE_URL = Deno.env.get("DATABASE_URL");
+
+// Validate OpenAI API key exists
+if (!OPENAI_API_KEY) {
+  console.error("OPENAI_API_KEY environment variable is not set");
+}
 
 interface WebhookPayload {
   type: "INSERT";
@@ -89,20 +94,26 @@ Tags:`;
                 content: prompt,
               },
             ],
-            temperature: 0.7,
-            max_tokens: 100,
+            max_completion_tokens: 100,
           }),
         }
       );
-
+      
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+        const errorBody = await openaiResponse.text();
+        console.error("OpenAI API Error:", {
+          status: openaiResponse.status,
+          statusText: openaiResponse.statusText,
+          body: errorBody,
+          model: OPENAI_MODEL,
+        });
+        throw new Error(`OpenAI API error: ${openaiResponse.statusText} - ${errorBody}`);
       }
 
       const openaiData = await openaiResponse.json();
       const suggestionsText =
         openaiData.choices[0]?.message?.content?.trim() || "";
-
+      
       // Parse tags from response
       const suggestedTags = suggestionsText
         .split(",")

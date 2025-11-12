@@ -27,6 +27,7 @@ interface TagSuggestionModalProps {
   suggestions: TagSuggestion[];
   onAccept: (selectedTags: string[]) => Promise<void>;
   onReject: () => Promise<void>;
+  onDismiss: () => Promise<void>;
 }
 
 export function TagSuggestionModal({
@@ -36,6 +37,7 @@ export function TagSuggestionModal({
   suggestions,
   onAccept,
   onReject,
+  onDismiss,
 }: TagSuggestionModalProps) {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(
     new Set(suggestions.map((s) => s.name))
@@ -80,6 +82,20 @@ export function TagSuggestionModal({
     } catch (error) {
       console.error("Error rejecting tags:", error);
       toast.error("Failed to reject tags");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDismiss = async () => {
+    setIsProcessing(true);
+    try {
+      await onDismiss();
+      toast.info("Tag suggestions dismissed");
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error dismissing tags:", error);
+      toast.error("Failed to dismiss tags");
     } finally {
       setIsProcessing(false);
     }
@@ -137,6 +153,13 @@ export function TagSuggestionModal({
 
         <DialogFooter className="gap-2">
           <Button
+            variant="ghost"
+            onClick={handleDismiss}
+            disabled={isProcessing}
+          >
+            Dismiss
+          </Button>
+          <Button
             variant="outline"
             onClick={handleRejectAll}
             disabled={isProcessing}
@@ -154,4 +177,5 @@ export function TagSuggestionModal({
     </Dialog>
   );
 }
+
 

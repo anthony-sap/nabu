@@ -93,6 +93,11 @@ export function formatNoteResponse(note: any) {
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
     deletedAt: note.deletedAt,
+    // Tag suggestion fields
+    tagSuggestionStatus: note.tagSuggestionStatus,
+    lastTagSuggestionAt: note.lastTagSuggestionAt,
+    lastTagModifiedAt: note.lastTagModifiedAt,
+    pendingJobId: note.pendingJobId,
     folder: note.folder
       ? {
           id: note.folder.id,
@@ -100,6 +105,18 @@ export function formatNoteResponse(note: any) {
           color: note.folder.color,
         }
       : null,
+    noteTags: note.noteTags
+      ? note.noteTags.map((nt: any) => ({
+          tag: {
+            id: nt.tag.id,
+            name: nt.tag.name,
+            color: nt.tag.color,
+            type: nt.tag.type,
+          },
+          source: nt.source,
+          confidence: nt.confidence,
+        }))
+      : [],
     tags: note.noteTags
       ? note.noteTags.map((nt: any) => ({
           id: nt.tag.id,

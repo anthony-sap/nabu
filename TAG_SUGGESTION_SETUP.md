@@ -123,10 +123,11 @@ With npx, prefix each command with `npx`, e.g., `npx supabase secrets set OPENAI
 
 ### 4. Deploy Function
 ```bash
-cd supabase/functions
-supabase functions deploy process-tag-suggestion
+supabase functions deploy process-tag-suggestion --no-verify-jwt
 ```
-With npx: `npx supabase functions deploy process-tag-suggestion`
+With npx: `npx supabase functions deploy process-tag-suggestion --no-verify-jwt`
+
+> **Note for Windows users**: The `--no-verify-jwt` flag is often required for successful deployment on Windows systems.
 
 **Alternative: Deploy via Supabase Dashboard**
 1. Zip the `supabase/functions/process-tag-suggestion` folder

@@ -29,7 +29,18 @@ export async function GET(
         tenantId,
         deletedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        contentState: true,
+        folderId: true,
+        createdAt: true,
+        updatedAt: true,
+        tagSuggestionStatus: true,
+        lastTagSuggestionAt: true,
+        lastTagModifiedAt: true,
+        pendingJobId: true,
         folder: {
           select: {
             id: true,
@@ -38,7 +49,9 @@ export async function GET(
           },
         },
         noteTags: {
-          include: {
+          select: {
+            source: true,
+            confidence: true,
             tag: {
               select: {
                 id: true,

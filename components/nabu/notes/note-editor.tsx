@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles } from "lucide-react";
 import { LexicalEditor } from "./lexical-editor";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
 import { TagBadge } from "./tag-badge";
@@ -111,9 +111,43 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         })));
       }
 
-      // Check for pending job
+      // Check for pending job and load existing suggestions if completed
       if (data.pendingJobId) {
         setPendingJobId(data.pendingJobId);
+        
+        // Fetch job status to check if suggestions are ready
+        try {
+          const jobResponse = await fetch(`/api/nabu/tag-suggestions/${data.pendingJobId}`);
+          
+          if (jobResponse.status === 404) {
+            // Job doesn't exist (deleted or invalid), clear stale pendingJobId from state
+            console.log("Tag suggestion job not found, clearing stale pendingJobId");
+            setPendingJobId(null);
+            // Will be cleared from DB on next save
+            return;
+          }
+          
+          if (jobResponse.ok) {
+            const jobData = await jobResponse.json();
+            
+            // If job is completed, load suggestions (even if already reviewed)
+            if (jobData.status === "COMPLETED") {
+              setSuggestedTags(jobData.suggestedTags.map((name: string) => ({
+                name,
+                confidence: jobData.confidence,
+              })));
+              
+              // Only show notification if not yet reviewed
+              if (!jobData.consumed) {
+                setShowSuggestionNotification(true);
+              }
+            }
+          }
+        } catch (jobError) {
+          console.error("Failed to load tag suggestion job:", jobError);
+          // On error, clear the pendingJobId to allow new suggestions
+          setPendingJobId(null);
+        }
       }
     } catch (error) {
       console.error("Failed to load note:", error);
@@ -127,8 +161,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
    * Request tag suggestions from AI
    */
   const requestTagSuggestions = useCallback(async () => {
-    if (content.length < 200 || tags.length >= 3 || pendingJobId) {
-      return; // Skip if content too short, enough tags, or job already pending
+    if (content.length < 200 || tags.length > 0 || pendingJobId) {
+      return; // Skip if content too short, has any tags, or job already pending
     }
 
     try {
@@ -186,7 +220,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
             confidence: data.confidence,
           })));
           setShowSuggestionNotification(true);
-          setPendingJobId(null);
+          // Don't clear pendingJobId here - modal needs it to render
         } else if (data.status === "FAILED") {
           clearInterval(pollInterval);
           setPendingJobId(null);
@@ -226,6 +260,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       await loadNote();
       setSuggestedTags([]);
       setShowSuggestionNotification(false);
+      setShowSuggestionModal(false);
+      setPendingJobId(null);
     } catch (error) {
       console.error("Error accepting tags:", error);
       throw error;
@@ -249,9 +285,35 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
 
       setSuggestedTags([]);
       setShowSuggestionNotification(false);
+      setShowSuggestionModal(false);
       setPendingJobId(null);
     } catch (error) {
       console.error("Error rejecting tags:", error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle dismissing suggested tags
+   */
+  const handleDismissTags = async () => {
+    if (!pendingJobId) return;
+
+    try {
+      const response = await fetch(`/api/nabu/tag-suggestions/${pendingJobId}/dismiss`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to dismiss tags");
+      }
+
+      setSuggestedTags([]);
+      setShowSuggestionNotification(false);
+      setShowSuggestionModal(false);
+      setPendingJobId(null);
+    } catch (error) {
+      console.error("Error dismissing tags:", error);
       throw error;
     }
   };
@@ -308,7 +370,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       setInitialContent(content);
       setInitialEditorState(editorState);
 
-      // Request tag suggestions if eligible
+      // Request tag suggestions if eligible (will create new job if pendingJobId is null)
       await requestTagSuggestions();
     } catch (error) {
       console.error("Save failed:", error);
@@ -478,8 +540,27 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         <TagSuggestionNotification
           suggestedTagsCount={suggestedTags.length}
           onOpenModal={() => setShowSuggestionModal(true)}
-          onDismiss={() => setShowSuggestionNotification(false)}
+          onDismiss={handleDismissTags}
         />
+      )}
+
+      {/* Suggested tags display (for reference after review) */}
+      {!showSuggestionNotification && suggestedTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
+          <span className="text-xs text-muted-foreground font-medium w-full mb-1">
+            AI Suggested (for reference):
+          </span>
+          {suggestedTags.map((tag, index) => (
+            <Badge
+              key={index}
+              variant="outline"
+              className="gap-1 text-xs border-dashed opacity-70"
+            >
+              <Sparkles className="h-3 w-3" />
+              {tag.name}
+            </Badge>
+          ))}
+        </div>
       )}
 
       {/* Lexical editor */}
@@ -515,6 +596,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           suggestions={suggestedTags}
           onAccept={handleAcceptTags}
           onReject={handleRejectTags}
+          onDismiss={handleDismissTags}
         />
       )}
     </div>

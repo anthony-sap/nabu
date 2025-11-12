@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
+import { getUserContext, handleApiError } from "@/lib/nabu-helpers";
 
 /**
  * POST /api/nabu/tag-suggestions/[jobId]/accept
@@ -9,15 +8,11 @@ import { prisma } from "@/lib/prisma";
  */
 export async function POST(
   req: Request,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { jobId } = params;
+    const { userId, tenantId } = await getUserContext();
+    const { jobId } = await params;
     const body = await req.json();
     const { tagNames } = body;
 
@@ -37,7 +32,7 @@ export async function POST(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    if (job.userId !== session.user.id) {
+    if (job.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -69,8 +64,8 @@ export async function POST(
         const existing = await prisma.tag.findFirst({
           where: {
             name,
-            userId: session.user.id,
-            tenantId: job.tenantId,
+            userId,
+            tenantId,
           },
         });
 
@@ -81,8 +76,8 @@ export async function POST(
         return prisma.tag.create({
           data: {
             name,
-            userId: session.user.id,
-            tenantId: job.tenantId,
+            userId,
+            tenantId,
             type: "TOPIC", // Default type for AI-suggested tags
           },
         });
@@ -110,7 +105,7 @@ export async function POST(
               tagId: tag.id,
               confidence: job.confidence,
               source: "AI_SUGGESTED",
-              createdBy: session.user.id,
+              createdBy: userId,
             },
           });
         })
@@ -148,15 +143,10 @@ export async function POST(
       }
     }
 
-    // Mark job as consumed and delete it
+    // Mark job as consumed (keep for audit trail)
     await prisma.tagSuggestionJob.update({
       where: { id: jobId },
       data: { consumed: true },
-    });
-
-    // Delete the job after a delay (optional - can keep for audit)
-    await prisma.tagSuggestionJob.delete({
-      where: { id: jobId },
     });
 
     return NextResponse.json({
@@ -164,11 +154,7 @@ export async function POST(
       tagsAdded: tagNames,
     });
   } catch (error) {
-    console.error("Error accepting tag suggestions:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 

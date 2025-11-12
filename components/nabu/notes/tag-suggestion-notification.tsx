@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 interface TagSuggestionNotificationProps {
   suggestedTagsCount: number;
   onOpenModal: () => void;
-  onDismiss?: () => void;
+  onDismiss?: () => Promise<void>;
   className?: string;
 }
 
@@ -57,9 +57,11 @@ export function TagSuggestionNotification({
         variant="ghost"
         size="sm"
         className="ml-auto h-6 w-6 p-0"
-        onClick={() => {
+        onClick={async () => {
+          if (onDismiss) {
+            await onDismiss();
+          }
           setDismissed(true);
-          onDismiss?.();
         }}
       >
         <X className="h-3 w-3" />
@@ -67,4 +69,5 @@ export function TagSuggestionNotification({
     </div>
   );
 }
+
 

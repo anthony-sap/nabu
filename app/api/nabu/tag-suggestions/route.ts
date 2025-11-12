@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
+import { getUserContext, errorResponse, handleApiError } from "@/lib/nabu-helpers";
 
 const TAG_SUGGESTION_MIN_CHARS = parseInt(
   process.env.TAG_SUGGESTION_MIN_CHARS || "200"
@@ -16,11 +15,7 @@ const TAG_SUGGESTION_COOLDOWN_MINUTES = parseInt(
  */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const { userId, tenantId } = await getUserContext();
     const body = await req.json();
     const { entityType, entityId, content } = body;
 
@@ -66,7 +61,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Entity not found" }, { status: 404 });
     }
 
-    if (entity.userId !== session.user.id) {
+    if (entity.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -110,8 +105,8 @@ export async function POST(req: Request) {
     // Create the job
     const job = await prisma.tagSuggestionJob.create({
       data: {
-        tenantId: entity.tenantId,
-        userId: session.user.id,
+        tenantId,
+        userId,
         entityType,
         entityId,
         content: content.substring(0, 1000), // Limit content for API
@@ -146,11 +141,7 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating tag suggestion job:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 

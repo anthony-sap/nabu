@@ -354,8 +354,11 @@ model TagSuggestionJob {
   error         String?   @db.Text
   consumed      Boolean   @default(false) // Prevents reuse
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+ createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
   
   @@index([status, createdAt])
   @@index([entityType, entityId])

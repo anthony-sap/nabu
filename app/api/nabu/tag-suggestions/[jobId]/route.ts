@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
+import { getUserContext, handleApiError } from "@/lib/nabu-helpers";
 
 /**
  * GET /api/nabu/tag-suggestions/[jobId]
@@ -9,15 +8,11 @@ import { prisma } from "@/lib/prisma";
  */
 export async function GET(
   req: Request,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { jobId } = params;
+    const { userId } = await getUserContext();
+    const { jobId } = await params;
 
     const job = await prisma.tagSuggestionJob.findUnique({
       where: { id: jobId },
@@ -27,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    if (job.userId !== session.user.id) {
+    if (job.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -36,17 +31,14 @@ export async function GET(
       status: job.status,
       suggestedTags: job.suggestedTags,
       confidence: job.confidence,
+      consumed: job.consumed,
       error: job.error,
       attempts: job.attempts,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     });
   } catch (error) {
-    console.error("Error fetching tag suggestion job:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 

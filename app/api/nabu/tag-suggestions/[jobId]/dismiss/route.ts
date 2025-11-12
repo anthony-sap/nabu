@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import { getUserContext, handleApiError } from "@/lib/nabu-helpers";
 
 /**
- * POST /api/nabu/tag-suggestions/[jobId]/reject
- * Reject suggested tags
+ * POST /api/nabu/tag-suggestions/[jobId]/dismiss
+ * Dismiss (mark as reviewed) suggested tags without accepting or rejecting
  */
 export async function POST(
   req: Request,
@@ -27,13 +27,17 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Update entity status
+    // Mark job as consumed (reviewed)
+    await prisma.tagSuggestionJob.update({
+      where: { id: jobId },
+      data: { consumed: true },
+    });
+
+    // Update entity to clear pendingJobId
     if (job.entityType === "NOTE") {
       await prisma.note.update({
         where: { id: job.entityId },
         data: {
-          tagSuggestionStatus: null,
-          lastTagModifiedAt: new Date(), // Prevents immediate re-suggest
           pendingJobId: null,
         },
       });
@@ -41,21 +45,13 @@ export async function POST(
       await prisma.thought.update({
         where: { id: job.entityId },
         data: {
-          tagSuggestionStatus: null,
-          lastTagModifiedAt: new Date(), // Prevents immediate re-suggest
           pendingJobId: null,
         },
       });
     }
 
-    // Mark job as consumed (keep for audit trail)
-    await prisma.tagSuggestionJob.update({
-      where: { id: jobId },
-      data: { consumed: true },
-    });
-
     return NextResponse.json({
-      message: "Tags rejected successfully",
+      message: "Tags dismissed successfully",
     });
   } catch (error) {
     return handleApiError(error);
