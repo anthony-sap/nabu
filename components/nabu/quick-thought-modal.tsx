@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Minimize2, X } from "lucide-react";
+import { Lightbulb, Minimize2, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickThought, ThoughtDraft } from "./quick-thought-context";
 import { LexicalEditor } from "./notes/lexical-editor";
+import { toast } from "sonner";
 
 /**
  * Props for the QuickThoughtModal component
@@ -39,6 +40,7 @@ const availableTags = ["idea", "todo", "meeting", "research", "planning", "perso
  */
 export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
   const { updateDraft, deleteDraft, minimizeDraft } = useQuickThought();
+  const [isSaving, setIsSaving] = useState(false);
 
   /**
    * Handle keyboard shortcuts within the modal
@@ -77,32 +79,47 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
   /**
    * Handle saving the thought
    */
-  const handleSave = () => {
-    if (!draft.content.trim()) return;
+  const handleSave = async () => {
+    if (!draft.content.trim() || isSaving) return;
 
-    const thought = {
-      id: `thought-${Date.now()}`,
-      title: draft.title.trim() || "Untitled",
-      content: draft.content.trim(),
-      tags: draft.selectedTags,
-      folder: draft.selectedFolder,
-      createdAt: new Date().toISOString(),
-      pinned: false,
-    };
+    setIsSaving(true);
 
-    // Save to localStorage
     try {
-      const saved = localStorage.getItem('nabu-saved-thoughts');
-      const existing = saved ? JSON.parse(saved) : [];
-      const updated = [thought, ...existing];
-      localStorage.setItem('nabu-saved-thoughts', JSON.stringify(updated));
-      
-      // Dispatch storage event for cross-component sync
-      window.dispatchEvent(new Event('storage'));
-      
+      // Prepare API payload
+      const payload = {
+        content: draft.content.trim(),
+        source: "WEB" as const,
+        suggestedTags: draft.selectedTags,
+        meta: {
+          title: draft.title.trim() || "Untitled",
+          folder: draft.selectedFolder,
+          contentState: draft.editorState || undefined, // Store Lexical state in meta
+        },
+      };
+
+      // Call API to create thought
+      const response = await fetch("/api/nabu/thoughts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to save thought");
+      }
+
+      // Success - close the modal
+      toast.success("Thought saved successfully!");
       deleteDraft(draft.id);
     } catch (error) {
-      console.error('Failed to save thought:', error);
+      console.error("Failed to save thought:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save thought. Please try again."
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -243,11 +260,20 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!draft.content.trim()}
+            disabled={!draft.content.trim() || isSaving}
             className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
           >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Save Thought
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Save Thought
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

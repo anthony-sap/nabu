@@ -7,6 +7,7 @@ import { NotesSidebar } from "./notes-sidebar";
 import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
 import { NoteEditor } from "./note-editor";
+import { ThoughtsActivityFeed } from "./thoughts-activity-feed";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { SavedThought, FolderItem, NoteItem } from "./types";
 import { exampleThoughts, STORAGE_KEY } from "./constants";
@@ -40,8 +41,8 @@ import {
  * - Auto-sync across browser tabs
  */
 export default function NotesActivityPage() {
-  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor
-  const [view, setView] = useState<"feed" | "folders" | "editor">("feed");
+  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor, "thoughts" shows thoughts feed
+  const [view, setView] = useState<"feed" | "folders" | "editor" | "thoughts">("feed");
   
   // Folder structure with expand/collapse state
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -277,11 +278,11 @@ export default function NotesActivityPage() {
   };
 
   /**
-   * Handles view changes and clears selected note when returning to feed
+   * Handles view changes and clears selected note when returning to feed or thoughts
    */
-  const handleViewChange = (newView: "feed" | "folders" | "editor") => {
+  const handleViewChange = (newView: "feed" | "folders" | "editor" | "thoughts") => {
     setView(newView);
-    if (newView === "feed") {
+    if (newView === "feed" || newView === "thoughts") {
       setSelectedNote(null);
       setEditingNote(null);
     }
@@ -901,13 +902,15 @@ export default function NotesActivityPage() {
           folderLoadError={folderLoadError}
         />
 
-        {/* Main Content Area: Activity feed, note editor, or note detail view */}
+        {/* Main Content Area: Activity feed, thoughts feed, note editor, or note detail view */}
         <div className="flex-1 min-w-0 bg-muted/15 px-6">
           {view === "feed" ? (
             <ActivityFeed
               thoughts={thoughts}
               onSaveThought={handleSaveThought}
             />
+          ) : view === "thoughts" ? (
+            <ThoughtsActivityFeed />
           ) : view === "editor" && editingNote ? (
             <NoteEditor
               noteId={editingNote.id}

@@ -3,7 +3,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Home, AlertCircle, FileText, Trash2 } from "lucide-react";
+import { Sparkles, Home, AlertCircle, FileText, Trash2, Lightbulb } from "lucide-react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
 import { FolderItem as FolderItemType, NoteItem } from "./types";
@@ -15,9 +15,9 @@ import { DragData } from "./drag-drop-utils";
 interface NotesSidebarProps {
   folders: FolderItemType[];
   rootNotes: NoteItem[];
-  view: "feed" | "folders" | "editor";
+  view: "feed" | "folders" | "editor" | "thoughts";
   selectedNote: FolderItemType | null;
-  onViewChange: (view: "feed" | "folders" | "editor") => void;
+  onViewChange: (view: "feed" | "folders" | "editor" | "thoughts") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
@@ -139,6 +139,21 @@ export function NotesSidebar({
           >
             <Home className="h-4 w-4" />
             <span className="text-sm">Feed</span>
+          </div>
+
+          {/* Thoughts navigation option */}
+          <div
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              view === "thoughts"
+                ? "bg-primary/10 text-primary font-medium"
+                : "hover:bg-muted/40 text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => {
+              onViewChange("thoughts");
+            }}
+          >
+            <Lightbulb className="h-4 w-4" />
+            <span className="text-sm">Thoughts</span>
           </div>
           
           <Separator className="my-2 bg-border/20" />
