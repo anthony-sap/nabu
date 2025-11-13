@@ -49,6 +49,9 @@ export async function GET(
           },
         },
         noteTags: {
+          where: {
+            deletedAt: null, // Only include active NoteTag links
+          },
           select: {
             source: true,
             confidence: true,

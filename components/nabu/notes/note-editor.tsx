@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles } from "lucide-react";
-import { LexicalEditor } from "./lexical-editor";
+import { LexicalEditor, type MentionItem } from "./lexical-editor";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
+import { RelatedLinksList } from "./related-links-list";
 import { TagBadge } from "./tag-badge";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
 import { TagSuggestionModal } from "./tag-suggestion-modal";
@@ -63,6 +64,18 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }>>([]);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
   const [showSuggestionNotification, setShowSuggestionNotification] = useState(false);
+
+  // Content-based tags and mentions state
+  const [contentTags, setContentTags] = useState<MentionItem[]>([]);
+  const [contentMentions, setContentMentions] = useState<MentionItem[]>([]);
+  const isSyncingTags = useRef(false); // Prevent infinite loops
+
+  /**
+   * Debug: Track when tags state changes
+   */
+  useEffect(() => {
+    console.log("🏷️ Tags state changed to:", tags);
+  }, [tags]);
 
   /**
    * Load note data on mount
@@ -292,6 +305,93 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       throw error;
     }
   };
+
+  /**
+   * Handle tags changed in editor content
+   * Syncs tags with database in real-time
+   */
+  const handleTagsChanged = useCallback(async (newTags: MentionItem[]) => {
+    // Skip if already syncing to prevent loops
+    if (isSyncingTags.current) return;
+    
+    console.log("📥 handleTagsChanged called with:", newTags);
+    console.log("📊 Current tags state:", tags);
+    setContentTags(newTags);
+
+    try {
+      isSyncingTags.current = true;
+
+      // Get current tag names from database
+      const currentTagNames = new Set(tags.map(t => t.name.toLowerCase()));
+      const newTagNames = new Set(newTags.map(t => t.value.toLowerCase()));
+
+      // Find tags to add and remove
+      const tagsToAdd = newTags
+        .filter(t => !currentTagNames.has(t.value.toLowerCase()))
+        .map(t => t.value);
+      
+      const tagsToRemove = tags
+        .filter(t => !newTagNames.has(t.name.toLowerCase()) && t.source === "USER_ADDED")
+        .map(t => t.name);
+      
+      console.log("➕ Will add:", tagsToAdd);
+      console.log("➖ Will remove:", tagsToRemove);
+
+      // Add new tags
+      if (tagsToAdd.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagNames: tagsToAdd }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("📥 POST response full:", result);
+          console.log("📥 POST response.data:", result.data);
+          console.log("📥 POST response.data.tags:", result.data.tags);
+          console.log("📥 POST response.data.tags.length:", result.data.tags?.length);
+          console.log("🔄 About to call setTags with:", result.data.tags);
+          setTags(result.data.tags);
+          console.log("✅ setTags called");
+        } else {
+          console.error("❌ POST failed with status:", response.status);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("❌ Error response:", errorData);
+        }
+      }
+
+      // Remove tags that are no longer in content
+      if (tagsToRemove.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagNames: tagsToRemove }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("📥 DELETE response:", result);
+          console.log("🔄 Updating tags state to:", result.data.tags);
+          setTags(result.data.tags);
+        } else {
+          console.error("❌ DELETE failed with status:", response.status);
+        }
+      }
+    } catch (error) {
+      console.error("Error syncing tags:", error);
+    } finally {
+      isSyncingTags.current = false;
+    }
+  }, [noteId, tags]);
+
+  /**
+   * Handle mentions changed in editor content
+   * Stores mentions for display in Related Links section
+   */
+  const handleMentionsChanged = useCallback((newMentions: MentionItem[]) => {
+    setContentMentions(newMentions);
+  }, []);
 
   /**
    * Handle dismissing suggested tags
@@ -573,6 +673,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
             setEditorState(serializedState);
           }}
           onSourceUrlsChanged={setSourceUrls}
+          onTagsChanged={handleTagsChanged}
+          onMentionsChanged={handleMentionsChanged}
           placeholder="Start writing your note..."
           showToolbar={true}
           autoFocus={true}
@@ -582,6 +684,11 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         {/* Display captured source URLs */}
         {sourceUrls.length > 0 && (
           <SourceUrlList sources={sourceUrls} className="mt-3" />
+        )}
+
+        {/* Display related links from @mentions */}
+        {contentMentions.length > 0 && (
+          <RelatedLinksList mentions={contentMentions} className="mt-3" />
         )}
       </div>
         </div>

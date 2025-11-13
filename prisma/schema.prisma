@@ -306,10 +306,14 @@ model Thought {
 model NoteTag {
   noteId     String
   tagId      String
+  tenantId  String?
   confidence Float?
   source     TagSource @default(USER_ADDED)
-  createdAt  DateTime  @default(now())
-  createdBy  String?
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
 
   note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
   tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -324,8 +328,11 @@ model NoteLink {
   fromNoteId String
   toNoteId   String
   relation   NoteLinkRelation
-  createdAt  DateTime         @default(now())
-  createdBy  String?
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
 
   from Note @relation("NoteOutgoing", fields: [fromNoteId], references: [id], onDelete: Cascade)
   to   Note @relation("NoteIncoming", fields: [toNoteId], references: [id], onDelete: Cascade)
@@ -399,8 +406,11 @@ model Share {
   userId     String
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   permission SharePermission
-  createdAt  DateTime        @default(now())
-  createdBy  String?
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
   revokedAt  DateTime?
 
   @@index([tenantId, entityType, entityId])

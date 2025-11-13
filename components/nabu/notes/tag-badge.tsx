@@ -48,8 +48,7 @@ export function TagBadge({
           <Badge
             variant="outline"
             className={cn(
-              "group relative gap-1.5 pr-1 pl-2 py-1 text-xs",
-              isAISuggested && "border-dashed opacity-80 bg-primary/5",
+              "group relative gap-1.5 pr-1 pl-2 py-1 text-xs border-dashed opacity-80 bg-primary/5",
               className
             )}
             style={badgeStyle}

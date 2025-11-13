@@ -30,7 +30,7 @@ import { forwardRef } from "react";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ListNode, ListItemNode } from "@lexical/list";
 import { LinkNode, AutoLinkNode } from "@lexical/link";
-import { HashtagNode } from "@lexical/hashtag";
+
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
 import { CodeNode, CodeHighlightNode } from "@lexical/code";
 import {
@@ -52,10 +52,12 @@ import {
 } from "@lexical/markdown";
 
 import { $getRoot, $createParagraphNode, $createTextNode, EditorState, LexicalEditor as LexicalEditorType } from "lexical";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { LexicalToolbar } from "./lexical-toolbar";
 import { SourceUrlCapturePlugin } from "./lexical-source-capture-plugin";
 import { SourceUrlDisplayPlugin, SourceInfo } from "./lexical-source-display-plugin";
+import { TagSyncPlugin } from "./lexical-tag-sync-plugin";
+import { MentionSyncPlugin } from "./lexical-mention-sync-plugin";
 import { Link2, Hash, AtSign } from "lucide-react";
 
 /**
@@ -141,6 +143,15 @@ const CustomMenuItem = forwardRef<HTMLLIElement, BeautifulMentionsMenuItemProps>
 CustomMenuItem.displayName = "CustomMenuItem";
 
 /**
+ * Mention item structure for tracking
+ */
+export interface MentionItem {
+  id: string;
+  value: string;
+  type: "note" | "folder" | "thought" | "tag";
+}
+
+/**
  * Props for LexicalEditor component
  */
 interface LexicalEditorProps {
@@ -152,6 +163,8 @@ interface LexicalEditorProps {
   className?: string;
   showToolbar?: boolean;
   onSourceUrlsChanged?: (sources: SourceInfo[]) => void;
+  onTagsChanged?: (tags: MentionItem[]) => void;
+  onMentionsChanged?: (mentions: MentionItem[]) => void;
 }
 
 /**
@@ -281,43 +294,46 @@ function ContentSyncPlugin({
     if (isFirstRender.current) {
       isFirstRender.current = false;
       
-      // Priority: serialized state > plain text
-      if (serializedState) {
-        try {
-          const parsedState = editor.parseEditorState(serializedState);
-          editor.setEditorState(parsedState);
-          
-          // Restore source URLs from serialized state to root node
-          const stateJSON = JSON.parse(serializedState);
-          if (stateJSON.root?.__sourceUrls) {
-            editor.update(() => {
-              const root = $getRoot();
-              const writableRoot = root.getWritable() as any;
-              writableRoot.__sourceUrls = stateJSON.root.__sourceUrls;
-            });
+      // Defer state updates to avoid flushSync warning
+      queueMicrotask(() => {
+        // Priority: serialized state > plain text
+        if (serializedState) {
+          try {
+            const parsedState = editor.parseEditorState(serializedState);
+            editor.setEditorState(parsedState);
+            
+            // Restore source URLs from serialized state to root node
+            const stateJSON = JSON.parse(serializedState);
+            if (stateJSON.root?.__sourceUrls) {
+              editor.update(() => {
+                const root = $getRoot();
+                const writableRoot = root.getWritable() as any;
+                writableRoot.__sourceUrls = stateJSON.root.__sourceUrls;
+              });
+            }
+          } catch (error) {
+            console.error("Failed to parse editor state:", error);
+            // Fall back to plain text
+            if (plainText) {
+              editor.update(() => {
+                const root = $getRoot();
+                root.clear();
+                const paragraph = $createParagraphNode();
+                paragraph.append($createTextNode(plainText));
+                root.append(paragraph);
+              });
+            }
           }
-        } catch (error) {
-          console.error("Failed to parse editor state:", error);
-          // Fall back to plain text
-          if (plainText) {
-            editor.update(() => {
-              const root = $getRoot();
-              root.clear();
-              const paragraph = $createParagraphNode();
-              paragraph.append($createTextNode(plainText));
-              root.append(paragraph);
-            });
-          }
+        } else if (plainText) {
+          editor.update(() => {
+            const root = $getRoot();
+            root.clear();
+            const paragraph = $createParagraphNode();
+            paragraph.append($createTextNode(plainText));
+            root.append(paragraph);
+          });
         }
-      } else if (plainText) {
-        editor.update(() => {
-          const root = $getRoot();
-          root.clear();
-          const paragraph = $createParagraphNode();
-          paragraph.append($createTextNode(plainText));
-          root.append(paragraph);
-        });
-      }
+      });
     }
   }, [plainText, serializedState, editor]);
 
@@ -356,67 +372,68 @@ export function LexicalEditor({
   className = "",
   showToolbar = false,
   onSourceUrlsChanged,
+  onTagsChanged,
+  onMentionsChanged,
 }: LexicalEditorProps) {
   // Store source URLs outside editor state to prevent loss on edits
   const sourceUrlsRef = useRef<string[]>([]);
   
   /**
-   * Mention items - folders, notes, thoughts for @, and tags for #
+   * Fetch mention suggestions dynamically as user types
    */
-  const [mentionItems, setMentionItems] = useState<{
-    "@": Array<{ value: string; description?: string }>;
-    "#": Array<{ value: string; description?: string }>;
-    "/": Array<{ value: string; description?: string }>;
-  }>({
-    "@": [],
-    "#": [],
-    "/": [],
-  });
-
-  /**
-   * Load mentions from localStorage on mount
-   */
-  useEffect(() => {
+  const handleMentionSearch = useCallback(async (trigger: string, queryString: string | null) => {
     try {
-      // Load saved thoughts for @ mentions
-      const savedThoughts = localStorage.getItem("nabu-saved-thoughts");
-      const thoughts = savedThoughts ? JSON.parse(savedThoughts) : [];
+      const response = await fetch("/api/nabu/mentions");
+      if (!response.ok) {
+        throw new Error("Failed to fetch mention data");
+      }
       
-      // Create mention items from thoughts
-      const thoughtMentions = thoughts.map((thought: any) => ({
-        value: thought.title || "Untitled",
-        description: `Thought: ${thought.content.slice(0, 50)}...`,
-      }));
-
-      // Default folders
-      const folderMentions = [
-        { value: "Inbox", description: "Default inbox folder" },
-        { value: "Work", description: "Work-related items" },
-        { value: "Personal", description: "Personal notes" },
-        { value: "Projects", description: "Project documentation" },
-        { value: "Archive", description: "Archived items" },
-      ];
-
-      // Default tags
-      const tagMentions = [
-        { value: "urgent", description: "High priority" },
-        { value: "work", description: "Work-related" },
-        { value: "personal", description: "Personal items" },
-        { value: "todo", description: "Action items" },
-        { value: "idea", description: "Ideas and brainstorming" },
-        { value: "meeting", description: "Meeting notes" },
-        { value: "project", description: "Project-related" },
-        { value: "research", description: "Research topics" },
-        { value: "planning", description: "Planning and strategy" },
-      ];
-
-      setMentionItems({
-        "@": [...folderMentions, ...thoughtMentions],
-        "#": tagMentions,
-        "/": folderMentions,
-      });
+      const result = await response.json();
+      const data = result.data;
+      
+      // Filter based on trigger type
+      if (trigger === "@") {
+        // Combine notes, folders, and thoughts for @ mentions
+        const allItems = [
+          ...data.notes,
+          ...data.folders,
+          ...data.thoughts,
+        ];
+        
+        // Filter by query if provided
+        if (queryString) {
+          const query = queryString.toLowerCase();
+          return allItems.filter(item => 
+            item.value.toLowerCase().startsWith(query)
+          );
+        }
+        return allItems;
+      } else if (trigger === "#") {
+        // Tags for # mentions
+        const tags = data.tags || [];
+        
+        if (queryString) {
+          const query = queryString.toLowerCase();
+          return tags.filter((item: any) => 
+            item.value.toLowerCase().startsWith(query)
+          );
+        }
+        return tags;
+      } else if (trigger === "/") {
+        // Folders only for /
+        if (queryString) {
+          const query = queryString.toLowerCase();
+          return data.folders.filter((item: any) => 
+            item.value.toLowerCase().startsWith(query)
+          );
+        }
+        return data.folders;
+      }
+      
+      return [];
     } catch (error) {
-      console.error("Failed to load mentions:", error);
+      console.error("Failed to fetch mention suggestions:", error);
+      return [];
     }
   }, []);
 
@@ -432,7 +449,6 @@ export function LexicalEditor({
       ListItemNode,
       LinkNode,
       AutoLinkNode,
-      HashtagNode,
       TableNode,
       TableCellNode,
       TableRowNode,
@@ -462,7 +478,6 @@ export function LexicalEditor({
         listitemUnchecked: "list-item",
       },
       link: "inline-flex items-center gap-1 text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/20 transition-colors no-underline before:content-['🔗'] before:text-sm",
-      hashtag: "text-primary/80 font-medium",
       text: {
         bold: "font-bold",
         italic: "italic",
@@ -544,7 +559,7 @@ export function LexicalEditor({
         
         {/* Other Plugins */}
         <TabIndentationPlugin />
-        <HashtagPlugin />
+
         <TablePlugin />
         
         {/* Markdown Plugin - enables Markdown paste and shortcuts */}
@@ -556,18 +571,19 @@ export function LexicalEditor({
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin
-          items={mentionItems}
           triggers={["@", "#", "/"]}
-          creatable={{
-            "@": 'Add folder/note "{{name}}"',
-            "#": 'Add tag "{{name}}"',
-            "/": 'Add folder "{{name}}"',
-          }}
+          onSearch={handleMentionSearch}
+          creatable
           insertOnBlur
           autoSpace
+          allowSpaces
           menuComponent={CustomMenu}
           menuItemComponent={CustomMenuItem}
         />
+        
+        {/* Tag and Mention Tracking Plugins */}
+        <TagSyncPlugin onTagsChanged={onTagsChanged} />
+        <MentionSyncPlugin onMentionsChanged={onMentionsChanged} />
         
         {/* Custom Link Plugin for styling */}
         <CustomLinkPlugin />
