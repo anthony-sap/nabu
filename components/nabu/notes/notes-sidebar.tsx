@@ -128,20 +128,25 @@ export function NotesSidebar({
     <div className="w-72 flex-shrink-0 h-full border-r border-border/30 backdrop-blur-xl bg-background/40 flex flex-col">
       {/* Top branding and controls with glassy effect */}
       <div className="flex-shrink-0 px-4 py-4 border-b border-border/30">
-        {/* Logo and brand */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="h-9 w-9 rounded-xl bg-primary/10 relative flex items-center justify-center ring-1 ring-primary/20">
-            <img src="/nabu_logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)] w-5"/>
+        {/* Logo and controls row - inline */}
+        <div className="flex items-center justify-between mb-4">
+          {/* Logo and brand */}
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-xl bg-primary/10 relative flex items-center justify-center ring-1 ring-primary/20">
+              <img src="/nabu_logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)] w-5"/>
+            </div>
+            <span className="font-serif font-bold text-xl text-foreground">Nabu</span>
           </div>
-          <span className="font-serif font-bold text-xl text-foreground">Nabu</span>
+          
+          {/* Controls on the right */}
+          <div className="flex items-center gap-1">
+            <ModeToggle />
+            <UserAccountNav />
+          </div>
         </div>
         
-        {/* Quick actions */}
-        <div className="flex items-center gap-2">
-          <QuickThoughtTrigger />
-          <ModeToggle />
-          <UserAccountNav />
-        </div>
+        {/* Quick Thought Trigger - full width button */}
+        <QuickThoughtTrigger />
       </div>
       
       {/* Navigation content */}
