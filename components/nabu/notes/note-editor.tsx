@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles } from "lucide-react";
-import { LexicalEditor } from "./lexical-editor";
+import { LexicalEditor, type MentionItem, type LinkItem } from "./lexical-editor";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
+import { RelatedLinksList } from "./related-links-list";
 import { TagBadge } from "./tag-badge";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
 import { TagSuggestionModal } from "./tag-suggestion-modal";
+import { AddLinkDialog } from "./add-link-dialog";
 import { toast } from "sonner";
 
 /**
@@ -64,6 +66,22 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
   const [showSuggestionNotification, setShowSuggestionNotification] = useState(false);
 
+  // Content-based tags and mentions state
+  const [contentTags, setContentTags] = useState<MentionItem[]>([]);
+  const [contentMentions, setContentMentions] = useState<MentionItem[]>([]);
+  const isSyncingTags = useRef(false); // Prevent infinite loops
+
+  // Links state
+  const [links, setLinks] = useState<LinkItem[]>([]);
+  const isSyncingLinks = useRef(false); // Prevent infinite loops
+
+  /**
+   * Debug: Track when tags state changes
+   */
+  useEffect(() => {
+    console.log("🏷️ Tags state changed to:", tags);
+  }, [tags]);
+
   /**
    * Load note data on mount
    */
@@ -108,6 +126,15 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           color: nt.tag.color,
           source: nt.source,
           confidence: nt.confidence,
+        })));
+      }
+
+      // Load links
+      if (data.outgoingLinks && Array.isArray(data.outgoingLinks)) {
+        setLinks(data.outgoingLinks.map((link: any) => ({
+          id: link.id,
+          toNoteId: link.toNoteId,
+          toNoteTitle: link.toNoteTitle,
         })));
       }
 
@@ -291,6 +318,181 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       console.error("Error rejecting tags:", error);
       throw error;
     }
+  };
+
+  /**
+   * Handle tags changed in editor content
+   * Syncs tags with database in real-time
+   */
+  const handleTagsChanged = useCallback(async (newTags: MentionItem[]) => {
+    // Skip if already syncing to prevent loops
+    if (isSyncingTags.current) return;
+    
+    console.log("📥 handleTagsChanged called with:", newTags);
+    console.log("📊 Current tags state:", tags);
+    setContentTags(newTags);
+
+    try {
+      isSyncingTags.current = true;
+
+      // Get current tag names from database
+      const currentTagNames = new Set(tags.map(t => t.name.toLowerCase()));
+      const newTagNames = new Set(newTags.map(t => t.value.toLowerCase()));
+
+      // Find tags to add and remove
+      const tagsToAdd = newTags
+        .filter(t => !currentTagNames.has(t.value.toLowerCase()))
+        .map(t => t.value);
+      
+      const tagsToRemove = tags
+        .filter(t => !newTagNames.has(t.name.toLowerCase()) && t.source === "USER_ADDED")
+        .map(t => t.name);
+      
+      console.log("➕ Will add:", tagsToAdd);
+      console.log("➖ Will remove:", tagsToRemove);
+
+      // Add new tags
+      if (tagsToAdd.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagNames: tagsToAdd }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("📥 POST response full:", result);
+          console.log("📥 POST response.data:", result.data);
+          console.log("📥 POST response.data.tags:", result.data.tags);
+          console.log("📥 POST response.data.tags.length:", result.data.tags?.length);
+          console.log("🔄 About to call setTags with:", result.data.tags);
+          setTags(result.data.tags);
+          console.log("✅ setTags called");
+        } else {
+          console.error("❌ POST failed with status:", response.status);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("❌ Error response:", errorData);
+        }
+      }
+
+      // Remove tags that are no longer in content
+      if (tagsToRemove.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagNames: tagsToRemove }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log("📥 DELETE response:", result);
+          console.log("🔄 Updating tags state to:", result.data.tags);
+          setTags(result.data.tags);
+        } else {
+          console.error("❌ DELETE failed with status:", response.status);
+        }
+      }
+    } catch (error) {
+      console.error("Error syncing tags:", error);
+    } finally {
+      isSyncingTags.current = false;
+    }
+  }, [noteId, tags]);
+
+  /**
+   * Handle mentions changed in editor content
+   * Syncs @mention links to database and stores mentions for display
+   */
+  const handleMentionsChanged = useCallback(async (newMentions: MentionItem[]) => {
+    // Skip if already syncing to prevent loops
+    if (isSyncingLinks.current) return;
+    
+    setContentMentions(newMentions);
+
+    try {
+      isSyncingLinks.current = true;
+      
+      // Filter only note mentions (ignore folders/thoughts)
+      const noteMentions = newMentions.filter(m => m.type === "note");
+      
+      // Compare with database links
+      const currentLinkIds = new Set(links.map(l => l.toNoteId));
+      const newLinkIds = new Set(noteMentions.map(m => m.id));
+      
+      // Find differences
+      const linksToAdd = noteMentions
+        .filter(m => !currentLinkIds.has(m.id))
+        .map(m => m.id);
+      
+      const linksToRemove = links
+        .filter(l => !newLinkIds.has(l.toNoteId))
+        .map(l => l.toNoteId);
+      
+      // Add new links
+      if (linksToAdd.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/links`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noteIds: linksToAdd }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setLinks(result.data.links);
+        }
+      }
+      
+      // Remove links
+      if (linksToRemove.length > 0) {
+        const response = await fetch(`/api/nabu/notes/${noteId}/links`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noteIds: linksToRemove }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setLinks(result.data.links);
+        }
+      }
+    } catch (error) {
+      // Silently fail - links will sync on next change
+    } finally {
+      isSyncingLinks.current = false;
+    }
+  }, [noteId, links]);
+
+  /**
+   * Handle deleting a link
+   */
+  const handleDeleteLink = async (noteId: string) => {
+    try {
+      const response = await fetch(`/api/nabu/notes/${noteId}/links`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteIds: [noteId] }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setLinks(result.data.links);
+        toast.success("Link removed");
+      } else {
+        toast.error("Failed to remove link");
+      }
+    } catch (error) {
+      console.error("Error deleting link:", error);
+      toast.error("Failed to remove link");
+    }
+  };
+
+  /**
+   * Handle adding a link (opens dialog)
+   */
+  const [showAddLinkDialog, setShowAddLinkDialog] = useState(false);
+
+  const handleAddLink = () => {
+    setShowAddLinkDialog(true);
   };
 
   /**
@@ -573,6 +775,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
             setEditorState(serializedState);
           }}
           onSourceUrlsChanged={setSourceUrls}
+          onTagsChanged={handleTagsChanged}
+          onMentionsChanged={handleMentionsChanged}
           placeholder="Start writing your note..."
           showToolbar={true}
           autoFocus={true}
@@ -583,6 +787,14 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         {sourceUrls.length > 0 && (
           <SourceUrlList sources={sourceUrls} className="mt-3" />
         )}
+
+        {/* Display linked notes */}
+        <RelatedLinksList 
+          links={links} 
+          onDeleteLink={handleDeleteLink}
+          onAddLink={handleAddLink}
+          className="mt-3" 
+        />
       </div>
         </div>
       </ScrollArea>
@@ -599,6 +811,14 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           onDismiss={handleDismissTags}
         />
       )}
+
+      {/* Add link dialog */}
+      <AddLinkDialog
+        open={showAddLinkDialog}
+        onOpenChange={setShowAddLinkDialog}
+        noteId={noteId}
+        onLinkAdded={setLinks}
+      />
     </div>
   );
 }

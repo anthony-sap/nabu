@@ -49,6 +49,9 @@ export async function GET(
           },
         },
         noteTags: {
+          where: {
+            deletedAt: null, // Only include active NoteTag links
+          },
           select: {
             source: true,
             confidence: true,
@@ -73,7 +76,12 @@ export async function GET(
           },
         },
         outgoingLinks: {
-          include: {
+          where: {
+            deletedAt: null, // Only include active links
+          },
+          select: {
+            id: true,
+            toNoteId: true,
             to: {
               select: {
                 id: true,
@@ -83,7 +91,12 @@ export async function GET(
           },
         },
         incomingLinks: {
-          include: {
+          where: {
+            deletedAt: null, // Only include active links
+          },
+          select: {
+            id: true,
+            fromNoteId: true,
             from: {
               select: {
                 id: true,
@@ -112,13 +125,13 @@ export async function GET(
     (formattedNote as any).attachments = note.attachments;
     (formattedNote as any).outgoingLinks = note.outgoingLinks.map((link: any) => ({
       id: link.id,
-      relation: link.relation,
-      to: link.to,
+      toNoteId: link.toNoteId,
+      toNoteTitle: link.to.title,
     }));
     (formattedNote as any).incomingLinks = note.incomingLinks.map((link: any) => ({
       id: link.id,
-      relation: link.relation,
-      from: link.from,
+      fromNoteId: link.fromNoteId,
+      fromNoteTitle: link.from.title,
     }));
 
     return new Response(JSON.stringify(successResponse(formattedNote)), {
