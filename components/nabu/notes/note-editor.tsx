@@ -76,12 +76,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [links, setLinks] = useState<LinkItem[]>([]);
   const isSyncingLinks = useRef(false); // Prevent infinite loops
 
-  /**
-   * Debug: Track when tags state changes
-   */
-  useEffect(() => {
-    console.log("🏷️ Tags state changed to:", tags);
-  }, [tags]);
+  
 
   /**
    * Load note data on mount
@@ -329,8 +324,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
     // Skip if already syncing to prevent loops
     if (isSyncingTags.current) return;
     
-    console.log("📥 handleTagsChanged called with:", newTags);
-    console.log("📊 Current tags state:", tags);
+    
     setContentTags(newTags);
 
     try {
@@ -349,8 +343,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         .filter(t => !newTagNames.has(t.name.toLowerCase()) && t.source === "USER_ADDED")
         .map(t => t.name);
       
-      console.log("➕ Will add:", tagsToAdd);
-      console.log("➖ Will remove:", tagsToRemove);
+     
 
       // Add new tags
       if (tagsToAdd.length > 0) {
@@ -786,7 +779,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           placeholder="Start writing your note..."
           showToolbar={true}
           autoFocus={true}
-              className="min-h-[400px]"
+          noteId={noteId}
+          className="min-h-[400px]"
         />
         
         {/* Display captured source URLs */}

@@ -58,6 +58,8 @@ import { SourceUrlCapturePlugin } from "./lexical-source-capture-plugin";
 import { SourceUrlDisplayPlugin, SourceInfo } from "./lexical-source-display-plugin";
 import { TagSyncPlugin } from "./lexical-tag-sync-plugin";
 import { MentionSyncPlugin } from "./lexical-mention-sync-plugin";
+import { CustomImageNode } from "./lexical-image-node";
+import { ImagePlugin } from "./lexical-image-plugin";
 import { Link2, Hash, AtSign } from "lucide-react";
 
 /**
@@ -171,6 +173,7 @@ interface LexicalEditorProps {
   autoFocus?: boolean;
   className?: string;
   showToolbar?: boolean;
+  noteId?: string; // Required for image uploads
   onSourceUrlsChanged?: (sources: SourceInfo[]) => void;
   onTagsChanged?: (tags: MentionItem[]) => void;
   onMentionsChanged?: (mentions: MentionItem[]) => void;
@@ -380,6 +383,7 @@ export function LexicalEditor({
   autoFocus = false,
   className = "",
   showToolbar = false,
+  noteId,
   onSourceUrlsChanged,
   onTagsChanged,
   onMentionsChanged,
@@ -463,6 +467,7 @@ export function LexicalEditor({
       TableRowNode,
       CodeNode,
       CodeHighlightNode,
+      CustomImageNode,
       ...createBeautifulMentionNode(CustomMentionComponent),
     ],
     theme: {
@@ -533,7 +538,7 @@ export function LexicalEditor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div className={`relative border border-input rounded-lg bg-muted/30 focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-colors ${className}`}>
-        {showToolbar && <LexicalToolbar />}
+        {showToolbar && <LexicalToolbar noteId={noteId} />}
         <div className="relative">
           <RichTextPlugin
             contentEditable={
@@ -593,6 +598,9 @@ export function LexicalEditor({
         {/* Tag and Mention Tracking Plugins */}
         <TagSyncPlugin onTagsChanged={onTagsChanged} />
         <MentionSyncPlugin onMentionsChanged={onMentionsChanged} />
+        
+        {/* Image Plugin - drag/drop and paste support */}
+        {noteId && <ImagePlugin noteId={noteId} />}
         
         {/* Custom Link Plugin for styling */}
         <CustomLinkPlugin />

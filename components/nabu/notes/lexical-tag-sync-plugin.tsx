@@ -75,7 +75,7 @@ export function TagSyncPlugin({ onTagsChanged }: TagSyncPluginProps) {
           // Only notify if tags have changed
           const currentTagsStr = JSON.stringify(tags);
           if (currentTagsStr !== previousTagsRef.current) {
-            console.log("🔄 Tag change detected - Old:", previousTagsRef.current, "New:", currentTagsStr);
+            
             previousTagsRef.current = currentTagsStr;
             onTagsChanged(tags);
           }

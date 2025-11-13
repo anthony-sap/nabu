@@ -84,24 +84,25 @@ enum TagSource {
 }
 
 model Tenant {
-  id         String       @id @default(cuid())
-  status     StatusEnum   @default(ENABLE)
-  name       String       @db.VarChar(50)
-  createdAt  DateTime     @default(now())
-  createdBy  String?
-  updatedAt  DateTime     @default(now()) @updatedAt
-  updatedBy  String?
-  deletedAt  DateTime?
-  AuditLog   AuditLog[]
-  Account    Account[]
-  User       User[]
-  Folder     Folder[]
-  Tag        Tag[]
-  Note       Note[]
-  Thought    Thought[]
-  NoteLink   NoteLink[]
-  Attachment Attachment[]
-  Share      Share[]
+  id              String            @id @default(cuid())
+  status          StatusEnum        @default(ENABLE)
+  name            String            @db.VarChar(50)
+  createdAt       DateTime          @default(now())
+  createdBy       String?
+  updatedAt       DateTime          @default(now()) @updatedAt
+  updatedBy       String?
+  deletedAt       DateTime?
+  AuditLog        AuditLog[]
+  Account         Account[]
+  User            User[]
+  Folder          Folder[]
+  Tag             Tag[]
+  Note            Note[]
+  Thought         Thought[]
+  NoteLink        NoteLink[]
+  Attachment      Attachment[]
+  Share           Share[]
+  ImageAttachment ImageAttachment[]
 }
 
 model AuditLog {
@@ -240,34 +241,35 @@ model Tag {
 }
 
 model Note {
-  id                   String         @id @default(cuid())
+  id                   String            @id @default(cuid())
   tenantId             String?
-  tenant               Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId               String
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   folderId             String?
-  folder               Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder               Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
   title                String
-  content              String         @db.Text
-  contentState         String?        @db.Text // Lexical editor serialized state (JSON)
+  content              String            @db.Text
+  contentState         String?           @db.Text // Lexical editor serialized state (JSON)
   sourceThoughts       String[]
-  summary              String?        @db.Text
+  summary              String?           @db.Text
   embedding            Bytes?
-  visibility           NoteVisibility @default(PRIVATE)
-  status               StatusEnum     @default(ENABLE)
-  tagSuggestionStatus  String?        // "pending", "completed", null
-  lastTagSuggestionAt  DateTime?      // When last suggestion was made (cooldown)
-  lastTagModifiedAt    DateTime?      // When user last manually modified tags
-  pendingJobId         String?        // Current pending job ID
-  createdAt            DateTime       @default(now())
+  visibility           NoteVisibility    @default(PRIVATE)
+  status               StatusEnum        @default(ENABLE)
+  tagSuggestionStatus  String?           // "pending", "completed", null
+  lastTagSuggestionAt  DateTime?         // When last suggestion was made (cooldown)
+  lastTagModifiedAt    DateTime?         // When user last manually modified tags
+  pendingJobId         String?           // Current pending job ID
+  createdAt            DateTime          @default(now())
   createdBy            String?
-  updatedAt            DateTime       @default(now()) @updatedAt
+  updatedAt            DateTime          @default(now()) @updatedAt
   updatedBy            String?
   deletedAt            DateTime?
   noteTags             NoteTag[]
   attachments          Attachment[]
-  outgoingLinks        NoteLink[]     @relation("NoteOutgoing")
-  incomingLinks        NoteLink[]     @relation("NoteIncoming")
+  images               ImageAttachment[]
+  outgoingLinks        NoteLink[]        @relation("NoteOutgoing")
+  incomingLinks        NoteLink[]        @relation("NoteIncoming")
   thoughts             Thought[]
 
   @@index([tenantId, userId])
@@ -415,4 +417,48 @@ model Share {
 
   @@index([tenantId, entityType, entityId])
   @@index([userId])
+}
+
+// Image attachments for notes - stored in Supabase storage
+model ImageAttachment {
+  id               String    @id @default(cuid())
+  noteId           String
+  note             Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  // File metadata
+  filename         String    // Unique filename in storage (uuid-originalname)
+  originalFilename String    // Original uploaded filename
+  storagePath      String    // Full path in Supabase: {tenantId}/note-images/{noteId}/{filename}
+  url              String?   // Public URL from Supabase (null until upload confirmed)
+  
+  // File properties
+  fileSize         Int       // Size in bytes
+  mimeType         String    // image/jpeg, image/png, etc.
+  width            Int?      // Image width in pixels
+  height           Int?      // Image height in pixels
+  
+  // Optimized versions (generated by edge function)
+  thumbnailUrl     String?   // 300px width
+  mediumUrl        String?   // 800px width
+  
+  // Multi-tenancy
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  
+  // Audit timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Audit users
+  createdBy        String
+  updatedBy        String
+  
+  // Soft delete
+  deletedAt        DateTime?
+  deletedBy        String?
+  
+  @@index([noteId])
+  @@index([tenantId])
+  @@index([fileSize]) // For storage reporting
+  @@index([createdAt]) // For reporting queries
 }

@@ -34,6 +34,7 @@ import {
   Code,
   Undo,
   Redo,
+  Image,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -46,11 +47,15 @@ import { $setBlocksType } from "@lexical/selection";
 import { $createParagraphNode, $getRoot } from "lexical";
 import { mergeRegister } from "@lexical/utils";
 import { INSERT_TABLE_COMMAND } from "@lexical/table";
+import { useRef } from "react";
+import { toast } from "sonner";
+import { useImageUpload } from "./use-image-upload";
+import { INSERT_IMAGE_COMMAND } from "./lexical-image-plugin";
 
 /**
  * Toolbar component for Lexical editor with comprehensive formatting controls
  */
-export function LexicalToolbar() {
+export function LexicalToolbar({ noteId }: { noteId?: string }) {
   const [editor] = useLexicalComposerContext();
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
@@ -58,6 +63,8 @@ export function LexicalToolbar() {
   const [isStrikethrough, setIsStrikethrough] = useState(false);
   const [isLink, setIsLink] = useState(false);
   const [blockType, setBlockType] = useState("paragraph");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadImage, uploadState } = useImageUpload(noteId || "");
 
   /**
    * Insert link
@@ -87,6 +94,49 @@ export function LexicalToolbar() {
       });
     }
   }, [editor]);
+
+  /**
+   * Handle image file selection
+   */
+  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (!noteId) {
+      toast.error("Note ID is required for image uploads");
+      return;
+    }
+
+    const file = files[0];
+    const toastId = toast.loading("Uploading image...");
+
+    try {
+      const result = await uploadImage(file);
+      
+      // Dispatch command to insert image
+      editor.dispatchCommand(INSERT_IMAGE_COMMAND, result);
+      
+      toast.success("Image uploaded successfully", { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to upload image", { id: toastId });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [editor, noteId, uploadImage]);
+
+  /**
+   * Trigger file input click
+   */
+  const triggerImageUpload = useCallback(() => {
+    if (!noteId) {
+      toast.error("Note ID is required for image uploads");
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [noteId]);
 
   /**
    * Format as heading
@@ -410,6 +460,29 @@ export function LexicalToolbar() {
       >
         <Table className="h-4 w-4" />
       </Button>
+
+      {/* Image Upload */}
+      {noteId && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={triggerImageUpload}
+            disabled={uploadState.isUploading}
+            title="Insert Image"
+          >
+            <Image className="h-4 w-4" />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.svg"
+            onChange={handleImageUpload}
+            style={{ display: "none" }}
+          />
+        </>
+      )}
     </div>
   );
 }

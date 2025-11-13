@@ -25,6 +25,9 @@ export const env = createEnv({
     // Stripe
     STRIPE_API_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    // Supabase (server-side only)
+    SUPABASE_URL: z.string().url(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().min(1),
@@ -65,5 +68,8 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_STRIPE_BUSINESS_MONTHLY_PLAN_ID,
     NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID:
       process.env.NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID,
+    // Supabase (server-side only)
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
 });
