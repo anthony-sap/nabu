@@ -6,13 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles, X } from "lucide-react";
 import { LexicalEditor, type MentionItem, type LinkItem } from "./lexical-editor";
-import { SourceUrlList, SourceInfo } from "./source-url-list";
-import { RelatedLinksList } from "./related-links-list";
-import { TagBadge } from "./tag-badge";
+import { SourceInfo } from "./source-url-list";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
 import { TagSuggestionModal } from "./tag-suggestion-modal";
 import { AddLinkDialog } from "./add-link-dialog";
 import { BreadcrumbNav } from "./breadcrumb-nav";
+import { MetadataSidebar } from "./metadata-sidebar";
 import { toast } from "sonner";
 
 /**
@@ -45,6 +44,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState<string | null>(null);
   const [sourceUrls, setSourceUrls] = useState<SourceInfo[]>([]);
+  const [createdAt, setCreatedAt] = useState<Date | null>(null);
   
   // Track initial values to detect changes (dirty state)
   const [initialTitle, setInitialTitle] = useState("");
@@ -112,6 +112,11 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       if (data.folder) {
         setFolderName(data.folder.name);
         setFolderColor(data.folder.color);
+      }
+
+      // Set created date
+      if (data.createdAt) {
+        setCreatedAt(new Date(data.createdAt));
       }
 
       // Load tags
@@ -706,98 +711,85 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         </div>
       </div>
 
-      {/* Scrollable content area */}
-      <ScrollArea className="relative flex-1 overflow-y-auto">
-        <div className="relative max-w-4xl mx-auto px-6 py-8 space-y-6">
-      {/* Title input - larger and more prominent */}
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Untitled Note"
-            className="w-full text-4xl font-serif font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none focus:outline-none"
-      />
-
-      {/* Tags display */}
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <TagBadge
-              key={tag.id}
-              id={tag.id}
-              name={tag.name}
-              color={tag.color}
-              source={tag.source}
-              confidence={tag.confidence}
-              onRemove={handleRemoveTag}
-              removable={true}
+      {/* Scrollable content area with sidebar */}
+      <div className="relative flex flex-1 overflow-hidden">
+        {/* Main Content - Scrollable */}
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="relative max-w-4xl mx-auto px-6 py-8 space-y-6">
+            {/* Title input - larger and more prominent */}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Untitled Note"
+              className="w-full text-4xl font-serif font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none focus:outline-none"
             />
-          ))}
+
+            {/* Tag suggestion notification */}
+            {showSuggestionNotification && suggestedTags.length > 0 && (
+              <TagSuggestionNotification
+                suggestedTagsCount={suggestedTags.length}
+                onOpenModal={() => setShowSuggestionModal(true)}
+                onDismiss={handleDismissTags}
+              />
+            )}
+
+            {/* Suggested tags display (for reference after review) */}
+            {!showSuggestionNotification && suggestedTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
+                <span className="text-xs text-muted-foreground font-medium w-full mb-1">
+                  AI Suggested (for reference):
+                </span>
+                {suggestedTags.map((tag, index) => (
+                  <Badge
+                    key={index}
+                    variant="outline"
+                    className="gap-1 text-xs border-dashed opacity-70"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Lexical editor */}
+            <div>
+              <LexicalEditor
+                value={content}
+                editorState={editorState}
+                onChange={(plainText, serializedState) => {
+                  setContent(plainText);
+                  setEditorState(serializedState);
+                }}
+                onSourceUrlsChanged={setSourceUrls}
+                onTagsChanged={handleTagsChanged}
+                onMentionsChanged={handleMentionsChanged}
+                placeholder="Start writing your note..."
+                showToolbar={true}
+                autoFocus={true}
+                noteId={noteId}
+                className="min-h-[400px]"
+              />
+            </div>
+          </div>
+        </ScrollArea>
+
+        {/* Metadata Sidebar - Fixed/Scrollable independently */}
+        <div className="hidden lg:block w-[280px] border-l border-border/30 overflow-y-auto">
+          <div className="sticky top-0 px-6 py-8">
+            <MetadataSidebar
+              createdAt={createdAt}
+              tags={tags}
+              sourceUrls={sourceUrls}
+              links={links}
+              onRemoveTag={handleRemoveTag}
+              onDeleteLink={handleDeleteLink}
+              onAddLink={handleAddLink}
+            />
+          </div>
         </div>
-      )}
-
-      {/* Tag suggestion notification */}
-      {showSuggestionNotification && suggestedTags.length > 0 && (
-        <TagSuggestionNotification
-          suggestedTagsCount={suggestedTags.length}
-          onOpenModal={() => setShowSuggestionModal(true)}
-          onDismiss={handleDismissTags}
-        />
-      )}
-
-      {/* Suggested tags display (for reference after review) */}
-      {!showSuggestionNotification && suggestedTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
-          <span className="text-xs text-muted-foreground font-medium w-full mb-1">
-            AI Suggested (for reference):
-          </span>
-          {suggestedTags.map((tag, index) => (
-            <Badge
-              key={index}
-              variant="outline"
-              className="gap-1 text-xs border-dashed opacity-70"
-            >
-              <Sparkles className="h-3 w-3" />
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Lexical editor */}
-          <div>
-        <LexicalEditor
-          value={content}
-          editorState={editorState}
-          onChange={(plainText, serializedState) => {
-            setContent(plainText);
-            setEditorState(serializedState);
-          }}
-          onSourceUrlsChanged={setSourceUrls}
-          onTagsChanged={handleTagsChanged}
-          onMentionsChanged={handleMentionsChanged}
-          placeholder="Start writing your note..."
-          showToolbar={true}
-          autoFocus={true}
-          noteId={noteId}
-          className="min-h-[400px]"
-        />
-        
-        {/* Display captured source URLs */}
-        {sourceUrls.length > 0 && (
-          <SourceUrlList sources={sourceUrls} className="mt-3" />
-        )}
-
-        {/* Display linked notes */}
-        <RelatedLinksList 
-          links={links} 
-          onDeleteLink={handleDeleteLink}
-          onAddLink={handleAddLink}
-          className="mt-3" 
-        />
       </div>
-        </div>
-      </ScrollArea>
 
       {/* Tag suggestion modal */}
       {pendingJobId && suggestedTags.length > 0 && (

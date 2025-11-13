@@ -1143,7 +1143,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           </header>
 
           {/* Content area with padding */}
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto">
             {view === "feed" ? (
               <ActivityFeed
                 thoughts={thoughts}
