@@ -34,11 +34,11 @@ export function QuickThoughtTrigger() {
       variant="outline"
       size="sm"
       onClick={createDraft}
-      className="gap-2 border-primary/40 text-muted-foreground hover:text-foreground hover:bg-primary/5 hover:border-primary/60 transition-colors"
+      className="w-full justify-start gap-2 border-primary/40 text-muted-foreground hover:text-foreground hover:bg-primary/5 hover:border-primary/60 transition-all duration-200"
     >
       <Lightbulb className="h-4 w-4 text-primary" />
-      <span className="hidden sm:inline">Quick thought...</span>
-      <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+      <span className="flex-1 text-left">Quick thought...</span>
+      <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
         <span className="text-xs">⌘</span>K
       </kbd>
     </Button>

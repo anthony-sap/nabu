@@ -1098,26 +1098,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
 
   return (
     <>
-      {/* Page Header with Search */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/20">
-        <h1 className="text-2xl font-semibold text-foreground">Notes</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setSearchDialogOpen(true)}
-          className="gap-2"
-        >
-          <Search className="h-4 w-4" />
-          <span>Search</span>
-          <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
-            <span className="text-xs">⌘</span>
-            <span className="text-xs">⇧</span>F
-          </kbd>
-        </Button>
-      </div>
-
-      <div className="flex h-[calc(100vh-14rem)] gap-0">
-        {/* Left Sidebar: Navigation and folder tree */}
+      <div className="flex h-screen overflow-hidden">
+        {/* Left Sidebar: Navigation and folder tree with glassy styling */}
         <NotesSidebar
           folders={folders}
           rootNotes={rootNotes}
@@ -1138,28 +1120,51 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           folderLoadError={folderLoadError}
         />
 
-        {/* Main Content Area: Activity feed, thoughts feed, note editor, or note detail view */}
-        <div className="flex-1 min-w-0 bg-muted/15 px-6">
-          {view === "feed" ? (
-            <ActivityFeed
-              thoughts={thoughts}
-              onSaveThought={handleSaveThought}
-            />
-          ) : view === "thoughts" ? (
-            <ThoughtsActivityFeed />
-          ) : view === "editor" && editingNote ? (
-            <NoteEditor
-              noteId={editingNote.id}
-              folderId={editingNote.folderId}
-              onClose={() => {
-                setView("feed");
-                setEditingNote(null);
-              }}
-              onDelete={() => handleDeleteNoteRequest(editingNote.id)}
-            />
-          ) : (
-            <NoteDetailView selectedNote={selectedNote} />
-          )}
+        {/* Main Content Area with top header integrated */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Integrated top header - glassy and premium */}
+          <header className="flex-shrink-0 h-16 border-b border-border/30 backdrop-blur-xl bg-background/60 flex items-center justify-between px-6">
+            <h1 className="text-xl font-serif font-semibold text-foreground">Notes</h1>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchDialogOpen(true)}
+                className="gap-2 bg-background/40 hover:bg-background/60 border-border/50 backdrop-blur transition-all duration-200"
+              >
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Search</span>
+                <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium opacity-70">
+                  <span className="text-xs">⌘</span>
+                  <span className="text-xs">⇧</span>F
+                </kbd>
+              </Button>
+            </div>
+          </header>
+
+          {/* Content area with padding */}
+          <div className="flex-1 overflow-auto p-6">
+            {view === "feed" ? (
+              <ActivityFeed
+                thoughts={thoughts}
+                onSaveThought={handleSaveThought}
+              />
+            ) : view === "thoughts" ? (
+              <ThoughtsActivityFeed />
+            ) : view === "editor" && editingNote ? (
+              <NoteEditor
+                noteId={editingNote.id}
+                folderId={editingNote.folderId}
+                onClose={() => {
+                  setView("feed");
+                  setEditingNote(null);
+                }}
+                onDelete={() => handleDeleteNoteRequest(editingNote.id)}
+              />
+            ) : (
+              <NoteDetailView selectedNote={selectedNote} />
+            )}
+          </div>
         </div>
       </div>
 

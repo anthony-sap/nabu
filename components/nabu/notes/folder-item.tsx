@@ -85,12 +85,12 @@ function NoteRow({
   return (
     <div
       ref={noteRef}
-      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors group h-8 ${
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group h-8 ${
         isEditing
-          ? "bg-primary/20 text-foreground font-medium"
+          ? "bg-primary/15 text-foreground font-medium shadow-sm ring-1 ring-primary/20"
           : isDragging
           ? "opacity-50"
-          : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
+          : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
       }`}
       style={{ paddingLeft }}
       onClick={() => {
@@ -104,14 +104,14 @@ function NoteRow({
       <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
       <span className="text-sm flex-1 truncate">{note.title}</span>
       <div className="flex items-center gap-1">
-        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
           {formatDate(note.updatedAt)}
         </span>
         {onDeleteNote && (
           <Button
             size="icon"
             variant="ghost"
-            className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               onDeleteNote(note.id);
@@ -283,14 +283,14 @@ export function FolderItem({
     <div>
       <div
         ref={folderRef}
-        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors relative group h-8 ${
+        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 relative group h-8 ${
           isSelected
-            ? "bg-primary/10 text-primary font-medium"
+            ? "bg-primary/15 text-primary font-medium shadow-sm ring-1 ring-primary/20"
             : isDragOver
-            ? "bg-primary/20 text-foreground"
+            ? "bg-primary/20 text-foreground shadow-sm"
             : isDragging
             ? "opacity-50"
-            : "text-foreground/60 hover:bg-muted/30 hover:text-foreground"
+            : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
         }`}
         style={{ paddingLeft: `${8 + (level * 16)}px` }}
         onMouseEnter={() => setIsHovered(true)}
@@ -339,12 +339,12 @@ export function FolderItem({
         
         {/* Action icons for folders on hover */}
         {isFolder && isHovered && (
-          <div className="flex items-center gap-0.5 animate-in fade-in-0 duration-150">
+          <div className="flex items-center gap-0.5 animate-in fade-in-0 duration-200">
             {onEditFolder && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-6 w-6 text-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                className="h-6 w-6 text-foreground/70 hover:text-primary hover:bg-primary/10 transition-all duration-200"
                 onClick={(e) => {
                   e.stopPropagation();
                   onEditFolder(item.id);
