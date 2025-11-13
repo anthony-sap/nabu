@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles, X } from "lucide-react";
 import { LexicalEditor, type MentionItem, type LinkItem } from "./lexical-editor";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
 import { RelatedLinksList } from "./related-links-list";
@@ -12,6 +12,7 @@ import { TagBadge } from "./tag-badge";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
 import { TagSuggestionModal } from "./tag-suggestion-modal";
 import { AddLinkDialog } from "./add-link-dialog";
+import { BreadcrumbNav } from "./breadcrumb-nav";
 import { toast } from "sonner";
 
 /**
@@ -647,76 +648,81 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header with back button, folder badge, and save status */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/20 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+    <div className="relative h-full flex flex-col bg-background overflow-hidden">
+      {/* Glassy shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+      
+      {/* Header with breadcrumb, actions, and save status - glassy and modern */}
+      <div className="relative flex items-center justify-between px-6 py-4 border-b border-border/30 flex-shrink-0 backdrop-blur-sm bg-background/60">
+        <div className="flex items-center gap-4">
+          {/* Breadcrumb navigation */}
+          <BreadcrumbNav 
+            items={[
+              ...(folderName ? [{ label: folderName }] : []),
+              { label: title || "Untitled Note" }
+            ]}
+          />
           
           {onDelete && (
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
               onClick={onDelete}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete Note
+              <span className="hidden sm:inline">Delete</span>
             </Button>
-          )}
-          
-          {folderName && (
-            <Badge 
-              variant="secondary" 
-              className="gap-1.5 bg-secondary/15 text-secondary border-secondary/20 font-normal ml-2"
-            >
-              <Folder className="h-3 w-3" style={{ color: folderColor || undefined }} />
-              {folderName}
-            </Badge>
           )}
         </div>
 
-        {/* Save status indicator */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {saveStatus === "saving" && (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Saving...</span>
-            </>
-          )}
-          {saveStatus === "saved" && lastSaved && (
-            <>
-              <Check className="h-3.5 w-3.5 text-primary" />
-              <span>Saved at {formatSaveTime(lastSaved)}</span>
-            </>
-          )}
-          {saveStatus === "error" && (
-            <>
-              <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-              <span className="text-destructive">Failed to save</span>
-            </>
+        {/* Save status indicator and close button */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {saveStatus === "saving" && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span className="hidden sm:inline">Saving...</span>
+              </>
+            )}
+            {saveStatus === "saved" && lastSaved && (
+              <>
+                <Check className="h-3.5 w-3.5 text-primary" />
+                <span className="hidden md:inline">Saved at {formatSaveTime(lastSaved)}</span>
+                <span className="md:hidden">Saved</span>
+              </>
+            )}
+            {saveStatus === "error" && (
+              <>
+                <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                <span className="hidden sm:inline">Failed to save</span>
+              </>
+            )}
+          </div>
+          
+          {onClose && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground transition-all duration-200"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
 
       {/* Scrollable content area */}
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <div className="px-6 py-6 space-y-6">
-      {/* Title input */}
+      <ScrollArea className="relative flex-1 overflow-y-auto">
+        <div className="relative max-w-4xl mx-auto px-6 py-8 space-y-6">
+      {/* Title input - larger and more prominent */}
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Note title..."
-            className="w-full text-2xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-none focus:outline-none"
+        placeholder="Untitled Note"
+            className="w-full text-4xl font-serif font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none focus:outline-none"
       />
 
       {/* Tags display */}

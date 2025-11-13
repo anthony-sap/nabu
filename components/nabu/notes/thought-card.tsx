@@ -18,24 +18,26 @@ interface ThoughtCardProps {
  */
 export function ThoughtCard({ thought }: ThoughtCardProps) {
   return (
-    <Card className="bg-card/40 border-border/10 hover:border-border/20 transition-colors hover:bg-card/50">
-      <CardContent className="pt-6 pb-5 px-5">
+    <Card className="relative bg-background/60 border-border/40 hover:border-primary/30 transition-all duration-200 hover:shadow-xl hover:shadow-primary/5 backdrop-blur-md overflow-hidden group">
+      {/* Glassy shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent pointer-events-none" />
+      <CardContent className="relative pt-6 pb-5 px-6">
         <div className="space-y-4">
           {/* Header: Title and timestamp */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base text-foreground mb-1 truncate">
+              <h3 className="font-serif font-semibold text-lg text-foreground mb-1.5 truncate">
                 {thought.title || "Untitled Thought"}
               </h3>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
+                <Clock className="h-3.5 w-3.5" />
                 <span>{formatTimeAgo(thought.createdAt)}</span>
               </div>
             </div>
           </div>
           
           {/* Content preview with line clamping */}
-          <p className="text-sm text-foreground/70 leading-relaxed line-clamp-3">
+          <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
             {thought.content}
           </p>
           

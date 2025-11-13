@@ -1,13 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { ModeToggle } from "@/components/layout/mode-toggle";
-import { UserAccountNav } from "@/components/layout/user-account-nav";
-import { NabuNav } from "@/components/nabu/nabu-nav";
-import { NabuMobileMenu } from "@/components/nabu/nabu-mobile-menu";
 import { QuickThoughtProvider } from "@/components/nabu/quick-thought-context";
-import { QuickThoughtTrigger } from "@/components/nabu/quick-thought-trigger";
 import { QuickThoughtManager } from "@/components/nabu/quick-thought-manager";
-import MaxWidthWrapper from "@/components/shared/max-width-wrapper";
 
 interface NabuLayoutProps {
   children: React.ReactNode;
@@ -15,7 +9,7 @@ interface NabuLayoutProps {
 
 /**
  * Layout for the Nabu application section
- * Includes top navigation bar with mode toggle and user account
+ * Minimalist layout with integrated sidebar navigation
  */
 export default async function NabuLayout({ children }: NabuLayoutProps) {
   const user = await getCurrentUser();
@@ -25,43 +19,21 @@ export default async function NabuLayout({ children }: NabuLayoutProps) {
 
   return (
     <QuickThoughtProvider>
-      <div className="relative flex min-h-screen w-full flex-col bg-background">
-        {/* Top navigation header */}
-        <header className="bg-background/95 backdrop-blur-sm sticky top-0 z-50 flex h-14 border-b border-border px-4 lg:h-[60px] xl:px-8">
-        <MaxWidthWrapper className="flex max-w-full items-center justify-between gap-x-3 px-0">
-          {/* Left side: Mobile menu + Logo/Brand + Desktop nav */}
-          <div className="flex items-center gap-3 md:gap-6">
-            {/* Mobile menu toggle */}
-            <NabuMobileMenu />
-            
-            {/* Logo/Brand area */}
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-xl bg-primary/10 relative flex items-center justify-center">
-               <img src="/nabu_logo.png" alt="Nabu" className="absolute inset-0 m-1.5 fill-[var(--nabu-mint)] w-5"/>
-              </div>
-              <span className="font-serif font-bold text-lg text-foreground">Nabu</span>
-            </div>
-            
-            {/* Desktop navigation links */}
-            <div className="hidden md:flex">
-              <NabuNav />
-            </div>
-          </div>
-
-          {/* Right side actions */}
-          <div className="flex items-center gap-3">
-            <QuickThoughtTrigger />
-            <ModeToggle />
-            <UserAccountNav />
-          </div>
-        </MaxWidthWrapper>
-      </header>
-
-        {/* Main content area */}
-        <main className="flex-1 p-4 xl:px-8">
-          <MaxWidthWrapper className="flex h-full max-w-full flex-col px-0">
-            {children}
-          </MaxWidthWrapper>
+      {/* Multi-layer gradient background for premium feel */}
+      <div className="relative flex min-h-screen w-full bg-background">
+        {/* Radial gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-[600px] bg-gradient-radial from-primary/10 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-gradient-radial from-secondary/8 via-transparent to-transparent pointer-events-none" />
+        
+        {/* Subtle noise texture overlay */}
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }} />
+        
+        {/* Main content - full width, children handle their own layout */}
+        <main className="relative flex-1 w-full">
+          {children}
         </main>
 
         {/* Quick Thought Manager - handles all modals and minimized thoughts */}

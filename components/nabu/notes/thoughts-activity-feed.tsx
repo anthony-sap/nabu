@@ -84,23 +84,24 @@ export function ThoughtsActivityFeed() {
   return (
     <div className="h-full">
       <ScrollArea className="h-full">
-        <div className="space-y-4 pt-6 pb-6">
+        <div className="space-y-6 max-w-4xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">Thoughts</h2>
+              <h2 className="text-xl font-serif font-semibold text-foreground">Thoughts</h2>
             </div>
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs bg-secondary/15 text-secondary border-secondary/20">
               {thoughts.length} {thoughts.length === 1 ? "thought" : "thoughts"}
             </Badge>
           </div>
 
           {/* Loading state */}
           {isLoading && (
-            <Card className="bg-card/30 border-border/20">
-              <CardContent className="py-16 text-center">
-                <div className="space-y-1.5">
+            <Card className="relative bg-background/60 border-border/40 shadow-xl shadow-primary/5 backdrop-blur-md overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent pointer-events-none" />
+              <CardContent className="relative py-20 text-center">
+                <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Loading thoughts...</p>
                 </div>
               </CardContent>
@@ -109,10 +110,11 @@ export function ThoughtsActivityFeed() {
 
           {/* Error state */}
           {error && !isLoading && (
-            <Card className="bg-destructive/5 border-destructive/20">
-              <CardContent className="py-16 text-center">
-                <div className="space-y-1.5">
-                  <p className="text-sm text-destructive">{error}</p>
+            <Card className="relative bg-destructive/5 border-destructive/30 shadow-xl backdrop-blur-md overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent pointer-events-none" />
+              <CardContent className="relative py-20 text-center">
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive font-medium">{error}</p>
                 </div>
               </CardContent>
             </Card>
@@ -120,17 +122,18 @@ export function ThoughtsActivityFeed() {
 
           {/* Empty state */}
           {!isLoading && !error && thoughts.length === 0 && (
-            <Card className="bg-card/30 border-border/20">
-              <CardContent className="py-16 text-center space-y-4">
-                <div className="relative mx-auto w-16 h-16">
-                  <div className="absolute inset-0 bg-primary/10 rounded-full blur-lg" />
-                  <div className="relative flex items-center justify-center w-full h-full bg-primary/5 rounded-full border border-primary/20">
-                    <Lightbulb className="h-8 w-8 text-primary" />
+            <Card className="relative bg-background/60 border-border/40 shadow-xl shadow-primary/5 backdrop-blur-md overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent pointer-events-none" />
+              <CardContent className="relative py-20 text-center space-y-6">
+                <div className="relative mx-auto w-20 h-20">
+                  <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl" />
+                  <div className="relative flex items-center justify-center w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 rounded-full border border-primary/30">
+                    <Lightbulb className="h-10 w-10 text-primary" />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="font-semibold text-base text-foreground">No thoughts yet</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                <div className="space-y-2">
+                  <h3 className="font-serif font-bold text-xl text-foreground">No thoughts yet</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
                     Use the Quick Thought feature (⌘+K) to capture your ideas. They'll appear here.
                   </p>
                 </div>
@@ -140,29 +143,30 @@ export function ThoughtsActivityFeed() {
 
           {/* Thoughts list */}
           {!isLoading && !error && thoughts.length > 0 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {thoughts.map((thought) => (
                 <Card
                   key={thought.id}
-                  className="bg-card/40 border-border/10 hover:border-border/20 transition-colors hover:bg-card/50"
+                  className="relative bg-background/60 border-border/40 hover:border-primary/30 transition-all duration-200 hover:shadow-xl hover:shadow-primary/5 backdrop-blur-md overflow-hidden group"
                 >
-                  <CardContent className="pt-6 pb-5 px-5">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent pointer-events-none" />
+                  <CardContent className="relative pt-6 pb-5 px-6">
                     <div className="space-y-4">
                       {/* Header: Title and timestamp */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-base text-foreground mb-1 truncate">
+                          <h3 className="font-serif font-semibold text-lg text-foreground mb-1.5 truncate">
                             {thought.meta?.title || "Untitled Thought"}
                           </h3>
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3.5 w-3.5" />
                             <span>{formatTimeAgo(thought.createdAt)}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Content preview */}
-                      <p className="text-sm text-foreground/70 leading-relaxed line-clamp-3">
+                      <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
                         {thought.content}
                       </p>
 
