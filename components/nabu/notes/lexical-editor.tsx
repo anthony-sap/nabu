@@ -152,6 +152,15 @@ export interface MentionItem {
 }
 
 /**
+ * Link item representing a note-to-note link
+ */
+export interface LinkItem {
+  id: string;
+  toNoteId: string;
+  toNoteTitle: string;
+}
+
+/**
  * Props for LexicalEditor component
  */
 interface LexicalEditorProps {
