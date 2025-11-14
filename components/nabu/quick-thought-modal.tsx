@@ -5,12 +5,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Minimize2, X, Loader2 } from "lucide-react";
+import { Lightbulb, Minimize2, X, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickThought, ThoughtDraft } from "./quick-thought-context";
 import { LexicalEditor } from "./notes/lexical-editor";
 import { toast } from "sonner";
 import { SourceUrlList, SourceInfo } from "./notes/source-url-list";
+import { SmartInputSuggestionCompact } from "./notes/smart-input-suggestion";
+import { analyzeContentIntent, shouldShowSuggestion, ContentClassification } from "@/lib/ai/content-classifier";
+import { useRouter } from "next/navigation";
 
 /**
  * Props for the QuickThoughtModal component
@@ -41,9 +44,38 @@ const availableTags = ["idea", "todo", "meeting", "research", "planning", "perso
  * - Keyboard shortcuts (Cmd+S to save, Esc to close)
  */
 export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
+  const router = useRouter();
   const { updateDraft, deleteDraft, minimizeDraft } = useQuickThought();
   const [isSaving, setIsSaving] = useState(false);
   const [sourceUrls, setSourceUrls] = useState<SourceInfo[]>([]);
+  const [classification, setClassification] = useState<ContentClassification | null>(null);
+  const [showSuggestion, setShowSuggestion] = useState(false);
+  const [userOverrideType, setUserOverrideType] = useState<'thought' | 'note' | null>(null);
+
+  /**
+   * Analyze content in real-time with debouncing
+   */
+  useEffect(() => {
+    // Don't analyze empty content
+    if (!draft.content.trim() && !draft.title.trim()) {
+      setClassification(null);
+      setShowSuggestion(false);
+      return;
+    }
+
+    // Debounce analysis by 500ms
+    const timer = setTimeout(() => {
+      const result = analyzeContentIntent(
+        draft.content,
+        draft.title,
+        false // Can't detect paste in this context
+      );
+      setClassification(result);
+      setShowSuggestion(shouldShowSuggestion(result));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [draft.content, draft.title]);
 
   /**
    * Handle keyboard shortcuts within the modal
@@ -80,9 +112,9 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
   };
 
   /**
-   * Handle saving the thought
+   * Handle saving as Thought
    */
-  const handleSave = async () => {
+  const handleSaveAsThought = async () => {
     if (!draft.content.trim() || isSaving) return;
 
     setIsSaving(true);
@@ -94,11 +126,11 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         source: "WEB" as const,
         suggestedTags: draft.selectedTags,
         meta: {
-      title: draft.title.trim() || "Untitled",
-      folder: draft.selectedFolder,
-          contentState: draft.editorState || undefined, // Store Lexical state in meta
+          title: draft.title.trim() || "Untitled",
+          folder: draft.selectedFolder,
+          contentState: draft.editorState || undefined,
         },
-    };
+      };
 
       // Call API to create thought
       const response = await fetch("/api/nabu/thoughts", {
@@ -123,6 +155,76 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  /**
+   * Handle creating as Note
+   */
+  const handleCreateAsNote = async () => {
+    if (!draft.content.trim() || isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      const payload = {
+        title: draft.title.trim() || "Untitled",
+        content: draft.content.trim(),
+        contentState: draft.editorState || undefined,
+      };
+
+      const response = await fetch("/api/nabu/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to create note");
+      }
+
+      toast.success("Note created!");
+      deleteDraft(draft.id);
+      
+      // Navigate to the new note
+      if (result.data?.note?.id) {
+        router.push(`/notes?noteId=${result.data.note.id}`);
+      }
+    } catch (error) {
+      console.error("Failed to create note:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create note"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /**
+   * Handle saving (respects user override or suggestion)
+   */
+  const handleSave = () => {
+    if (!draft.content.trim()) return;
+
+    // If user explicitly overrode, use that
+    if (userOverrideType === 'note') {
+      handleCreateAsNote();
+    } else if (userOverrideType === 'thought') {
+      handleSaveAsThought();
+    }
+    // If showing suggestion, use the suggested type
+    else if (classification && showSuggestion) {
+      if (classification.type === 'note') {
+        handleCreateAsNote();
+      } else {
+        handleSaveAsThought();
+      }
+    }
+    // Default: save as thought (low friction)
+    else {
+      handleSaveAsThought();
     }
   };
 
@@ -213,6 +315,24 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
             )}
           </div>
 
+          {/* Smart suggestion banner */}
+          {classification && showSuggestion && !userOverrideType && (
+            <SmartInputSuggestionCompact
+              classification={classification}
+              onConfirm={() => {
+                setUserOverrideType(classification.type);
+                setShowSuggestion(false);
+              }}
+              onOverride={() => {
+                setUserOverrideType(classification.type === 'note' ? 'thought' : 'note');
+                setShowSuggestion(false);
+              }}
+              onDismiss={() => {
+                setShowSuggestion(false);
+              }}
+            />
+          )}
+
           {/* Folder selection */}
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
@@ -266,30 +386,44 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         </ScrollArea>
 
         {/* Action buttons - fixed at bottom */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border/50 flex-shrink-0">
-          <Button
-            variant="ghost"
-            onClick={() => deleteDraft(draft.id)}
-          >
-            Discard
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!draft.content.trim() || isSaving}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Save Thought
-              </>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {userOverrideType && (
+              <span className="text-xs text-muted-foreground">
+                Will create as {userOverrideType === 'note' ? 'Note' : 'Thought'}
+              </span>
             )}
-          </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => deleteDraft(draft.id)}
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!draft.content.trim() || isSaving}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : userOverrideType === 'note' ? (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Create Note
+                </>
+              ) : (
+                <>
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  Save Thought
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -6,15 +6,13 @@ import Color from "color";
 import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { NotesSidebar } from "./notes-sidebar";
-import { ActivityFeed } from "./activity-feed";
 import { NoteDetailView } from "./note-detail-view";
 import { NoteEditor } from "./note-editor";
 import { ThoughtsActivityFeed } from "./thoughts-activity-feed";
 import { SearchDialog } from "./search-dialog";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
-import { SavedThought, FolderItem, NoteItem } from "./types";
+import { FolderItem, NoteItem } from "./types";
 import { SearchResult } from "./types-search";
-import { exampleThoughts, STORAGE_KEY } from "./constants";
 import { fetchRootFolders, fetchFolderChildren } from "./api";
 import {
   Dialog,
@@ -46,19 +44,17 @@ interface NotesActivityPageProps {
  * Combines activity feed, folder navigation, and note viewing functionality
  * 
  * Features:
- * - Activity feed with quick capture form
+ * - Database-backed thoughts feed with quick capture
  * - Hierarchical folder structure for organizing notes
  * - Dual view system (feed vs folder/note detail)
- * - LocalStorage persistence for thoughts
- * - Auto-sync across browser tabs
  * - URL-based routing for notes and thoughts
  */
 export default function NotesActivityPage({ initialNoteId, initialThoughtId }: NotesActivityPageProps = {}) {
   // Next.js navigation hooks
   const router = useRouter();
   const pathname = usePathname();
-  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor, "thoughts" shows thoughts feed
-  const [view, setView] = useState<"feed" | "folders" | "editor" | "thoughts">("feed");
+  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor
+  const [view, setView] = useState<"feed" | "folders" | "editor">("feed");
   
   // Folder structure with expand/collapse state
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -75,9 +71,6 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   
   // Note being edited in editor view
   const [editingNote, setEditingNote] = useState<{ id: string; folderId: string } | null>(null);
-  
-  // Array of all saved thoughts, sorted by creation date (newest first)
-  const [thoughts, setThoughts] = useState<SavedThought[]>([]);
 
   // Modal state for creating/editing folders
   const [folderModalOpen, setFolderModalOpen] = useState(false);
@@ -155,43 +148,35 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     loadRootNotes();
   }, []);
 
-  /**
-   * Load thoughts from localStorage on component mount
-   * Sets up storage event listener for cross-tab synchronization
-   */
-  useEffect(() => {
-    const loadThoughts = () => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsedThoughts = JSON.parse(saved);
-          // Sort by createdAt, newest first
-          const sorted = parsedThoughts.sort((a: SavedThought, b: SavedThought) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          setThoughts(sorted);
-        } else {
-          // If no saved thoughts, show examples
-          setThoughts(exampleThoughts);
-        }
-      } catch (error) {
-        console.error('Failed to load thoughts:', error);
-        setThoughts(exampleThoughts);
-      }
-    };
+  // localStorage logic removed - now using database-backed thoughts from API
 
-    loadThoughts();
-    
-    // Listen for storage changes to update in real-time across tabs
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) {
-        loadThoughts();
+  /**
+   * Refresh folder tree and root notes
+   * Used after bulk operations like auto-move
+   */
+  const refreshFoldersAndNotes = async () => {
+    try {
+      // Reload folders
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+      
+      // Reload root notes
+      const notesResponse = await fetch('/api/nabu/notes?folderId=null');
+      if (notesResponse.ok) {
+        const data = await notesResponse.json();
+        if (data.success && data.data.notes) {
+          setRootNotes(data.data.notes.map((note: any) => ({
+            id: note.id,
+            title: note.title,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          })));
+        }
       }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    } catch (error) {
+      console.error('Failed to refresh folders and notes:', error);
+    }
+  };
 
   /**
    * Setup keyboard shortcut for search (Cmd+Shift+F)
@@ -392,35 +377,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     setFolders(expandedFolders);
   };
 
-  /**
-   * Handles saving a new thought to localStorage and state
-   * Creates a new SavedThought object with timestamp-based ID
-   */
-  const handleSaveThought = (title: string, content: string) => {
-    if (!title.trim() && !content.trim()) {
-      return;
-    }
-
-    const thought: SavedThought = {
-      id: `thought-${Date.now()}`,
-      title: title.trim() || "Untitled",
-      content: content.trim(),
-      tags: [],
-      folder: "",
-      createdAt: new Date().toISOString(),
-      pinned: false,
-    };
-
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const existing = saved ? JSON.parse(saved) : [];
-      const updated = [thought, ...existing];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      setThoughts(updated);
-    } catch (error) {
-      console.error('Failed to save thought:', error);
-    }
-  };
+  // handleSaveThought removed - now using database API in ThoughtsActivityFeed
 
   /**
    * Recursively toggles the expanded state of a folder in the tree
@@ -497,11 +454,11 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   };
 
   /**
-   * Handles view changes and clears selected note when returning to feed or thoughts
+   * Handles view changes and clears selected note when returning to feed
    */
-  const handleViewChange = (newView: "feed" | "folders" | "editor" | "thoughts") => {
+  const handleViewChange = (newView: "feed" | "folders" | "editor") => {
     setView(newView);
-    if (newView === "feed" || newView === "thoughts") {
+    if (newView === "feed") {
       setSelectedNote(null);
       setEditingNote(null);
     }
@@ -1116,6 +1073,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           onDeleteNote={handleDeleteNoteRequest}
           onMoveFolder={handleMoveFolder}
           onMoveNote={handleMoveNote}
+          onRefreshFolders={refreshFoldersAndNotes}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
         />
@@ -1145,11 +1103,6 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           {/* Content area with padding */}
           <div className="flex-1 overflow-auto">
             {view === "feed" ? (
-              <ActivityFeed
-                thoughts={thoughts}
-                onSaveThought={handleSaveThought}
-              />
-            ) : view === "thoughts" ? (
               <ThoughtsActivityFeed />
             ) : view === "editor" && editingNote ? (
               <NoteEditor

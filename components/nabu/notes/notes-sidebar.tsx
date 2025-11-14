@@ -3,14 +3,20 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Home, AlertCircle, FileText, Trash2, Lightbulb, Zap } from "lucide-react";
+import { Sparkles, Home, AlertCircle, FileText, Trash2, Loader2 } from "lucide-react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
 import { FolderItem as FolderItemType, NoteItem } from "./types";
 import { DragData } from "./drag-drop-utils";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { UserAccountNav } from "@/components/layout/user-account-nav";
 import { QuickThoughtTrigger } from "@/components/nabu/quick-thought-trigger";
+import { UncategorisedHeader, UncategorisedMode } from "./uncategorised-header";
+import { BulkMoveControls } from "./bulk-move-controls";
+import { AutoMovePreview, AutoMoveSuggestions } from "./auto-move-preview";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 /**
  * Props for the NotesSidebar component
@@ -18,10 +24,10 @@ import { QuickThoughtTrigger } from "@/components/nabu/quick-thought-trigger";
 interface NotesSidebarProps {
   folders: FolderItemType[];
   rootNotes: NoteItem[];
-  view: "feed" | "folders" | "editor" | "thoughts";
+  view: "feed" | "folders" | "editor";
   selectedNote: FolderItemType | null;
   editingNoteId?: string | null;
-  onViewChange: (view: "feed" | "folders" | "editor" | "thoughts") => void;
+  onViewChange: (view: "feed" | "folders" | "editor") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
@@ -31,6 +37,7 @@ interface NotesSidebarProps {
   onDeleteNote?: (noteId: string) => void;
   onMoveFolder?: (folderId: string, newParentId: string | null) => void;
   onMoveNote?: (noteId: string, newFolderId: string | null) => void;
+  onRefreshFolders?: () => Promise<void>; // Callback to refresh folder tree and root notes
   isLoadingFolders?: boolean;
   folderLoadError?: string | null;
 }
@@ -45,6 +52,124 @@ const formatDate = (dateString: string) => {
     month: '2-digit' 
   });
 };
+
+/**
+ * Draggable note component for uncategorised section
+ */
+function UncategorisedNote({
+  note,
+  editingNoteId,
+  onNoteSelect,
+  onDeleteNote,
+  showCheckbox = false,
+  isSelected = false,
+  onToggleSelection,
+  selectedNoteIds = [],
+}: {
+  note: NoteItem;
+  editingNoteId?: string | null;
+  onNoteSelect: (item: FolderItemType) => void;
+  onDeleteNote?: (noteId: string) => void;
+  showCheckbox?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (noteId: string) => void;
+  selectedNoteIds?: string[];
+}) {
+  const noteRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Setup drag functionality for this note
+  useEffect(() => {
+    const element = noteRef.current;
+    if (!element) return;
+
+    const cleanup = draggable({
+      element,
+      getInitialData: () => {
+        // If in bulk mode and this note is selected, include all selected notes
+        const noteIdsToMove = showCheckbox && isSelected && selectedNoteIds.length > 0
+          ? selectedNoteIds
+          : [note.id];
+
+        const dragData: DragData = {
+          type: "note",
+          id: note.id,
+          name: selectedNoteIds.length > 1 ? `${selectedNoteIds.length} notes` : note.title,
+          folderId: null,
+          // Custom data for bulk move
+          bulkMoveNoteIds: noteIdsToMove.length > 1 ? noteIdsToMove : undefined,
+        };
+        return dragData;
+      },
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    return cleanup;
+  }, [note.id, note.title, showCheckbox, isSelected, selectedNoteIds]);
+
+  return (
+    <div
+      ref={noteRef}
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group h-8 ${
+        editingNoteId === note.id
+          ? "bg-primary/15 text-foreground font-medium shadow-sm ring-1 ring-primary/20"
+          : isDragging
+          ? "opacity-50"
+          : isSelected
+          ? "bg-primary/10 border border-primary/30"
+          : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
+      }`}
+      style={{ paddingLeft: showCheckbox ? '12px' : '24px' }}
+      onClick={() => {
+        if (showCheckbox && onToggleSelection) {
+          onToggleSelection(note.id);
+        } else {
+          onNoteSelect({
+            id: note.id,
+            name: note.title,
+            type: "note",
+          });
+        }
+      }}
+    >
+      {/* Checkbox in bulk/auto mode */}
+      {showCheckbox && (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelection?.(note.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="h-4 w-4 rounded border-border/40 text-primary focus:ring-primary cursor-pointer"
+        />
+      )}
+      
+      <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+      <span className="text-sm flex-1 truncate">{note.title}</span>
+      <div className="flex items-center gap-1">
+        {!showCheckbox && (
+          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
+            {formatDate(note.updatedAt)}
+          </span>
+        )}
+        {!showCheckbox && onDeleteNote && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteNote(note.id);
+            }}
+            title="Delete note"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Sidebar component for notes navigation
@@ -66,12 +191,21 @@ export function NotesSidebar({
   onDeleteNote,
   onMoveFolder,
   onMoveNote,
+  onRefreshFolders,
   isLoadingFolders,
   folderLoadError,
 }: NotesSidebarProps) {
+  const router = useRouter();
   const [isRootDropTarget, setIsRootDropTarget] = useState(false);
   const uncategorisedRef = useRef<HTMLDivElement>(null);
   const rootDropZoneRef = useRef<HTMLButtonElement>(null);
+  
+  // Uncategorised section modes and state
+  const [uncategorisedMode, setUncategorisedMode] = useState<UncategorisedMode>('normal');
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
+  const [autoMoveSuggestions, setAutoMoveSuggestions] = useState<AutoMoveSuggestions | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showAutoMovePreview, setShowAutoMovePreview] = useState(false);
 
   // Setup drop target for Uncategorised section (notes only)
   useEffect(() => {
@@ -124,8 +258,132 @@ export function NotesSidebar({
 
     return cleanup;
   }, [onMoveFolder]);
+
+  /**
+   * Handle mode change for uncategorised section
+   */
+  const handleModeChange = async (newMode: UncategorisedMode) => {
+    if (newMode === 'normal') {
+      // Exiting mode - clear selection
+      setSelectedNoteIds(new Set());
+      setAutoMoveSuggestions(null);
+      setShowAutoMovePreview(false);
+    } else if (newMode === 'auto') {
+      // Entering auto mode - select all notes initially
+      setSelectedNoteIds(new Set(rootNotes.map(n => n.id)));
+    }
+    setUncategorisedMode(newMode);
+  };
+
+  /**
+   * Toggle selection of a note
+   */
+  const handleToggleSelection = (noteId: string) => {
+    const newSet = new Set(selectedNoteIds);
+    if (newSet.has(noteId)) {
+      newSet.delete(noteId);
+    } else {
+      newSet.add(noteId);
+    }
+    setSelectedNoteIds(newSet);
+  };
+
+  /**
+   * Select all uncategorised notes
+   */
+  const handleSelectAll = () => {
+    setSelectedNoteIds(new Set(rootNotes.map(n => n.id)));
+  };
+
+  /**
+   * Deselect all notes
+   */
+  const handleDeselectAll = () => {
+    setSelectedNoteIds(new Set());
+  };
+
+  /**
+   * Trigger auto-move analysis
+   */
+  const handleAnalyzeAutoMove = async () => {
+    if (selectedNoteIds.size === 0) {
+      toast.error("Please select at least one note");
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      const response = await fetch("/api/nabu/notes/auto-move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          noteIds: Array.from(selectedNoteIds),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to analyze notes");
+      }
+
+      setAutoMoveSuggestions(result.data);
+      setShowAutoMovePreview(true);
+    } catch (error) {
+      console.error("Failed to analyze auto-move:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to analyze notes"
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  /**
+   * Execute auto-move with suggestions
+   */
+  const handleExecuteAutoMove = async (moves: Array<{
+    noteId: string;
+    folderId?: string;
+    createFolder?: { name: string; color: string };
+  }>) => {
+    try {
+      const response = await fetch("/api/nabu/notes/execute-auto-move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ moves }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to execute auto-move");
+      }
+
+      toast.success(result.message || "Notes organized successfully!");
+      
+      // Reset state
+      setUncategorisedMode('normal');
+      setSelectedNoteIds(new Set());
+      setAutoMoveSuggestions(null);
+      setShowAutoMovePreview(false);
+      
+      // Refresh folder tree and root notes
+      if (onRefreshFolders) {
+        await onRefreshFolders();
+      } else {
+        // Fallback to router refresh if callback not provided
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Failed to execute auto-move:", error);
+      throw error; // Re-throw so preview can handle it
+    }
+  };
+
   return (
-    <div className="w-72 flex-shrink-0 h-full border-r border-border/30 backdrop-blur-xl bg-background/40 flex flex-col">
+    <div className="w-80 flex-shrink-0 h-full border-r border-border/30 backdrop-blur-xl bg-background/40 flex flex-col">
       {/* Top branding and controls with glassy effect */}
       <div className="flex-shrink-0 px-4 py-4 border-b border-border/30">
         {/* Logo and controls row - inline */}
@@ -173,27 +431,6 @@ export function NotesSidebar({
             )}
           </div>
 
-          {/* Thoughts navigation option with premium active state */}
-          <div
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
-              view === "thoughts"
-                ? "bg-primary/15 text-primary font-medium shadow-sm ring-1 ring-primary/20"
-                : "hover:bg-muted/30 text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => {
-              onViewChange("thoughts");
-            }}
-          >
-            {view === "thoughts" && (
-              <div className="absolute left-0 w-1 h-6 bg-primary rounded-r-full" />
-            )}
-            <Lightbulb className="h-4 w-4" />
-            <span className="text-sm">Thoughts</span>
-            {view === "thoughts" && (
-              <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            )}
-          </div>
-          
           <Separator className="my-3 bg-border/30" />
 
           {/* Section label */}
@@ -266,61 +503,98 @@ export function NotesSidebar({
             </div>
           )}
 
-          {/* Uncategorised section for root-level notes */}
-          {!isLoadingFolders && rootNotes.length > 0 && (
+          {/* Uncategorised section - always visible as drop target */}
+          {!isLoadingFolders && (
             <>
               <Separator className="my-3 bg-border/30" />
-              <div className="space-y-0.5" ref={uncategorisedRef}>
-                <div className={`text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 py-1.5 rounded-lg transition-all duration-200 ${
-                  isRootDropTarget ? "bg-primary/20 text-primary" : ""
-                }`}>
-                  Uncategorised
+              <div className="space-y-0.5">
+                {/* Header with mode switcher */}
+                <div className="group">
+                  <UncategorisedHeader
+                    noteCount={rootNotes.length}
+                    selectedCount={selectedNoteIds.size}
+                    mode={uncategorisedMode}
+                    onModeChange={handleModeChange}
+                    isDragOver={isRootDropTarget}
+                  />
                 </div>
-                {rootNotes.map((note) => (
-                  <div
-                    key={note.id}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group h-8 ${
-                      editingNoteId === note.id
-                        ? "bg-primary/15 text-foreground font-medium shadow-sm ring-1 ring-primary/20"
-                        : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
-                    }`}
-                    style={{ paddingLeft: '24px' }}
-                    onClick={() => {
-                      onNoteSelect({
-                        id: note.id,
-                        name: note.title,
-                        type: "note",
-                      });
-                    }}
-                  >
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm flex-1 truncate">{note.title}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
-                        {formatDate(note.updatedAt)}
-                      </span>
-                      {onDeleteNote && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteNote(note.id);
-                          }}
-                          title="Delete note"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+
+                {/* Bulk move controls */}
+                {uncategorisedMode === 'bulk' && rootNotes.length > 0 && (
+                  <BulkMoveControls
+                    totalNotes={rootNotes.length}
+                    selectedCount={selectedNoteIds.size}
+                    onSelectAll={handleSelectAll}
+                    onDeselectAll={handleDeselectAll}
+                  />
+                )}
+
+                {/* Auto-move controls */}
+                {uncategorisedMode === 'auto' && rootNotes.length > 0 && (
+                  <div className="px-3 py-2 space-y-2">
+                    <BulkMoveControls
+                      totalNotes={rootNotes.length}
+                      selectedCount={selectedNoteIds.size}
+                      onSelectAll={handleSelectAll}
+                      onDeselectAll={handleDeselectAll}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleAnalyzeAutoMove}
+                      disabled={selectedNoteIds.size === 0 || isAnalyzing}
+                      className="w-full h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                          Analyze & Move
+                        </>
                       )}
-                    </div>
+                    </Button>
                   </div>
-                ))}
+                )}
+
+                {/* Notes list with drag target - always render drop zone */}
+                <div ref={uncategorisedRef}>
+                  {rootNotes.length > 0 ? (
+                    rootNotes.map((note) => (
+                      <UncategorisedNote
+                        key={note.id}
+                        note={note}
+                        editingNoteId={editingNoteId}
+                        onNoteSelect={onNoteSelect}
+                        onDeleteNote={onDeleteNote}
+                        showCheckbox={uncategorisedMode !== 'normal'}
+                        isSelected={selectedNoteIds.has(note.id)}
+                        onToggleSelection={handleToggleSelection}
+                        selectedNoteIds={Array.from(selectedNoteIds)}
+                      />
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                      No uncategorised notes
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
         </div>
       </ScrollArea>
+
+      {/* Auto-move preview dialog */}
+      <AutoMovePreview
+        open={showAutoMovePreview}
+        onOpenChange={setShowAutoMovePreview}
+        suggestions={autoMoveSuggestions}
+        noteDetails={new Map(rootNotes.map(n => [n.id, { id: n.id, title: n.title }]))}
+        onExecute={handleExecuteAutoMove}
+      />
     </div>
   );
 }

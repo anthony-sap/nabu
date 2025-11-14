@@ -9,6 +9,7 @@ export interface DragData extends Record<string, unknown> {
   name: string;
   parentId?: string | null; // For folders
   folderId?: string | null; // For notes
+  bulkMoveNoteIds?: string[]; // For bulk moving multiple notes
 }
 
 /**

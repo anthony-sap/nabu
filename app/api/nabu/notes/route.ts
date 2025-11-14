@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
     };
 
     if (folderId !== undefined) {
-      where.folderId = folderId;
+      // Handle string "null" as actual null for uncategorised notes
+      where.folderId = folderId === 'null' ? null : folderId;
     }
 
     if (visibility) {
