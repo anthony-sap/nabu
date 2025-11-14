@@ -1,367 +1,102 @@
 # Tag System Architecture
 
-## Overview
-
-The tag system allows users to create and manage tags using the `#` mention syntax in the Lexical editor. Tags automatically sync with the database in real-time and can be searched, filtered, and created dynamically.
+This document explains how tags flow through the product—from Lexical mentions to Prisma models—so new contributors can reason about UX behavior, database invariants, and background jobs without re‑reading the entire codebase.
 
 ---
 
-## 1. Frontend - Lexical Editor
+## Platform Responsibilities
 
-### Mention Plugin (`lexical-editor.tsx`)
-
-**Configuration:**
-- Uses `BeautifulMentionsPlugin` with `onSearch` callback
-- Dynamic fetching: Calls `/api/nabu/mentions` as user types
-- Filters results with "starts with" logic
-- `creatable: true` allows creating new tags
-- Returns format: `{ id, value, type, description }`
-
-**Key Props:**
-```typescript
-<BeautifulMentionsPlugin
-  triggers={["@", "#", "/"]}
-  onSearch={handleMentionSearch}
-  creatable
-  insertOnBlur
-  autoSpace
-  allowSpaces
-/>
-```
-
-**Search Function:**
-```typescript
-const handleMentionSearch = async (trigger: string, queryString: string | null) => {
-  // Fetch from API
-  const response = await fetch("/api/nabu/mentions");
-  const data = result.data;
-  
-  // Filter by trigger type
-  if (trigger === "#") {
-    const tags = data.tags || [];
-    if (queryString) {
-      return tags.filter(item => 
-        item.value.toLowerCase().startsWith(queryString.toLowerCase())
-      );
-    }
-    return tags;
-  }
-  // ... similar for @ and /
-};
-```
+1. **Capture** – recognize `#hashtags` (and future `/commands`) inline inside the Lexical editor, including newly created tag names.
+2. **Sync** – keep the editor state, metadata sidebar, and Prisma-backed NoteTag join table in sync with soft-delete semantics.
+3. **Suggest** – surface AI-generated tag candidates when content meets the configured thresholds and let users accept/dismiss them.
+4. **Retrieve** – expose tags as chips, filters, and search facets so both keyword and semantic search can narrow by tag context.
+5. **Audit** – every tag mutation must honor multi-tenant audit fields (`tenantId`, `createdBy`, `deletedAt`, …) enforced by Prisma middleware.
 
 ---
 
-### Tag Tracking (`lexical-tag-sync-plugin.tsx`)
+## System Map
 
-**Purpose:** Monitor editor for tag mentions and notify parent component
-
-**Implementation:**
-- Registers editor update listener
-- Traverses all nodes looking for `custom-beautifulMention` with `trigger: "#"`
-- Debounces (500ms) to avoid excessive calls
-- Extracts tags and calls: `onTagsChanged(tags[])`
-- Only notifies when tags actually change
-
-**Key Code:**
-```typescript
-export function TagSyncPlugin({ onTagsChanged }: TagSyncPluginProps) {
-  const [editor] = useLexicalComposerContext();
-  
-  useEffect(() => {
-    const removeListener = editor.registerUpdateListener(({ editorState }) => {
-      setTimeout(() => {
-        editorState.read(() => {
-          const tags: MentionItem[] = [];
-          
-          function traverse(node: any) {
-            if (node.__type === "custom-beautifulMention" && node.__trigger === "#") {
-              tags.push({
-                id: node.__data?.id || node.__value,
-                value: node.__value,
-                type: "tag",
-              });
-            }
-            node.getChildren?.().forEach(child => traverse(child));
-          }
-          
-          root.getChildren().forEach(child => traverse(child));
-          onTagsChanged(tags);
-        });
-      }, 500);
-    });
-    
-    return removeListener;
-  }, [editor, onTagsChanged]);
-}
-```
+| Layer | Responsibilities | Key files |
+| --- | --- | --- |
+| Lexical plugins | Mention dropdown, hashtag capture, source tracking | `components/nabu/notes/lexical-*.tsx` |
+| Note editor shell | React state, debounce + diffing, API orchestration | `components/nabu/notes/note-editor.tsx` |
+| REST APIs | CRUD on tags, mentions autocomplete, tag suggestion jobs | `app/api/nabu/{mentions,notes/[id]/tags,tag-suggestions}` |
+| DB + middleware | Tag / NoteTag models, audit enforcement, soft delete/restore | `prisma/schema.prisma`, `lib/dbMiddleware.ts` |
+| Background workers | AI tagging pipeline (Supabase Edge Function) | `supabase/functions/process-tag-suggestion` |
+| Search | Tag filters, hybrid ranking, `/api/nabu/search` | `app/api/nabu/search/route.ts`, `components/nabu/notes/search-dialog.tsx` |
 
 ---
 
-## 2. Frontend - Note Editor
+## 1. Editor Capture & Mentions
 
-### State Management (`note-editor.tsx`)
+### `BeautifulMentionsPlugin` (inside `lexical-editor.tsx`)
+- Triggers: `["@", "#", "/"]`; `#` drives tag creation.
+- `onSearch` hits `/api/nabu/mentions` to fetch up to 100 of the user’s most recent tags, folders, notes, and thoughts.
+- The response normalizes to `{ id, value, type, description, color }` so downstream UI renders consistent pills.
+- `creatable: true` + `allowSpaces` lets users type multi-word tags inline; we rely on `insertOnBlur` to finalize nodes even if the user clicks out.
 
-**State Variables:**
-- `tags` - All tags linked to note in database
-- `contentTags` - Tags detected in editor content via TagSyncPlugin
-- `isSyncingTags` - Ref to prevent infinite loops
-
-**Callbacks:**
-```typescript
-<LexicalEditor
-  onTagsChanged={handleTagsChanged}
-  // ... other props
-/>
-```
+### Search handler responsibilities
+1. Debounce network calls (handled at the plugin level).
+2. Send both the trigger (`#`, `@`, `/`) and the partial query string.
+3. Filter the payload client-side with `startsWith` so we never expose someone else’s tag name (multi-tenant constraint).
 
 ---
 
-### Sync Logic (`handleTagsChanged`)
+## 2. TagSyncPlugin → Note Editor Glue
 
-**Flow:**
-1. Receive new tags from TagSyncPlugin
-2. Compare with current database tags
-3. Determine tags to add and remove
-4. Call APIs to sync
-5. Update local state
+`components/nabu/notes/lexical-tag-sync-plugin.tsx` walks the Lexical AST after every editor update:
+- Adds only nodes with `__trigger === "#"`.
+- Deduplicates by node id/value to avoid duplicate POST calls.
+- Debounces 500 ms via a `setTimeout` ref; prevents thrashing while the user types a long tag.
+- Emits the sanitized `MentionItem[]` through `onTagsChanged`.
 
-**Implementation:**
-```typescript
-const handleTagsChanged = useCallback(async (newTags: MentionItem[]) => {
-  if (isSyncingTags.current) return;
-  
-  setContentTags(newTags);
-  isSyncingTags.current = true;
+`note-editor.tsx` receives the callback and runs the reconciliation loop:
+1. Short-circuits if another sync is in flight (`isSyncingTags.current` guard).
+2. Builds `Set`s of lowercase names from DB (`tags`) vs. editor (`newTags`).
+3. Diff logic:
+   - `tagsToAdd` → POST `/api/nabu/notes/{noteId}/tags` (body `{ tagNames: string[] }`).
+   - `tagsToRemove` → DELETE `/api/nabu/notes/{noteId}/tags` but only for `source === "USER_ADDED"` so AI suggestions stay visible until manually dismissed.
+4. Each API response returns the canonical tag list via nested Prisma selects, so React state always reflects the DB truth.
+5. Resets `isSyncingTags.current` to allow the next update.
 
-  // Compare tags
-  const currentTagNames = new Set(tags.map(t => t.name.toLowerCase()));
-  const newTagNames = new Set(newTags.map(t => t.value.toLowerCase()));
-
-  // Find differences
-  const tagsToAdd = newTags
-    .filter(t => !currentTagNames.has(t.value.toLowerCase()))
-    .map(t => t.value);
-  
-  const tagsToRemove = tags
-    .filter(t => !newTagNames.has(t.name.toLowerCase()) && t.source === "USER_ADDED")
-    .map(t => t.name);
-
-  // Add new tags
-  if (tagsToAdd.length > 0) {
-    const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagNames: tagsToAdd }),
-    });
-    if (response.ok) {
-      const { data } = await response.json();
-      setTags(data.tags);
-    }
-  }
-
-  // Remove tags
-  if (tagsToRemove.length > 0) {
-    const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagNames: tagsToRemove }),
-    });
-    if (response.ok) {
-      const { data } = await response.json();
-      setTags(data.tags);
-    }
-  }
-
-  isSyncingTags.current = false;
-}, [noteId, tags]);
-```
-
-**Important Notes:**
-- Only removes `USER_ADDED` tags (preserves AI_SUGGESTED)
-- Uses case-insensitive comparison
-- Updates state with full tag list from API response
+Edge cases handled in code:
+- Case-insensitive comparisons prevent duplicates like `#Ops` vs `#ops`.
+- Removing tags inside the editor never hard deletes AI suggestions; those are managed by the tag suggestion modal.
+- Tag badges (`components/nabu/notes/tag-badge.tsx`) visually differentiate `USER_ADDED` vs `AI_SUGGESTED` (solid vs dashed).
 
 ---
 
-## 3. Backend - Tag APIs
+## 3. API Surface
 
-### GET Mentions (`/api/nabu/mentions`)
+### `/api/nabu/mentions` (GET)
+- Collects the user’s notes, folders, thoughts, and tags scoped by `tenantId`, `userId`, and `deletedAt: null`.
+- Serves as the single autocomplete feed for all mention triggers.
+- Applies default ordering (`updatedAt desc`) and limits to prevent heavy payloads.
 
-**Purpose:** Provide autocomplete data for mention plugin
+### `/api/nabu/notes/[id]/tags` (POST)
+Workflow per tag name:
+1. Confirm note ownership (user + tenant) and ensure note isn’t soft-deleted.
+2. `findFirst` existing Tag; create if missing (restoring `deletedAt` when necessary).
+3. Check for `NoteTag` in one of three states:
+   - Active → skip.
+   - Soft deleted → `update` to clear `deletedAt`, set `source` to `USER_ADDED`.
+   - Missing → create new `NoteTag`.
+4. Update `note.lastTagModifiedAt` to help the tag suggestion cooldown logic.
+5. Return the entire active tag list via `note.noteTags` nested select to stay compatible with audit middleware.
 
-**Response Format:**
-```typescript
-{
-  success: true,
-  data: {
-    notes: [{ id, value, description, type: "note" }],
-    folders: [{ id, value, description, type: "folder" }],
-    thoughts: [{ id, value, description, type: "thought" }],
-    tags: [{ id, value, description, type: "tag", color }]
-  }
-}
-```
+### `/api/nabu/notes/[id]/tags` (DELETE)
+- Looks up the referenced tags, then `updateMany` the `NoteTag` rows to set `deletedAt`.
+- Never hard deletes; this preserves history and allows future restoration.
+- Uses the same nested select response payload as POST.
 
-**Query:**
-```typescript
-const tags = await prisma.tag.findMany({
-  where: { userId, tenantId, deletedAt: null },
-  select: { id, name, color, updatedAt },
-  orderBy: { updatedAt: "desc" },
-  take: 100,
-});
-
-// Transform
-tags.map(tag => ({
-  id: tag.id,
-  value: tag.name,
-  description: tag.color ? `Tag • ${tag.color}` : "Tag",
-  type: "tag",
-  color: tag.color,
-}))
-```
+### `/api/nabu/tag-suggestions`
+- Creates `TagSuggestionJob` rows when content passes the configured thresholds (see `TAG_SUGGESTION_SETUP.md`).
+- Edge Function `process-tag-suggestion` calls OpenAI, stores `suggestedTags`, and updates job status → frontend polls every 3 s via `tag-suggestion-notification.tsx` + `tag-suggestion-modal.tsx`.
+- Accept/reject endpoints (`/[jobId]/accept`, `/reject`, `/dismiss`) update `NoteTag` records and note cooldown timestamps.
 
 ---
 
-### POST Tags (`/api/nabu/notes/[id]/tags`)
-
-**Purpose:** Add tags to a note (create tags if needed, restore if soft-deleted)
-
-**Request:**
-```typescript
-POST /api/nabu/notes/[id]/tags
-Body: { tagNames: ["tag1", "tag2"] }
-```
-
-**Logic:**
-```typescript
-1. Verify note ownership
-2. For each tagName:
-   a. Find or create Tag in database
-   b. Check for existing NoteTag (active OR soft-deleted)
-   c. If soft-deleted: Restore (set deletedAt: null)
-   d. If not exists: Create new NoteTag with source: USER_ADDED
-3. Update note.lastTagModifiedAt
-4. Query all active noteTags for the note
-5. Return complete tag list
-```
-
-**Key Code:**
-```typescript
-// Find or create tag
-let tag = await prisma.tag.findFirst({
-  where: { name: tagName, userId, tenantId, deletedAt: null },
-});
-
-if (!tag) {
-  tag = await prisma.tag.create({
-    data: { name: tagName, userId, tenantId, status: "ENABLE", ... },
-  });
-}
-
-// Check for existing link (active or soft-deleted)
-const activeLink = await prisma.noteTag.findFirst({
-  where: { noteId, tagId: tag.id, deletedAt: null },
-});
-
-const deletedLink = await prisma.noteTag.findFirst({
-  where: { noteId, tagId: tag.id, deletedAt: { not: null } },
-});
-
-if (activeLink) {
-  // Already linked, skip
-} else if (deletedLink) {
-  // Restore soft-deleted link
-  await prisma.noteTag.update({
-    where: { noteId_tagId: { noteId, tagId: tag.id } },
-    data: { deletedAt: null, source: "USER_ADDED" },
-  });
-} else {
-  // Create new link
-  await prisma.noteTag.create({
-    data: { noteId, tagId: tag.id, source: "USER_ADDED" },
-  });
-}
-
-// Fetch complete tag list (IMPORTANT: Use this pattern for middleware compatibility)
-const noteWithTags = await prisma.note.findUnique({
-  where: { id: noteId },
-  select: {
-    noteTags: {
-      where: { deletedAt: null },
-      select: { source, confidence, tag: { select: { id, name, color, type } } }
-    }
-  }
-});
-
-const tags = noteWithTags.noteTags.map(nt => ({
-  id: nt.tag.id,
-  name: nt.tag.name,
-  color: nt.tag.color,
-  source: nt.source,
-  confidence: nt.confidence,
-}));
-
-return { tags };
-```
-
----
-
-### DELETE Tags (`/api/nabu/notes/[id]/tags`)
-
-**Purpose:** Remove tags from a note (soft delete NoteTag link)
-
-**Request:**
-```typescript
-DELETE /api/nabu/notes/[id]/tags
-Body: { tagNames: ["tag1"] }
-```
-
-**Logic:**
-```typescript
-1. Verify note ownership
-2. Find tags by names
-3. Soft delete NoteTags (updateMany with deletedAt)
-4. Update note.lastTagModifiedAt
-5. Query remaining active noteTags
-6. Return updated tag list
-```
-
-**Key Code:**
-```typescript
-// Find tags to remove
-const tags = await prisma.tag.findMany({
-  where: { name: { in: tagNames }, userId, tenantId, deletedAt: null },
-});
-
-// Soft delete (NOT hard delete!)
-if (tags.length > 0) {
-  await prisma.noteTag.updateMany({
-    where: {
-      noteId,
-      tagId: { in: tags.map(t => t.id) },
-      deletedAt: null, // Only update active records
-    },
-    data: { deletedAt: new Date() },
-  });
-}
-
-// Return remaining tags (same pattern as POST)
-const noteWithTags = await prisma.note.findUnique({
-  where: { id: noteId },
-  select: {
-    noteTags: {
-      where: { deletedAt: null },
-      select: { source, confidence, tag: { ... } }
-    }
-  }
-});
-```
-
----
-
-## 4. Database Schema
+## 4. Data Model & Middleware
 
 ```prisma
 model Tag {
@@ -372,200 +107,116 @@ model Tag {
   color     String?
   type      TagType?
   status    StatusEnum @default(ENABLE)
+  createdAt DateTime   @default(now())
+  createdBy String?
+  updatedAt DateTime   @updatedAt
+  updatedBy String?
   deletedAt DateTime?
   noteTags  NoteTag[]
-  // ... audit fields
+
+  @@unique([tenantId, userId, name])
 }
 
 model NoteTag {
   noteId     String
   tagId      String
-  source     TagSource  // USER_ADDED | AI_SUGGESTED
+  tenantId   String?
+  source     TagSource @default(USER_ADDED)
   confidence Float?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
-  // ... audit fields
-  
-  note Note @relation(...)
-  tag  Tag  @relation(...)
-  
-  @@unique([noteId, tagId])
-}
 
-enum TagSource {
-  USER_ADDED
-  AI_SUGGESTED
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
 }
 ```
 
----
-
-## 5. Critical Patterns & Gotchas
-
-### ✅ DO
-
-**Soft Delete Pattern:**
-```typescript
-// Always use updateMany, never deleteMany
-await prisma.noteTag.updateMany({
-  where: { ... },
-  data: { deletedAt: new Date() }
-});
-```
-
-**Restore Pattern:**
-```typescript
-// Check for soft-deleted before creating
-const deletedLink = await prisma.noteTag.findFirst({
-  where: { noteId, tagId, deletedAt: { not: null } }
-});
-
-if (deletedLink) {
-  await prisma.noteTag.update({
-    where: { noteId_tagId: { noteId, tagId } },
-    data: { deletedAt: null }
-  });
-}
-```
-
-**Middleware-Safe Query:**
-```typescript
-// Query through parent relation, not directly
-const note = await prisma.note.findUnique({
-  where: { id },
-  select: {
-    noteTags: {
-      where: { deletedAt: null },
-      select: { ... }
-    }
-  }
-});
-```
-
-### ❌ DON'T
-
-**Hard Delete:**
-```typescript
-// NEVER use deleteMany - breaks restore pattern
-await prisma.noteTag.deleteMany({ where: { ... } }); // ❌
-```
-
-**Nested Where on Relations:**
-```typescript
-// Middleware breaks this pattern
-await prisma.noteTag.findMany({
-  where: { 
-    noteId,
-    tag: { deletedAt: null } // ❌ Doesn't work with middleware
-  }
-});
-```
-
-**Assume Unique Constraint Prevents Duplicates:**
-```typescript
-// Check for soft-deleted first!
-await prisma.noteTag.create({ ... }); // ❌ Fails if soft-deleted exists
-```
+Middleware guarantees:
+- All queries automatically scope by `tenantId` + soft delete flags; never query NoteTag standalone if you need related Tag metadata—always go through `note.noteTags` to inherit middleware filters.
+- Restore-before-create rule: attempting to `create` a NoteTag without checking `deletedAt` will violate the composite PK.
 
 ---
 
-## 6. Data Flow Diagram
+## 5. AI Tag Suggestion Pipeline
 
-```
-User types #tag in editor
-         ↓
-BeautifulMentionsPlugin shows dropdown
-         ↓
-User selects/creates tag
-         ↓
-TagSyncPlugin detects mention node
-         ↓ (500ms debounce)
-onTagsChanged([{ id, value, type }])
-         ↓
-handleTagsChanged compares with DB
-         ↓
-POST /api/nabu/notes/[id]/tags
-         ↓
-API: Find/Create Tag → Check NoteTag → Create/Restore
-         ↓
-Return complete tag list
-         ↓
-setTags(newTags)
-         ↓
-UI updates with all tags
-```
+1. Auto-save (3 s idle) checks eligibility:
+   - Content ≥ `TAG_SUGGESTION_MIN_CHARS` (default 200).
+   - Fewer than 3 existing tags.
+   - Cooldown (`TAG_SUGGESTION_COOLDOWN_MINUTES`, default 5) expired.
+   - No pending `TagSuggestionJob`.
+2. `/api/nabu/tag-suggestions` inserts job row with note/thought content.
+3. Supabase database webhook fires → `process-tag-suggestion` Edge Function:
+   - Calls OpenAI `gpt-4o-mini`.
+   - Assigns confidence per tag and overall job confidence.
+   - Handles retries (max 3) with exponential backoff; marks failures with `error` text.
+4. Frontend polls job status:
+   - Completed → show toast + open modal listing suggested tags.
+   - Accepting tags hits `/accept` with subset of `tagNames`, which reuses the same POST logic as manual tags but marks source `AI_SUGGESTED`.
+   - Reject/dismiss updates cooldown so users aren’t spammed.
+
+Tag badges show AI suggestions with dashed borders + sparkle icon; accepting them converts tags to standard chips but keeps the `source` metadata for analytics.
 
 ---
 
-## 7. For Implementing Links (Same Pattern)
+## 6. Retrieval & Search
 
-**Components Needed:**
-- `MentionSyncPlugin` (already exists) - tracks `@mentions`
-- `handleMentionsChanged` - sync logic
-- `/api/nabu/notes/[id]/links` - POST/DELETE endpoints
-- `NoteLink` table operations (soft delete/restore)
+- Hybrid search endpoint (`/api/nabu/search`) weights keyword (0.4) and vector (0.6) scores; tag filters in the UI narrow results by selected tag IDs.
+- `components/nabu/notes/search-dialog.tsx` provides keyboard-driven filtering with tag pills.
+- Storage + metadata views reuse tags:
+  - `metadata-sidebar.tsx` lists active tags and allows removal.
+  - `notes-sidebar.tsx` shows tag filter groups.
+  - `search-command.tsx` surfaces recent tags for quick navigation.
 
-**Key Differences:**
-- Links use `@` trigger instead of `#`
-- Link to `NoteLink` table instead of `NoteTag`
-- Display in "Related Links" section instead of tag badges
-- Navigation on click instead of just display
-
-**Same Patterns:**
-- ✅ Soft delete/restore
-- ✅ Query through `note.outgoingLinks` relation
-- ✅ Real-time sync with debouncing
-- ✅ Check for soft-deleted before creating
+Because vector search runs against `NoteChunk` / `ThoughtChunk`, tags act as secondary filters rather than direct vector dimensions—keeping the chunk vectors focused on semantic content.
 
 ---
 
-## 8. Testing Checklist
+## 7. Testing & Debug Checklist
 
-- [ ] Create new tag with `#newtag` → Appears in tag list
-- [ ] Delete `#newtag` from content → Removed from tag list
-- [ ] Re-add `#newtag` → Restored (not duplicated)
-- [ ] Refresh page → Tags persist correctly
-- [ ] AI-suggested tags → Not auto-removed when missing from content
-- [ ] Multiple tags → All remain visible when adding/removing one
-- [ ] Tag search → Filters with "starts with" logic
-- [ ] Tag creation → "Add 'name'" option appears for new tags
+- Create → Remove → Re-add the same `#tag` to verify restore logic (no duplicate DB rows).
+- Tag search respects multi-tenant scoping (log in as another tenant to verify isolation).
+- AI suggestions:
+  - Verify cooldown prevents immediate re-suggestion.
+  - Accept some tags → ensure badges switch from dashed to solid and `source` updates.
+  - Reject all suggestions → job marked `consumed` and UI stops polling.
+- Mention dropdown:
+  - Returns newly created tags immediately after POST.
+  - Handles uppercase/lowercase differences.
+- Audit compliance:
+  - `Tag.createdBy` / `NoteTag.updatedBy` autopopulate via `lib/dbMiddleware.ts`.
+  - Soft-deleted tags stay hidden from autocomplete/search.
 
----
-
-## 9. Common Issues & Solutions
-
-### Issue: Tags disappear when adding new one
-**Cause:** API returning only new tag instead of all tags  
-**Solution:** Query through `note.noteTags` relation, not `noteTag.findMany`
-
-### Issue: Unique constraint error when re-adding tag
-**Cause:** Not checking for soft-deleted NoteTag before creating  
-**Solution:** Query for `deletedAt: { not: null }` and restore if found
-
-### Issue: Middleware filters out tags with `tenantId: null`
-**Cause:** Database middleware adds tenantId filter automatically  
-**Solution:** Query through parent Note relation using nested select
-
-### Issue: Tag list cleared when clicking out of editor
-**Cause:** State being reset somewhere  
-**Solution:** Check for `setTags([])` or `setTags(data.tags)` calls
+Use `SEMANTIC_SEARCH_TESTING.md` for holistic regression (tags are part of hybrid filters) and `TAG_SUGGESTION_SETUP.md` for deep AI pipeline validation.
 
 ---
 
-## 10. File Reference
+## 8. File Reference
 
-**Frontend:**
-- `components/nabu/notes/lexical-editor.tsx` - Main editor with mention plugin
-- `components/nabu/notes/lexical-tag-sync-plugin.tsx` - Tag detection
-- `components/nabu/notes/note-editor.tsx` - Tag sync logic
-- `components/nabu/notes/tag-badge.tsx` - Tag display component
+**Frontend**
+- `components/nabu/notes/lexical-editor.tsx` – Editor shell + mention plugin wiring.
+- `components/nabu/notes/lexical-tag-sync-plugin.tsx` – AST walker that emits hashtags.
+- `components/nabu/notes/note-editor.tsx` – Diff logic + API calls.
+- `components/nabu/notes/tag-badge.tsx` – Visual treatment for user vs AI tags.
+- `components/nabu/notes/tag-suggestion-modal.tsx` / `tag-suggestion-notification.tsx` – AI workflow UI.
+- `components/nabu/notes/search-dialog.tsx` – Tag filters inside global search.
 
-**Backend:**
-- `app/api/nabu/mentions/route.ts` - Autocomplete data
-- `app/api/nabu/notes/[id]/tags/route.ts` - Tag CRUD operations
-- `lib/nabu-helpers.ts` - Shared helper functions
+**APIs**
+- `app/api/nabu/mentions/route.ts`
+- `app/api/nabu/notes/[id]/tags/route.ts`
+- `app/api/nabu/tag-suggestions/*`
+- `app/api/nabu/search/route.ts`
 
-**Database:**
-- `prisma/schema.prisma` - Tag, NoteTag models
-- `lib/dbMiddleware.ts` - Soft delete middleware
+**Background**
+- `supabase/functions/process-tag-suggestion/index.ts` – Tag suggestion job worker.
+- `supabase/functions/generate-embedding/index.ts` – Indirect dependency; tag filters pair with semantic search results.
 
+**Database & Shared**
+- `prisma/schema.prisma` – Tag/NoteTag definitions, enums.
+- `lib/dbMiddleware.ts` – Tenant + soft delete enforcement.
+- `TAG_SUGGESTION_SETUP.md` – Deployment runbook.
+- `DEBUG_SEMANTIC_SEARCH.md` – Tips for hybrid search investigations.
 
+Keep this doc updated whenever mention triggers, API payloads, or background job contracts change; future auditing depends on it.
