@@ -258,15 +258,16 @@ model Note {
   summary              String?           @db.Text
   visibility           NoteVisibility    @default(PRIVATE)
   status               StatusEnum        @default(ENABLE)
-  tagSuggestionStatus  String?           // "pending", "completed", null
-  lastTagSuggestionAt  DateTime?         // When last suggestion was made (cooldown)
-  lastTagModifiedAt    DateTime?         // When user last manually modified tags
-  pendingJobId         String?           // Current pending job ID
-  createdAt            DateTime          @default(now())
-  createdBy            String?
-  updatedAt            DateTime          @default(now()) @updatedAt
-  updatedBy            String?
-  deletedAt            DateTime?
+  tagSuggestionStatus      String?           // "pending", "completed", null
+  lastTagSuggestionAt      DateTime?         // When last suggestion was made (cooldown)
+  lastTagModifiedAt        DateTime?         // When user last manually modified tags
+  pendingJobId             String?           // Current pending job ID
+  lastEmbeddingGeneratedAt DateTime?         // When embeddings were last generated (for batching)
+  createdAt                DateTime          @default(now())
+  createdBy                String?
+  updatedAt                DateTime          @default(now()) @updatedAt
+  updatedBy                String?
+  deletedAt                DateTime?
   noteTags             NoteTag[]
   attachments          Attachment[]
   images               ImageAttachment[]
