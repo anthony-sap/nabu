@@ -25,12 +25,72 @@ interface NoteEditorProps {
 }
 
 /**
+ * LocalStorage data structure for notes
+ */
+interface LocalNoteData {
+  title: string;
+  content: string;
+  contentState: string;
+  lastModified: string; // ISO timestamp
+}
+
+/**
+ * LocalStorage utility functions
+ */
+const LocalStorageUtils = {
+  /**
+   * Save note to localStorage with timestamp
+   */
+  saveNote: (noteId: string, data: Omit<LocalNoteData, 'lastModified'>) => {
+    try {
+      const key = `nabu-note-${noteId}`;
+      const localData: LocalNoteData = {
+        ...data,
+        lastModified: new Date().toISOString(),
+      };
+      localStorage.setItem(key, JSON.stringify(localData));
+    } catch (error) {
+      console.error("Failed to save to localStorage:", error);
+    }
+  },
+
+  /**
+   * Get note from localStorage
+   */
+  getNote: (noteId: string): LocalNoteData | null => {
+    try {
+      const key = `nabu-note-${noteId}`;
+      const stored = localStorage.getItem(key);
+      if (!stored) return null;
+      return JSON.parse(stored) as LocalNoteData;
+    } catch (error) {
+      console.error("Failed to read from localStorage:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Remove note from localStorage
+   */
+  removeNote: (noteId: string) => {
+    try {
+      const key = `nabu-note-${noteId}`;
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error("Failed to remove from localStorage:", error);
+    }
+  },
+};
+
+/**
  * Full-page note editor component with auto-save functionality
  * 
  * Features:
  * - Editable title field
  * - Lexical rich text editor for content
- * - Auto-save every 3 seconds after changes
+ * - Local auto-save every 5 seconds
+ * - Server sync every 60 seconds
+ * - Save on page leave
  * - Visual save status indicator
  * - Folder context badge
  */
@@ -38,8 +98,9 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [editorState, setEditorState] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved-locally" | "syncing" | "synced" | "error">("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastSyncedToServer, setLastSyncedToServer] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [folderName, setFolderName] = useState("");
   const [folderColor, setFolderColor] = useState<string | null>(null);
@@ -88,6 +149,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   async function loadNote() {
     try {
       setIsLoading(true);
+      
+      // Fetch from both server and localStorage
       const response = await fetch(`/api/nabu/notes/${noteId}`);
       
       if (!response.ok) {
@@ -95,9 +158,44 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       }
 
       const { data } = await response.json();
-      const noteTitle = data.title || "";
-      const noteContent = data.content || "";
-      const noteEditorState = data.contentState || "";
+      const localData = LocalStorageUtils.getNote(noteId);
+      
+      // Determine which version is newer
+      let noteTitle: string;
+      let noteContent: string;
+      let noteEditorState: string;
+      let useLocalVersion = false;
+      
+      if (localData) {
+        const serverTimestamp = new Date(data.updatedAt).getTime();
+        const localTimestamp = new Date(localData.lastModified).getTime();
+        
+        // Use local version if it's newer
+        if (localTimestamp > serverTimestamp) {
+          noteTitle = localData.title;
+          noteContent = localData.content;
+          noteEditorState = localData.contentState;
+          useLocalVersion = true;
+          
+          // Show a toast to inform user that local version was loaded
+          toast.info("Loaded unsaved changes from this device", {
+            description: "Your local changes are newer than the server version",
+          });
+        } else {
+          // Server version is newer or same
+          noteTitle = data.title || "";
+          noteContent = data.content || "";
+          noteEditorState = data.contentState || "";
+          
+          // Clean up outdated local data
+          LocalStorageUtils.removeNote(noteId);
+        }
+      } else {
+        // No local data, use server version
+        noteTitle = data.title || "";
+        noteContent = data.content || "";
+        noteEditorState = data.contentState || "";
+      }
       
       setTitle(noteTitle);
       setContent(noteContent);
@@ -107,6 +205,15 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       setInitialTitle(noteTitle);
       setInitialContent(noteContent);
       setInitialEditorState(noteEditorState);
+      
+      // Set last synced time if using server version
+      if (!useLocalVersion) {
+        setLastSyncedToServer(new Date(data.updatedAt));
+        setSaveStatus("synced");
+      } else {
+        // If using local version, mark as locally saved but not synced
+        setSaveStatus("saved-locally");
+      }
       
       // Set folder info if available
       if (data.folder) {
@@ -541,12 +648,25 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }
 
   /**
-   * Manual save function
+   * Save note to localStorage only (fast, local-only save)
    */
-  const saveNote = async () => {
-    if (isLoading || saveStatus === "saving") return;
+  const saveToLocalStorage = useCallback(() => {
+    LocalStorageUtils.saveNote(noteId, {
+      title,
+      content,
+      contentState: editorState,
+    });
+    setLastSaved(new Date());
+    setSaveStatus("saved-locally");
+  }, [noteId, title, content, editorState]);
+
+  /**
+   * Save note to server (slower, persistent save)
+   */
+  const saveToServer = useCallback(async () => {
+    if (isLoading || saveStatus === "syncing") return;
     
-    setSaveStatus("saving");
+    setSaveStatus("syncing");
     
     try {
       const response = await fetch(`/api/nabu/notes/${noteId}`, {
@@ -563,25 +683,28 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         throw new Error("Failed to save note");
       }
 
-      setSaveStatus("saved");
-      setLastSaved(new Date());
+      setSaveStatus("synced");
+      setLastSyncedToServer(new Date());
       
       // Update initial values after successful save
       setInitialTitle(title);
       setInitialContent(content);
       setInitialEditorState(editorState);
 
+      // Remove from localStorage after successful server sync
+      LocalStorageUtils.removeNote(noteId);
+
       // Request tag suggestions if eligible (will create new job if pendingJobId is null)
       await requestTagSuggestions();
     } catch (error) {
-      console.error("Save failed:", error);
+      console.error("Save to server failed:", error);
       setSaveStatus("error");
     }
-  };
+  }, [noteId, title, content, editorState, isLoading, saveStatus, requestTagSuggestions]);
 
   /**
-   * Auto-save effect with 3-second debounce
-   * Only triggers if content has actually changed (dirty state)
+   * Local auto-save effect with 5-second debounce
+   * Saves to localStorage only for fast, local persistence
    */
   useEffect(() => {
     // Don't auto-save during initial load
@@ -596,32 +719,111 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
     // Don't auto-save if no changes
     if (!isDirty) {
       if (saveStatus === "idle") {
-        setSaveStatus("saved");
+        setSaveStatus("synced");
       }
       return;
     }
 
     const timer = setTimeout(() => {
-      saveNote();
-    }, 3000); // 3 second debounce
+      saveToLocalStorage();
+    }, 5000); // 5 second debounce for local save
 
     return () => clearTimeout(timer);
-  }, [title, content, editorState, isLoading, initialTitle, initialContent, initialEditorState]);
+  }, [title, content, editorState, isLoading, initialTitle, initialContent, initialEditorState, saveStatus, saveToLocalStorage]);
+
+  /**
+   * Server sync effect with 60-second debounce
+   * Syncs to server for persistent storage
+   */
+  useEffect(() => {
+    // Don't sync during initial load
+    if (isLoading) return;
+    
+    // Check if content has actually changed (dirty state)
+    const isDirty = 
+      title !== initialTitle || 
+      content !== initialContent || 
+      editorState !== initialEditorState;
+    
+    // Don't sync if no changes
+    if (!isDirty) return;
+
+    const timer = setTimeout(() => {
+      saveToServer();
+    }, 60000); // 60 second debounce for server sync
+
+    return () => clearTimeout(timer);
+  }, [title, content, editorState, isLoading, initialTitle, initialContent, initialEditorState, saveToServer]);
 
   /**
    * Keyboard shortcut handler for Ctrl+S / Cmd+S
+   * Forces immediate server sync
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        saveNote();
+        saveToServer();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [title, content, editorState]);
+  }, [saveToServer]);
+
+  /**
+   * Save to server on page leave (beforeunload)
+   * Prevents data loss when closing tab or navigating away
+   */
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Check if there are unsaved changes
+      const isDirty = 
+        title !== initialTitle || 
+        content !== initialContent || 
+        editorState !== initialEditorState;
+      
+      if (isDirty) {
+        // Save to localStorage immediately (synchronous)
+        LocalStorageUtils.saveNote(noteId, {
+          title,
+          content,
+          contentState: editorState,
+        });
+
+        // Attempt to save to server using sendBeacon (fire-and-forget)
+        const data = JSON.stringify({ title, content, contentState: editorState });
+        const blob = new Blob([data], { type: 'application/json' });
+        navigator.sendBeacon(`/api/nabu/notes/${noteId}`, blob);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [noteId, title, content, editorState, initialTitle, initialContent, initialEditorState]);
+
+  /**
+   * Save to server on component unmount
+   * Ensures data is persisted when navigating within the app
+   */
+  useEffect(() => {
+    return () => {
+      // Check if there are unsaved changes
+      const isDirty = 
+        title !== initialTitle || 
+        content !== initialContent || 
+        editorState !== initialEditorState;
+      
+      if (isDirty) {
+        // Save to localStorage synchronously
+        LocalStorageUtils.saveNote(noteId, {
+          title,
+          content,
+          contentState: editorState,
+        });
+      }
+    };
+  }, [noteId, title, content, editorState, initialTitle, initialContent, initialEditorState]);
 
   /**
    * Format last saved time
@@ -677,23 +879,30 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         {/* Save status indicator and close button */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {saveStatus === "saving" && (
+            {saveStatus === "saved-locally" && lastSaved && (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span className="hidden sm:inline">Saving...</span>
+                <Check className="h-3.5 w-3.5 text-blue-500" />
+                <span className="hidden md:inline">Saved locally at {formatSaveTime(lastSaved)}</span>
+                <span className="md:hidden">Saved locally</span>
               </>
             )}
-            {saveStatus === "saved" && lastSaved && (
+            {saveStatus === "syncing" && (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span className="hidden sm:inline">Syncing...</span>
+              </>
+            )}
+            {saveStatus === "synced" && lastSyncedToServer && (
               <>
                 <Check className="h-3.5 w-3.5 text-primary" />
-                <span className="hidden md:inline">Saved at {formatSaveTime(lastSaved)}</span>
-                <span className="md:hidden">Saved</span>
+                <span className="hidden md:inline">Synced at {formatSaveTime(lastSyncedToServer)}</span>
+                <span className="md:hidden">Synced</span>
               </>
             )}
             {saveStatus === "error" && (
               <>
                 <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-                <span className="hidden sm:inline">Failed to save</span>
+                <span className="hidden sm:inline">Failed to sync</span>
               </>
             )}
           </div>
