@@ -17,11 +17,14 @@ export function useSearch() {
   const [filters, setFilters] = useState<SearchFilters>({ type: "all" });
 
   /**
-   * Search both notes and thoughts APIs
+   * Call the semantic search API (notes + thoughts)
    */
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim();
+
+    if (!trimmedQuery) {
       setResults([]);
+      setError(null);
       return;
     }
 
@@ -29,55 +32,56 @@ export function useSearch() {
     setError(null);
 
     try {
-      // Search both APIs in parallel
-      const [notesResponse, thoughtsResponse] = await Promise.all([
-        fetch(`/api/nabu/notes?search=${encodeURIComponent(searchQuery)}&limit=50`),
-        fetch(`/api/nabu/thoughts?search=${encodeURIComponent(searchQuery)}&limit=50`),
-      ]);
+      const params = new URLSearchParams({
+        q: trimmedQuery,
+        limit: "50",
+        includeNotes: "true",
+        includeThoughts: "true",
+      });
 
-      if (!notesResponse.ok || !thoughtsResponse.ok) {
+      const response = await fetch(`/api/nabu/search?${params.toString()}`);
+
+      if (!response.ok) {
         throw new Error("Search failed");
       }
 
-      const notesData = await notesResponse.json();
-      const thoughtsData = await thoughtsResponse.json();
+      const json = await response.json();
+      const apiResults = json?.data?.results || [];
 
-      // Transform notes to SearchResult format
-      const noteResults: SearchResult[] = (notesData.data?.notes || []).map((note: any) => ({
-        id: note.id,
-        type: "note" as const,
-        title: note.title,
-        content: note.content,
-        preview: note.content.slice(0, 150) + (note.content.length > 150 ? "..." : ""),
-        folder: note.folder,
-        tags: note.tags?.map((t: any) => t.name) || [],
-        createdAt: note.createdAt,
-        updatedAt: note.updatedAt,
-        folderId: note.folderId,
-      }));
+      const mappedResults: SearchResult[] = apiResults.map((item: any) => {
+        const entityType = item.entityType === "thought" ? "thought" : "note";
+        const fallbackTitle =
+          entityType === "note" ? "Untitled Note" : "Untitled Thought";
 
-      // Transform thoughts to SearchResult format
-      const thoughtResults: SearchResult[] = (thoughtsData.data?.thoughts || []).map((thought: any) => ({
-        id: thought.id,
-        type: "thought" as const,
-        title: thought.meta?.title || "Untitled Thought",
-        content: thought.content,
-        preview: thought.content.slice(0, 150) + (thought.content.length > 150 ? "..." : ""),
-        folder: thought.meta?.folder ? { id: "", name: thought.meta.folder } : undefined,
-        tags: thought.suggestedTags || [],
-        createdAt: thought.createdAt,
-        updatedAt: thought.updatedAt,
-        folderId: null,
-      }));
+        const content = item.content || item.matchedChunk?.content || "";
+        const previewSource = item.matchedChunk?.content || content || "";
+        const preview =
+          previewSource.length > 150
+            ? `${previewSource.slice(0, 150)}...`
+            : previewSource;
 
-      // Combine and sort by most recent
-      const combined = [...noteResults, ...thoughtResults].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
+        return {
+          id: item.id,
+          type: entityType,
+          title: item.title || fallbackTitle,
+          content,
+          preview,
+          folder: item.folder
+            ? {
+                id: item.folder.id,
+                name: item.folder.name,
+                color: item.folder.color,
+              }
+            : undefined,
+          tags: item.tags || [],
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          folderId: item.folderId ?? null,
+        };
+      });
 
-      setResults(combined);
+      setResults(mappedResults);
     } catch (err) {
-      console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
     } finally {

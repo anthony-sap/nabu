@@ -9,6 +9,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
+import { enqueueThoughtEmbeddingJobs, shouldRegenerateEmbeddings } from "@/lib/embeddings";
 
 /**
  * GET /api/nabu/thoughts/[id]
@@ -83,9 +84,17 @@ export async function PATCH(
   try {
     const { userId, tenantId } = await getUserContext();
 
-    // Verify ownership
-    const isOwner = await validateOwnership("thought", params.id, userId, tenantId);
-    if (!isOwner) {
+    // Verify ownership and get existing thought
+    const existingThought = await prisma.thought.findFirst({
+      where: {
+        id: params.id,
+        userId,
+        tenantId,
+        deletedAt: null,
+      },
+    });
+
+    if (!existingThought) {
       return errorResponse("Thought not found or access denied", 404);
     }
 
@@ -119,6 +128,11 @@ export async function PATCH(
       }
     }
 
+    // Check if content has changed
+    const contentChanged = data.content
+      ? shouldRegenerateEmbeddings(existingThought.content, data.content)
+      : false;
+
     // Update thought
     const thought = await prisma.thought.update({
       where: { id: params.id },
@@ -140,6 +154,19 @@ export async function PATCH(
         },
       },
     });
+
+    // Regenerate embeddings if content changed (async, don't wait)
+    if (contentChanged) {
+      enqueueThoughtEmbeddingJobs(
+        thought.id,
+        thought.content,
+        userId,
+        tenantId
+      ).catch((error) => {
+        console.error("Failed to enqueue embedding jobs for thought update:", error);
+        // Don't fail the request if embedding jobs fail
+      });
+    }
 
     return new Response(
       JSON.stringify(successResponse(formatThoughtResponse(thought), "Thought updated successfully")),

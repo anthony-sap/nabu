@@ -28,6 +28,11 @@ export const env = createEnv({
     // Supabase (server-side only)
     SUPABASE_URL: z.string().url(),
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    // OpenAI for embeddings
+    OPENAI_API_KEY: z.string().min(1),
+    // Embeddings configuration (optional - have sensible defaults)
+    EMBEDDING_MODEL: z.string().optional(),
+    EMBEDDING_DIMENSIONS: z.string().optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().min(1),
@@ -71,5 +76,9 @@ export const env = createEnv({
     // Supabase (server-side only)
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // OpenAI
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+    EMBEDDING_DIMENSIONS: process.env.EMBEDDING_DIMENSIONS,
   },
 });

@@ -9,6 +9,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
+import { enqueueNoteEmbeddingJobs, shouldRegenerateEmbeddings, prepareNoteContent, extractTextContent } from "@/lib/embeddings";
 
 /**
  * GET /api/nabu/notes/[id]
@@ -155,9 +156,17 @@ export async function PATCH(
     const { userId, tenantId } = await getUserContext();
     const { id } = await params;
 
-    // Verify ownership
-    const isOwner = await validateOwnership("note", id, userId, tenantId);
-    if (!isOwner) {
+    // Verify ownership and get existing note
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        userId,
+        tenantId,
+        deletedAt: null,
+      },
+    });
+
+    if (!existingNote) {
       return errorResponse("Note not found or access denied", 404);
     }
 
@@ -206,6 +215,22 @@ export async function PATCH(
         return errorResponse("One or more tags not found", 404);
       }
     }
+
+    // Check if content has changed (title or content/contentState)
+    const oldContentForComparison = prepareNoteContent(
+      existingNote.title,
+      extractTextContent(existingNote.contentState) || existingNote.content
+    );
+    const newContentForComparison = prepareNoteContent(
+      noteData.title ?? existingNote.title,
+      noteData.contentState
+        ? extractTextContent(noteData.contentState)
+        : noteData.content ?? existingNote.content
+    );
+    const contentChanged = shouldRegenerateEmbeddings(
+      oldContentForComparison,
+      newContentForComparison
+    );
 
     // Update note with tags in a transaction
     const note = await prisma.$transaction(async (tx) => {
@@ -270,6 +295,24 @@ export async function PATCH(
         },
       });
     });
+
+    // Regenerate embeddings if content changed (async, don't wait)
+    if (contentChanged) {
+      console.log(`[NOTE UPDATE] Content changed for note ${note!.id}, enqueueing embedding jobs`);
+      enqueueNoteEmbeddingJobs(
+        note!.id,
+        note!.title,
+        note!.content,
+        note!.contentState,
+        userId,
+        tenantId
+      ).catch((error) => {
+        console.error(`[NOTE UPDATE ERROR] Failed to enqueue embedding jobs for note ${note!.id}:`, error);
+        // Don't fail the request if embedding jobs fail
+      });
+    } else {
+      console.log(`[NOTE UPDATE] Content not changed for note ${note!.id}, skipping embeddings`);
+    }
 
     return new Response(
       JSON.stringify(successResponse(formatNoteResponse(note), "Note updated successfully")),

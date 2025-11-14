@@ -226,7 +226,9 @@ describe("Thoughts API Routes", () => {
     });
 
     it("validates note when promoting", async () => {
-      mockValidateOwnership.mockResolvedValueOnce(true);
+      // Mock finding the existing thought first
+      (prisma.thought.findFirst as jest.Mock).mockResolvedValueOnce(baseThought);
+      // Mock note not found
       (prisma.note.findFirst as jest.Mock).mockResolvedValueOnce(null);
 
       const res = await updateThought(
@@ -243,8 +245,9 @@ describe("Thoughts API Routes", () => {
     });
 
     it("updates thought successfully", async () => {
-      mockValidateOwnership.mockResolvedValueOnce(true);
-      (prisma.note.findFirst as jest.Mock).mockResolvedValueOnce(null);
+      // Mock finding the existing thought
+      (prisma.thought.findFirst as jest.Mock).mockResolvedValueOnce(baseThought);
+      // Mock the update
       (prisma.thought.update as jest.Mock).mockResolvedValueOnce(baseThought);
 
       const res = await updateThought(
@@ -283,6 +286,8 @@ describe("Thoughts API Routes", () => {
 
   describe("DELETE /api/nabu/thoughts/[id]", () => {
     it("requires ownership", async () => {
+      // Reset and override mock for this test
+      mockValidateOwnership.mockReset();
       mockValidateOwnership.mockResolvedValueOnce(false);
 
       const res = await deleteThought(
@@ -296,7 +301,11 @@ describe("Thoughts API Routes", () => {
     });
 
     it("soft deletes thought", async () => {
-      mockValidateOwnership.mockResolvedValueOnce(true);
+      // Reset mocks and set up for this test
+      mockGetUserContext.mockReset();
+      mockValidateOwnership.mockReset();
+      mockGetUserContext.mockResolvedValue(defaultContext);
+      mockValidateOwnership.mockResolvedValue(true);
       (prisma.thought.update as jest.Mock).mockResolvedValueOnce({});
 
       const res = await deleteThought(
@@ -306,16 +315,18 @@ describe("Thoughts API Routes", () => {
         { params: { id: "thought-1" } },
       );
 
+      // Check response first - helps debug if something failed early
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.message).toBe("Thought deleted successfully");
+      
+      // Verify the update was called with correct params
       expect(prisma.thought.update).toHaveBeenCalledWith({
         where: { id: "thought-1" },
         data: expect.objectContaining({
           deletedAt: expect.any(Date),
         }),
       });
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.message).toBe("Thought deleted successfully");
     });
   });
 });

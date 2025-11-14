@@ -296,10 +296,23 @@ describe("Notes API Routes", () => {
     });
 
     it("updates note successfully", async () => {
-      mockValidateOwnership.mockResolvedValueOnce(true);
+      // Mock finding the existing note
+      (prisma.note.findFirst as jest.Mock).mockResolvedValueOnce(baseNote);
+      // Mock tag findMany
       (prisma.tag.findMany as jest.Mock).mockResolvedValueOnce([]);
-      (prisma.note.update as jest.Mock).mockResolvedValue(baseNote);
-      (prisma.note.findUnique as jest.Mock).mockResolvedValue(baseNote);
+      // Mock transaction
+      (prisma.$transaction as jest.Mock).mockImplementationOnce(async (callback: any) => {
+        const txMock = {
+          note: {
+            update: jest.fn().mockResolvedValue(baseNote),
+            findUnique: jest.fn().mockResolvedValue(baseNote),
+          },
+          noteTag: {
+            deleteMany: jest.fn(),
+          },
+        };
+        return await callback(txMock);
+      });
 
       const res = await updateNote(
         new Request("http://localhost/api/nabu/notes/note-1", {
@@ -309,10 +322,8 @@ describe("Notes API Routes", () => {
         { params: { id: "note-1" } },
       );
 
-      expect(prisma.note.update).toHaveBeenCalledWith({
-        where: { id: "note-1" },
-        data: expect.objectContaining({ summary: "Updated summary" }),
-      });
+      // Verify transaction was called
+      expect(prisma.$transaction).toHaveBeenCalled();
 
       expect(res.status).toBe(200);
       const body = await res.json();

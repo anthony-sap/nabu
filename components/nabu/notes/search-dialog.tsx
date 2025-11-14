@@ -49,7 +49,12 @@ export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialo
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      contentClassName="w-2/3  rounded-3xl border border-border/60 bg-background/95 backdrop-blur-xl"
+      commandClassName="min-h-[560px]"
+    >
       <CommandInput
         placeholder="Search notes and thoughts..."
         value={query}
@@ -85,7 +90,7 @@ export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialo
         </Button>
       </div>
 
-      <CommandList>
+      <CommandList className="max-h-[440px] px-2 py-2 space-y-2">
         {/* Loading state */}
         {isLoading && (
           <div className="flex items-center justify-center py-16">

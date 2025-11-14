@@ -8,6 +8,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
+import { enqueueThoughtEmbeddingJobs } from "@/lib/embeddings";
 
 /**
  * GET /api/nabu/thoughts
@@ -175,6 +176,17 @@ export async function POST(req: NextRequest) {
           },
         },
       },
+    });
+
+    // Enqueue embedding jobs for the new thought (async, don't wait)
+    enqueueThoughtEmbeddingJobs(
+      thought.id,
+      thought.content,
+      userId,
+      tenantId
+    ).catch((error) => {
+      console.error("Failed to enqueue embedding jobs for thought:", error);
+      // Don't fail the request if embedding jobs fail
     });
 
     return new Response(

@@ -103,6 +103,9 @@ model Tenant {
   Attachment      Attachment[]
   Share           Share[]
   ImageAttachment ImageAttachment[]
+  NoteChunk       NoteChunk[]
+  ThoughtChunk    ThoughtChunk[]
+  EmbeddingJob    EmbeddingJob[]
 }
 
 model AuditLog {
@@ -253,7 +256,6 @@ model Note {
   contentState         String?           @db.Text // Lexical editor serialized state (JSON)
   sourceThoughts       String[]
   summary              String?           @db.Text
-  embedding            Bytes?
   visibility           NoteVisibility    @default(PRIVATE)
   status               StatusEnum        @default(ENABLE)
   tagSuggestionStatus  String?           // "pending", "completed", null
@@ -271,6 +273,7 @@ model Note {
   outgoingLinks        NoteLink[]        @relation("NoteOutgoing")
   incomingLinks        NoteLink[]        @relation("NoteIncoming")
   thoughts             Thought[]
+  chunks               NoteChunk[]       // Chunked content for embeddings
 
   @@index([tenantId, userId])
   @@index([folderId])
@@ -288,7 +291,6 @@ model Thought {
   source               ThoughtSource
   state                ThoughtState  @default(NEW)
   suggestedTags        String[]
-  embedding            Bytes?
   meta                 Json?
   tagSuggestionStatus  String?       // "pending", "completed", null
   lastTagSuggestionAt  DateTime?     // When last suggestion was made (cooldown)
@@ -300,6 +302,7 @@ model Thought {
   updatedBy            String?
   deletedAt            DateTime?
   attachments          Attachment[]
+  chunks               ThoughtChunk[] // Chunked content for embeddings
 
   @@index([tenantId, userId])
   @@index([noteId])
@@ -461,4 +464,85 @@ model ImageAttachment {
   @@index([tenantId])
   @@index([fileSize]) // For storage reporting
   @@index([createdAt]) // For reporting queries
+}
+
+// Chunked note content for embeddings
+// Handles long notes by splitting into ~2000 char chunks with overlap
+model NoteChunk {
+  id         String                       @id @default(cuid())
+  noteId     String
+  note       Note                         @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunkIndex Int                          // Order of chunk (0, 1, 2, etc.)
+  content    String                       @db.Text // Chunked text content
+  embedding  Unsupported("vector(512)")?  // Vector embedding (512 dimensions - OpenAI text-embedding-3-small)
+  
+  // Audit fields
+  createdAt  DateTime                     @default(now())
+  createdBy  String?
+  updatedAt  DateTime                     @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  deletedBy  String?
+  
+  @@index([noteId])
+  @@index([tenantId])
+}
+
+// Chunked thought content for embeddings
+// Handles long thoughts by splitting into ~2000 char chunks with overlap
+model ThoughtChunk {
+  id         String                       @id @default(cuid())
+  thoughtId  String
+  thought    Thought                      @relation(fields: [thoughtId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunkIndex Int                          // Order of chunk (0, 1, 2, etc.)
+  content    String                       @db.Text // Chunked text content
+  embedding  Unsupported("vector(512)")?  // Vector embedding (512 dimensions - OpenAI text-embedding-3-small)
+  
+  // Audit fields
+  createdAt  DateTime                     @default(now())
+  createdBy  String?
+  updatedAt  DateTime                     @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  deletedBy  String?
+  
+  @@index([thoughtId])
+  @@index([tenantId])
+}
+
+// Job queue for generating embeddings
+// Similar to TagSuggestionJob but for embeddings
+model EmbeddingJob {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String
+  entityType    String    // "NOTE" or "THOUGHT"
+  entityId      String    // Note or Thought ID
+  chunkId       String    // NoteChunk or ThoughtChunk ID
+  chunkIndex    Int       // Index of chunk being processed
+  content       String    @db.Text // Text content to embed
+  status        JobStatus @default(PENDING)
+  
+  // Metadata for retry logic
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  error         String?   @db.Text
+  
+  // Audit fields
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([tenantId])
 }

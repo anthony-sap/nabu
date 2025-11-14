@@ -8,6 +8,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
+import { enqueueNoteEmbeddingJobs } from "@/lib/embeddings";
 
 /**
  * GET /api/nabu/notes
@@ -240,6 +241,20 @@ export async function POST(req: NextRequest) {
           },
         },
       });
+    });
+
+    // Enqueue embedding jobs for the new note (async, don't wait)
+    console.log(`[NOTE CREATE] Enqueueing embedding jobs for note ${note!.id}`);
+    enqueueNoteEmbeddingJobs(
+      note!.id,
+      note!.title,
+      note!.content,
+      note!.contentState,
+      userId,
+      tenantId
+    ).catch((error) => {
+      console.error(`[NOTE CREATE ERROR] Failed to enqueue embedding jobs for note ${note!.id}:`, error);
+      // Don't fail the request if embedding jobs fail
     });
 
     return new Response(
