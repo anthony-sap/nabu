@@ -151,6 +151,34 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   // localStorage logic removed - now using database-backed thoughts from API
 
   /**
+   * Refresh folder tree and root notes
+   * Used after bulk operations like auto-move
+   */
+  const refreshFoldersAndNotes = async () => {
+    try {
+      // Reload folders
+      const rootFolders = await fetchRootFolders();
+      setFolders(sortFolderItems(rootFolders));
+      
+      // Reload root notes
+      const notesResponse = await fetch('/api/nabu/notes?folderId=null');
+      if (notesResponse.ok) {
+        const data = await notesResponse.json();
+        if (data.success && data.data.notes) {
+          setRootNotes(data.data.notes.map((note: any) => ({
+            id: note.id,
+            title: note.title,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh folders and notes:', error);
+    }
+  };
+
+  /**
    * Setup keyboard shortcut for search (Cmd+Shift+F)
    */
   useEffect(() => {
@@ -1045,6 +1073,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           onDeleteNote={handleDeleteNoteRequest}
           onMoveFolder={handleMoveFolder}
           onMoveNote={handleMoveNote}
+          onRefreshFolders={refreshFoldersAndNotes}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
         />

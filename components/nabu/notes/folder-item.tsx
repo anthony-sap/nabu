@@ -210,7 +210,16 @@ export function FolderItem({
         if (data.type === "folder" && onMoveFolder) {
           onMoveFolder(data.id, item.id);
         } else if (data.type === "note" && onMoveNote) {
-          onMoveNote(data.id, item.id);
+          // Handle bulk move if multiple notes selected
+          if (data.bulkMoveNoteIds && data.bulkMoveNoteIds.length > 1) {
+            // Move all selected notes
+            data.bulkMoveNoteIds.forEach((noteId) => {
+              onMoveNote(noteId, item.id);
+            });
+          } else {
+            // Single note move
+            onMoveNote(data.id, item.id);
+          }
         }
       },
     });
