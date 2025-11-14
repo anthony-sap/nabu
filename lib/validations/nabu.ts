@@ -185,7 +185,9 @@ export const tagQuerySchema = z.object({
 });
 
 export const noteQuerySchema = z.object({
-  folderId: z.string().cuid().optional(),
+  folderId: z.string().refine(val => val === 'null' || z.string().cuid().safeParse(val).success, {
+    message: "folderId must be a valid CUID or 'null'"
+  }).optional(),
   tagId: z.string().cuid().optional(),
   search: z.string().max(500).optional(),
   visibility: z.nativeEnum(NoteVisibility).optional(),

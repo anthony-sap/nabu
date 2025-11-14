@@ -5,6 +5,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Clock, Lightbulb } from "lucide-react";
+import { QuickCaptureForm } from "./quick-capture-form";
+import { ThoughtCard } from "./thought-card";
 
 /**
  * Thought data from API
@@ -81,10 +83,39 @@ export function ThoughtsActivityFeed() {
     loadThoughts();
   }, []);
 
+  /**
+   * Refresh thoughts list (e.g., after deletion)
+   */
+  const refreshThoughts = () => {
+    const loadThoughts = async () => {
+      try {
+        const response = await fetch("/api/nabu/thoughts");
+        if (!response.ok) {
+          throw new Error("Failed to fetch thoughts");
+        }
+
+        const data = await response.json();
+        if (data.success && data.data && Array.isArray(data.data.thoughts)) {
+          const sorted = data.data.thoughts.sort((a: ApiThought, b: ApiThought) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          setThoughts(sorted);
+        }
+      } catch (err) {
+        console.error("Failed to refresh thoughts:", err);
+      }
+    };
+
+    loadThoughts();
+  };
+
   return (
     <div className="h-full">
       <ScrollArea className="h-full">
         <div className="space-y-6 max-w-4xl mx-auto">
+          {/* Quick capture form */}
+          <QuickCaptureForm />
+          
           {/* Header */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -145,58 +176,11 @@ export function ThoughtsActivityFeed() {
           {!isLoading && !error && thoughts.length > 0 && (
             <div className="space-y-6">
               {thoughts.map((thought) => (
-                <Card
+                <ThoughtCard
                   key={thought.id}
-                  className="relative bg-background/60 border-border/40 hover:border-primary/30 transition-all duration-200 hover:shadow-xl hover:shadow-primary/5 backdrop-blur-md overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent pointer-events-none" />
-                  <CardContent className="relative pt-6 pb-5 px-6">
-                    <div className="space-y-4">
-                      {/* Header: Title and timestamp */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-serif font-semibold text-lg text-foreground mb-1.5 truncate">
-                            {thought.meta?.title || "Untitled Thought"}
-                          </h3>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>{formatTimeAgo(thought.createdAt)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Content preview */}
-                      <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
-                        {thought.content}
-                      </p>
-
-                      {/* Metadata: Folder and tags */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {/* Folder badge */}
-                        {thought.meta?.folder && (
-                          <Badge variant="outline" className="text-[11px] font-normal bg-muted/30 text-muted-foreground">
-                            {thought.meta.folder}
-                          </Badge>
-                        )}
-
-                        {/* Tags */}
-                        {thought.suggestedTags && thought.suggestedTags.length > 0 && (
-                          <>
-                            {thought.suggestedTags.map((tag, index) => (
-                              <Badge
-                                key={index}
-                                variant="secondary"
-                                className="text-[11px] font-normal bg-primary/10 text-primary hover:bg-primary/20"
-                              >
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                  thought={thought}
+                  onDeleted={refreshThoughts}
+                />
               ))}
             </div>
           )}

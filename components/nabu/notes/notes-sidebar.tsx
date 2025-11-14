@@ -3,8 +3,9 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Home, AlertCircle, FileText, Trash2, Lightbulb, Zap } from "lucide-react";
+import { Sparkles, Home, AlertCircle, FileText, Trash2 } from "lucide-react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
 import { FolderItem as FolderItemType, NoteItem } from "./types";
 import { DragData } from "./drag-drop-utils";
@@ -18,10 +19,10 @@ import { QuickThoughtTrigger } from "@/components/nabu/quick-thought-trigger";
 interface NotesSidebarProps {
   folders: FolderItemType[];
   rootNotes: NoteItem[];
-  view: "feed" | "folders" | "editor" | "thoughts";
+  view: "feed" | "folders" | "editor";
   selectedNote: FolderItemType | null;
   editingNoteId?: string | null;
-  onViewChange: (view: "feed" | "folders" | "editor" | "thoughts") => void;
+  onViewChange: (view: "feed" | "folders" | "editor") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
@@ -45,6 +46,90 @@ const formatDate = (dateString: string) => {
     month: '2-digit' 
   });
 };
+
+/**
+ * Draggable note component for uncategorised section
+ */
+function UncategorisedNote({
+  note,
+  editingNoteId,
+  onNoteSelect,
+  onDeleteNote,
+}: {
+  note: NoteItem;
+  editingNoteId?: string | null;
+  onNoteSelect: (item: FolderItemType) => void;
+  onDeleteNote?: (noteId: string) => void;
+}) {
+  const noteRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Setup drag functionality for this note
+  useEffect(() => {
+    const element = noteRef.current;
+    if (!element) return;
+
+    const cleanup = draggable({
+      element,
+      getInitialData: () => {
+        const dragData: DragData = {
+          type: "note",
+          id: note.id,
+          name: note.title,
+          folderId: null, // Uncategorised notes have no folder
+        };
+        return dragData;
+      },
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    return cleanup;
+  }, [note.id, note.title]);
+
+  return (
+    <div
+      ref={noteRef}
+      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group h-8 ${
+        editingNoteId === note.id
+          ? "bg-primary/15 text-foreground font-medium shadow-sm ring-1 ring-primary/20"
+          : isDragging
+          ? "opacity-50"
+          : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
+      }`}
+      style={{ paddingLeft: '24px' }}
+      onClick={() => {
+        onNoteSelect({
+          id: note.id,
+          name: note.title,
+          type: "note",
+        });
+      }}
+    >
+      <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+      <span className="text-sm flex-1 truncate">{note.title}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
+          {formatDate(note.updatedAt)}
+        </span>
+        {onDeleteNote && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteNote(note.id);
+            }}
+            title="Delete note"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Sidebar component for notes navigation
@@ -173,27 +258,6 @@ export function NotesSidebar({
             )}
           </div>
 
-          {/* Thoughts navigation option with premium active state */}
-          <div
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
-              view === "thoughts"
-                ? "bg-primary/15 text-primary font-medium shadow-sm ring-1 ring-primary/20"
-                : "hover:bg-muted/30 text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => {
-              onViewChange("thoughts");
-            }}
-          >
-            {view === "thoughts" && (
-              <div className="absolute left-0 w-1 h-6 bg-primary rounded-r-full" />
-            )}
-            <Lightbulb className="h-4 w-4" />
-            <span className="text-sm">Thoughts</span>
-            {view === "thoughts" && (
-              <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            )}
-          </div>
-          
           <Separator className="my-3 bg-border/30" />
 
           {/* Section label */}
@@ -277,44 +341,13 @@ export function NotesSidebar({
                   Uncategorised
                 </div>
                 {rootNotes.map((note) => (
-                  <div
+                  <UncategorisedNote
                     key={note.id}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all duration-200 group h-8 ${
-                      editingNoteId === note.id
-                        ? "bg-primary/15 text-foreground font-medium shadow-sm ring-1 ring-primary/20"
-                        : "text-foreground/70 hover:bg-muted/30 hover:text-foreground"
-                    }`}
-                    style={{ paddingLeft: '24px' }}
-                    onClick={() => {
-                      onNoteSelect({
-                        id: note.id,
-                        name: note.title,
-                        type: "note",
-                      });
-                    }}
-                  >
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm flex-1 truncate">{note.title}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
-                        {formatDate(note.updatedAt)}
-                      </span>
-                      {onDeleteNote && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-5 w-5 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteNote(note.id);
-                          }}
-                          title="Delete note"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                    note={note}
+                    editingNoteId={editingNoteId}
+                    onNoteSelect={onNoteSelect}
+                    onDeleteNote={onDeleteNote}
+                  />
                 ))}
               </div>
             </>
