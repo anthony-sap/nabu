@@ -21,11 +21,11 @@ Auto-save to server (60s)
     ↓
 [Wait 2 minutes of inactivity]
     ↓
-pg_cron triggers Edge Function (every 5 min)
+pg_cron triggers Edge Function (every 2 min)
     ↓
 Edge Function finds stale notes
     ↓
-Calls internal API to enqueue embeddings
+Creates chunks and embedding jobs directly
     ↓
 Embeddings generated asynchronously
 ```
@@ -53,18 +53,9 @@ model Note {
 - Calls internal API to enqueue embedding jobs
 - Updates `lastEmbeddingGeneratedAt` timestamp
 
-**Triggered by**: pg_cron every 5 minutes
+**Triggered by**: pg_cron every 2 minutes
 
-### 3. Internal API Endpoint
-
-**Location**: `app/api/internal/embeddings/enqueue/route.ts`
-
-**Purpose**: 
-- Protected endpoint for enqueueing embedding jobs
-- Only accessible with Supabase service role key
-- Calls `enqueueNoteEmbeddingJobs()` function
-
-### 4. Modified Note Endpoints
+### 3. Modified Note Endpoints
 
 **Changed**:
 - `app/api/nabu/notes/route.ts` (POST) - Removed immediate embedding trigger
@@ -78,7 +69,7 @@ model Note {
 
 - Supabase project set up
 - `SUPABASE_SERVICE_ROLE_KEY` environment variable configured
-- `NEXT_PUBLIC_APP_URL` environment variable configured
+- Edge Function is standalone - no Next.js API dependency
 
 ### Step 1: Apply Database Migration
 
@@ -108,8 +99,9 @@ In your Supabase project settings, add the following environment variables for t
 # Supabase Dashboard → Settings → Edge Functions → Secrets
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-NEXT_PUBLIC_APP_URL=<your-app-url>  # e.g., https://your-app.vercel.app
 ```
+
+**Note:** The Edge Function is now standalone and does NOT require `NEXT_PUBLIC_APP_URL`
 
 ### Step 4: Enable pg_cron Extension
 
@@ -123,10 +115,10 @@ NEXT_PUBLIC_APP_URL=<your-app-url>  # e.g., https://your-app.vercel.app
 Connect to your Supabase database using the SQL Editor and run:
 
 ```sql
--- Create cron job to run every 5 minutes
+-- Create cron job to run every 2 minutes
 SELECT cron.schedule(
   'process-pending-embeddings',           -- Job name
-  '*/5 * * * *',                          -- Cron expression (every 5 minutes)
+  '*/2 * * * *',                          -- Cron expression (every 2 minutes)
   $$
   SELECT
     net.http_post(
@@ -175,17 +167,19 @@ LIMIT 10;
 
 ### Background Job Flow
 
-Every 5 minutes, the cron job:
+Every 2 minutes, the cron job:
 
 1. Triggers `process-pending-embeddings` Edge Function
 2. Function queries for notes where:
    - `updatedAt < 2 minutes ago`
    - `deletedAt IS NULL`
-   - `lastEmbeddingGeneratedAt IS NULL OR lastEmbeddingGeneratedAt < updatedAt`
+   - `(lastEmbeddingGeneratedAt IS NULL OR lastEmbeddingGeneratedAt < updatedAt)`
 3. For each note found (max 50 per run):
-   - Calls internal API endpoint to enqueue embedding jobs
+   - Extracts and chunks the content
+   - Creates `NoteChunk` records directly in database
+   - Creates `EmbeddingJob` records with PENDING status
    - Updates `lastEmbeddingGeneratedAt` to current timestamp
-4. Embedding jobs are processed asynchronously by the existing embedding system
+4. Embedding jobs are processed asynchronously by database webhooks
 
 ### Example Timeline
 
@@ -196,13 +190,13 @@ Every 5 minutes, the cron job:
 12:02:30 - Server sync (60s) → updatedAt = 12:02:30
 12:03:00 - User stops editing
 12:03:30 - No more edits
-12:05:00 - Cron job runs
-          → updatedAt (12:02:30) was >2 min ago (12:03:00)
+12:04:00 - Cron job runs
+          → updatedAt (12:02:30) was <2 min ago
           → Still too recent, skip
-12:10:00 - Cron job runs
-          → updatedAt (12:02:30) was >2 min ago (12:07:30)
+12:06:00 - Cron job runs
+          → updatedAt (12:02:30) was >2 min ago (now 12:06:00)
           → Eligible! Generate embeddings
-          → lastEmbeddingGeneratedAt = 12:10:00
+          → lastEmbeddingGeneratedAt = 12:06:00
 ```
 
 ## Monitoring
@@ -291,10 +285,11 @@ UPDATE "Note" SET "lastEmbeddingGeneratedAt" = NULL;
 
 ## Cost Considerations
 
-- **Cron Job Frequency**: Running every 5 minutes = 288 executions/day
-- **Edge Function Invocations**: ~288/day (only when notes need processing)
+- **Cron Job Frequency**: Running every 2 minutes = 720 executions/day
+- **Edge Function Invocations**: ~720/day (lightweight queries)
 - **Embedding API Calls**: Reduced by ~80-90% compared to immediate generation
 - **Benefits**: Significant cost savings during active editing sessions
+- **Faster Response**: Notes get embeddings within 4 minutes (2 min cooldown + 2 min cron)
 
 ## Future Improvements
 
