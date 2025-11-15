@@ -262,8 +262,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
             throw new Error('Failed to fetch thought');
           }
           
-          // Switch to thoughts view
-          setView("thoughts");
+          // Switch to feed view (thoughts are shown in feed)
+          setView("feed");
           // Note: Scrolling to specific thought or highlighting would be added here
         } catch (error) {
           console.error('Failed to load initial thought:', error);
@@ -663,6 +663,52 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   };
 
   /**
+   * Handles creating a quick note (uncategorized)
+   * Creates note on server with timestamp title and opens full editor
+   */
+  const handleQuickNote = async () => {
+    try {
+      // Generate timestamp-based title: "Unsaved dd-mm-yyyy HH:MM"
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
+      });
+      const timeStr = now.toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+      const title = `Unsaved ${dateStr} ${timeStr}`;
+      
+      // Create uncategorized note on server (no folderId)
+      const response = await fetch("/api/nabu/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content: "",
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to create note");
+      }
+      
+      // Refresh sidebar to show new uncategorized note
+      await refreshFoldersAndNotes();
+      
+      // Navigate to new note URL using search params
+      router.push(`/nabu/notes?noteId=${payload.data.id}`);
+    } catch (error) {
+      console.error("Failed to create quick note:", error);
+      toast.error("Failed to create note. Please try again.");
+    }
+  };
+
+  /**
    * Helper to find a folder within the tree by id
    */
   function findFolderById(items: FolderItem[], id: string): FolderItem | undefined {
@@ -881,7 +927,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           throw new Error(payload?.error || "Failed to delete note");
         }
         
-        setFolders(current => removeNoteFromTree(current, deleteItemId));
+        // Refresh the folder tree and uncategorized notes to show updated state
+        await refreshFoldersAndNotes();
         
         // If we're editing this note, go back to feed
         if (editingNote?.id === deleteItemId) {
@@ -899,10 +946,6 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
       setMoveAction("delete");
       setTargetFolderId(null);
       setAvailableFolders([]);
-      
-      // Reload folders to get updated tree
-      const rootFolders = await fetchRootFolders();
-      setFolders(sortFolderItems(rootFolders));
     } catch (error) {
       console.error(`Failed to delete ${deleteType}:`, error);
       alert(error instanceof Error ? error.message : `Failed to delete ${deleteType}`);
@@ -1070,6 +1113,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           onNoteSelect={handleNoteSelect}
           onAddFolder={handleAddFolderRequest}
           onAddNote={handleAddNote}
+          onQuickNote={handleQuickNote}
           onEditFolder={handleEditFolderRequest}
           onDeleteFolder={handleDeleteFolderRequest}
           onDeleteNote={handleDeleteNoteRequest}

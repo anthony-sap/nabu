@@ -7,6 +7,7 @@ import {
   errorResponse,
 } from "@/lib/nabu-helpers";
 import { ThoughtState } from "@prisma/client";
+import { generateNoteTitle } from "@/lib/ai/title-generator";
 
 /**
  * POST /api/nabu/thoughts/:id/promote
@@ -73,14 +74,9 @@ export async function POST(
       }
     }
 
-    // Extract title from meta, or generate from content
-    let title = (thought.meta as any)?.title;
-    
-    // If no title in meta, generate from content (first 50 chars)
-    if (!title || title.trim() === '' || title === 'Untitled') {
-      const contentPreview = thought.content.trim().substring(0, 50);
-      title = contentPreview + (thought.content.length > 50 ? '...' : '');
-    }
+    // Generate AI-powered title from content
+    // Fallback to simple truncation if AI generation fails
+    const title = await generateNoteTitle(thought.content);
     
     const contentState = (thought.meta as any)?.contentState;
 

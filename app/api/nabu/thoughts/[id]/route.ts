@@ -17,14 +17,15 @@ import { enqueueThoughtEmbeddingJobs, shouldRegenerateEmbeddings } from "@/lib/e
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id: thoughtId } = await params;
 
     const thought = await prisma.thought.findFirst({
       where: {
-        id: params.id,
+        id: thoughtId,
         userId,
         tenantId,
         deletedAt: null,
@@ -79,15 +80,16 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id: thoughtId } = await params;
 
     // Verify ownership and get existing thought
     const existingThought = await prisma.thought.findFirst({
       where: {
-        id: params.id,
+        id: thoughtId,
         userId,
         tenantId,
         deletedAt: null,
@@ -135,7 +137,7 @@ export async function PATCH(
 
     // Update thought
     const thought = await prisma.thought.update({
-      where: { id: params.id },
+      where: { id: thoughtId },
       data: {
         ...data,
         updatedBy: userId,
@@ -186,20 +188,21 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { id: thoughtId } = await params;
 
     // Verify ownership
-    const isOwner = await validateOwnership("thought", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("thought", thoughtId, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Thought not found or access denied", 404);
     }
 
     // Soft delete thought
     await prisma.thought.update({
-      where: { id: params.id },
+      where: { id: thoughtId },
       data: {
         deletedAt: new Date(),
         updatedBy: userId,

@@ -8,6 +8,7 @@ import {
 } from "@/lib/nabu-helpers";
 import { ThoughtState } from "@prisma/client";
 import { z } from "zod";
+import { generateBulkNoteTitle } from "@/lib/ai/title-generator";
 
 /**
  * Request validation schema
@@ -98,14 +99,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Generate title from first thought
-    const firstThought = thoughts[0];
-    let title = (firstThought.meta as any)?.title;
-    
-    if (!title || title.trim() === '' || title === 'Untitled') {
-      const contentPreview = firstThought.content.trim().substring(0, 50);
-      title = contentPreview + (firstThought.content.length > 50 ? '...' : '');
-    }
+    // Generate AI-powered title from all thought contents
+    // This creates a title that represents the common theme
+    const thoughtContents = thoughts.map(t => t.content);
+    const title = await generateBulkNoteTitle(thoughtContents);
 
     // Combine all thought content with markdown headings
     const combinedContent = thoughts

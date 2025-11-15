@@ -207,7 +207,7 @@ export function ThoughtsActivityFeed() {
       <ScrollArea className="h-full">
         <div className="space-y-6 max-w-4xl mx-auto">
           {/* Quick capture form */}
-          <QuickCaptureForm />
+          <QuickCaptureForm onSaved={refreshThoughts} />
           
           {/* Header */}
           <div className="flex items-center justify-between mb-2">
