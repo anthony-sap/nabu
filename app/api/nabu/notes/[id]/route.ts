@@ -106,6 +106,21 @@ export async function GET(
             },
           },
         },
+        thoughts: {
+          where: {
+            state: 'PROMOTED',
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            content: true,
+            meta: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
         _count: {
           select: {
             noteTags: true,
@@ -134,6 +149,7 @@ export async function GET(
       fromNoteId: link.fromNoteId,
       fromNoteTitle: link.from.title,
     }));
+    (formattedNote as any).thoughts = note.thoughts || [];
 
     return new Response(JSON.stringify(successResponse(formattedNote)), {
       status: 200,

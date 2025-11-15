@@ -137,6 +137,13 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [links, setLinks] = useState<LinkItem[]>([]);
   const isSyncingLinks = useRef(false); // Prevent infinite loops
 
+  // Source thoughts state (thoughts that were promoted to create this note)
+  const [sourceThoughts, setSourceThoughts] = useState<Array<{
+    id: string;
+    title: string;
+    content: string;
+  }>>([]);
+
   
 
   /**
@@ -243,6 +250,15 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           id: link.id,
           toNoteId: link.toNoteId,
           toNoteTitle: link.toNoteTitle,
+        })));
+      }
+
+      // Load source thoughts
+      if (data.thoughts && Array.isArray(data.thoughts)) {
+        setSourceThoughts(data.thoughts.map((thought: any) => ({
+          id: thought.id,
+          title: thought.meta?.title || 'Untitled',
+          content: thought.content,
         })));
       }
 
@@ -992,6 +1008,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
               tags={tags}
               sourceUrls={sourceUrls}
               links={links}
+              sourceThoughts={sourceThoughts}
               onRemoveTag={handleRemoveTag}
               onDeleteLink={handleDeleteLink}
               onAddLink={handleAddLink}

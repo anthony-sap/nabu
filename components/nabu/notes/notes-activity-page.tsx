@@ -461,6 +461,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     if (newView === "feed") {
       setSelectedNote(null);
       setEditingNote(null);
+      // Update URL to base /notes path
+      router.push('/nabu/notes');
     }
   };
 

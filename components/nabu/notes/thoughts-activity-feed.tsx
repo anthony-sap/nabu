@@ -4,9 +4,19 @@ import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Clock, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Clock, Lightbulb, MoreVertical, FileText, CheckSquare, Square, Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { QuickCaptureForm } from "./quick-capture-form";
 import { ThoughtCard } from "./thought-card";
+import { PromoteThoughtDialog } from "./promote-thought-dialog";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 /**
  * Thought data from API
@@ -49,9 +59,13 @@ export function ThoughtsActivityFeed() {
   const [thoughts, setThoughts] = useState<ApiThought[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedThoughtIds, setSelectedThoughtIds] = useState<Set<string>>(new Set());
+  const [showBulkPromoteDialog, setShowBulkPromoteDialog] = useState(false);
+  const [showPromoted, setShowPromoted] = useState(false);
 
   /**
-   * Load thoughts from API
+   * Load thoughts from API with filter
    */
   useEffect(() => {
     const loadThoughts = async () => {
@@ -59,7 +73,7 @@ export function ThoughtsActivityFeed() {
         setIsLoading(true);
         setError(null);
         
-        const response = await fetch("/api/nabu/thoughts");
+        const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
         if (!response.ok) {
           throw new Error("Failed to fetch thoughts");
         }
@@ -81,7 +95,9 @@ export function ThoughtsActivityFeed() {
     };
 
     loadThoughts();
-  }, []);
+  }, [showPromoted]); // Reload when filter changes
+
+  const router = useRouter();
 
   /**
    * Refresh thoughts list (e.g., after deletion)
@@ -89,7 +105,7 @@ export function ThoughtsActivityFeed() {
   const refreshThoughts = () => {
     const loadThoughts = async () => {
       try {
-        const response = await fetch("/api/nabu/thoughts");
+        const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
         if (!response.ok) {
           throw new Error("Failed to fetch thoughts");
         }
@@ -109,6 +125,83 @@ export function ThoughtsActivityFeed() {
     loadThoughts();
   };
 
+  /**
+   * Handle bulk promotion - merges all selected thoughts into ONE note
+   */
+  const handleBulkPromoteWithFolder = async (thoughtIds: string[], folderId: string | null) => {
+    toast.loading(`Merging ${thoughtIds.length} thoughts into one note...`);
+
+    try {
+      // Call bulk promote API which handles merging on the backend
+      const response = await fetch('/api/nabu/thoughts/bulk-promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thoughtIds,
+          folderId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to merge thoughts');
+      }
+
+      toast.dismiss();
+      toast.success(result.message || `Merged ${thoughtIds.length} thoughts into one note!`);
+
+      // Reset state
+      setBulkMode(false);
+      setSelectedThoughtIds(new Set());
+      
+      // Refresh thoughts list
+      refreshThoughts();
+      
+      // Navigate to the new note
+      const newNoteId = result.data?.note?.id;
+      if (newNoteId) {
+        router.push(`/notes?noteId=${newNoteId}`);
+      } else {
+        router.refresh();
+      }
+    } catch (error) {
+      toast.dismiss();
+      console.error("Failed to bulk promote:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to merge thoughts"
+      );
+      throw error;
+    }
+  };
+
+  /**
+   * Toggle selection of a thought
+   */
+  const handleToggleSelection = (thoughtId: string) => {
+    const newSet = new Set(selectedThoughtIds);
+    if (newSet.has(thoughtId)) {
+      newSet.delete(thoughtId);
+    } else {
+      newSet.add(thoughtId);
+    }
+    setSelectedThoughtIds(newSet);
+  };
+
+  /**
+   * Select all thoughts
+   */
+  const handleSelectAll = () => {
+    setSelectedThoughtIds(new Set(thoughts.map(t => t.id)));
+  };
+
+  /**
+   * Deselect all thoughts
+   */
+  const handleDeselectAll = () => {
+    setSelectedThoughtIds(new Set());
+  };
+
   return (
     <div className="h-full">
       <ScrollArea className="h-full">
@@ -121,10 +214,112 @@ export function ThoughtsActivityFeed() {
             <div className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-serif font-semibold text-foreground">Thoughts</h2>
+              {!bulkMode && (
+                <Badge variant="secondary" className="text-xs bg-secondary/15 text-secondary border-secondary/20">
+                  {thoughts.length} {thoughts.length === 1 ? "thought" : "thoughts"}
+                </Badge>
+              )}
+              {bulkMode && (
+                <Badge variant="default" className="text-xs bg-primary text-primary-foreground">
+                  {selectedThoughtIds.size} selected
+                </Badge>
+              )}
             </div>
-            <Badge variant="secondary" className="text-xs bg-secondary/15 text-secondary border-secondary/20">
-              {thoughts.length} {thoughts.length === 1 ? "thought" : "thoughts"}
-            </Badge>
+
+            <div className="flex items-center gap-2">
+              {/* Filter toggle - not in bulk mode */}
+              {!bulkMode && thoughts.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowPromoted(!showPromoted)}
+                  className="h-8 px-3 text-xs"
+                >
+                  {showPromoted ? (
+                    <>
+                      <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                      Hide Promoted
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Show Promoted
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Bulk mode controls */}
+              {bulkMode ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={selectedThoughtIds.size === thoughts.length ? handleDeselectAll : handleSelectAll}
+                    className="h-8 text-xs"
+                  >
+                    {selectedThoughtIds.size === thoughts.length ? (
+                      <>
+                        <Square className="h-3.5 w-3.5 mr-1.5" />
+                        Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+                        Select All
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (selectedThoughtIds.size === 0) {
+                        toast.error("Please select at least one thought");
+                        return;
+                      }
+                      setShowBulkPromoteDialog(true);
+                    }}
+                    disabled={selectedThoughtIds.size === 0}
+                    className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1.5" />
+                    Promote Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setBulkMode(false);
+                      setSelectedThoughtIds(new Set());
+                    }}
+                    className="h-8 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                /* Normal mode - three-dot menu */
+                thoughts.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setBulkMode(true)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Bulk Promote
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              )}
+            </div>
           </div>
 
           {/* Loading state */}
@@ -180,12 +375,31 @@ export function ThoughtsActivityFeed() {
                   key={thought.id}
                   thought={thought}
                   onDeleted={refreshThoughts}
+                  showCheckbox={bulkMode}
+                  isSelected={selectedThoughtIds.has(thought.id)}
+                  onToggleSelection={handleToggleSelection}
                 />
               ))}
             </div>
           )}
         </div>
       </ScrollArea>
+
+      {/* Bulk promote dialog */}
+      <PromoteThoughtDialog
+        open={showBulkPromoteDialog}
+        onOpenChange={setShowBulkPromoteDialog}
+        thoughtIds={Array.from(selectedThoughtIds)}
+        thoughtPreviews={thoughts
+          .filter(t => selectedThoughtIds.has(t.id))
+          .map(t => ({
+            id: t.id,
+            title: t.meta?.title || 'Untitled',
+            content: t.content,
+          }))
+        }
+        onPromote={handleBulkPromoteWithFolder}
+      />
     </div>
   );
 }

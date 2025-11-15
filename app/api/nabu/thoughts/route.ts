@@ -34,6 +34,9 @@ export async function GET(req: NextRequest) {
     }
 
     const { state, source, noteId, search, page = 1, limit = 20 } = queryResult.data;
+    
+    // Check includePromoted parameter (default: false to hide promoted thoughts)
+    const includePromoted = searchParams.get("includePromoted") === "true";
 
     // Build query
     const where: any = {
@@ -44,6 +47,9 @@ export async function GET(req: NextRequest) {
 
     if (state) {
       where.state = state;
+    } else if (!includePromoted) {
+      // By default, exclude promoted thoughts unless explicitly requested
+      where.state = { not: 'PROMOTED' };
     }
 
     if (source) {
