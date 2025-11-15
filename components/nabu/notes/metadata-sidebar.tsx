@@ -1,10 +1,11 @@
 "use client";
 
-import { Calendar } from "lucide-react";
+import { Calendar, Lightbulb } from "lucide-react";
 import { TagBadge } from "./tag-badge";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
 import { RelatedLinksList } from "./related-links-list";
 import { type LinkItem } from "./lexical-editor";
+import { Badge } from "@/components/ui/badge";
 
 /**
  * Props for MetadataSidebar component
@@ -20,6 +21,11 @@ interface MetadataSidebarProps {
   }>;
   sourceUrls: SourceInfo[];
   links: LinkItem[];
+  sourceThoughts?: Array<{
+    id: string;
+    title: string;
+    content: string;
+  }>;
   onRemoveTag: (tagId: string) => void;
   onDeleteLink: (linkId: string) => void;
   onAddLink: () => void;
@@ -51,6 +57,7 @@ export function MetadataSidebar({
   tags,
   sourceUrls,
   links,
+  sourceThoughts = [],
   onRemoveTag,
   onDeleteLink,
   onAddLink,
@@ -100,6 +107,34 @@ export function MetadataSidebar({
             Source URLs
           </div>
           <SourceUrlList sources={sourceUrls} />
+        </div>
+      )}
+
+      {/* Source Thoughts Section - show which thoughts created this note */}
+      {sourceThoughts.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <Lightbulb className="h-3.5 w-3.5" />
+            Source Thoughts
+          </div>
+          <div className="space-y-2">
+            {sourceThoughts.map((thought) => (
+              <div
+                key={thought.id}
+                className="p-2 rounded-md bg-muted/30 border border-border/40"
+              >
+                <p className="text-xs font-medium text-foreground mb-1">
+                  {thought.title}
+                </p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {thought.content}
+                </p>
+              </div>
+            ))}
+            <Badge variant="secondary" className="text-[10px]">
+              {sourceThoughts.length} thought{sourceThoughts.length > 1 ? 's' : ''} merged
+            </Badge>
+          </div>
         </div>
       )}
 

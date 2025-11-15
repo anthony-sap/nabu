@@ -23,11 +23,11 @@ import { prisma } from "@/lib/db";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
-    const noteId = params.id;
+    const { id: noteId } = await params;
 
     // Verify the note exists and belongs to the user
     const note = await prisma.note.findFirst({
@@ -81,11 +81,11 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
-    const noteId = params.id;
+    const { id: noteId } = await params;
     const body = await req.json();
 
     const { folderId, newFolderName, newFolderColor } = body;

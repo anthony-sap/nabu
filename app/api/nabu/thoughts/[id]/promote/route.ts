@@ -23,11 +23,11 @@ import { ThoughtState } from "@prisma/client";
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId, tenantId } = await getUserContext();
-    const thoughtId = params.id;
+    const { id: thoughtId } = await params;
     
     // Parse optional request body
     let folderId: string | undefined;
@@ -73,8 +73,15 @@ export async function POST(
       }
     }
 
-    // Extract title from meta or use "Untitled"
-    const title = (thought.meta as any)?.title || "Untitled";
+    // Extract title from meta, or generate from content
+    let title = (thought.meta as any)?.title;
+    
+    // If no title in meta, generate from content (first 50 chars)
+    if (!title || title.trim() === '' || title === 'Untitled') {
+      const contentPreview = thought.content.trim().substring(0, 50);
+      title = contentPreview + (thought.content.length > 50 ? '...' : '');
+    }
+    
     const contentState = (thought.meta as any)?.contentState;
 
     // Create the new note
