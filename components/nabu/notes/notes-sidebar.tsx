@@ -32,6 +32,7 @@ interface NotesSidebarProps {
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null) => void;
   onAddNote?: (folderId: string) => void;
+  onQuickNote?: () => void; // Callback to create a quick note
   onEditFolder?: (folderId: string) => void;
   onDeleteFolder?: (folderId: string) => void;
   onDeleteNote?: (noteId: string) => void;
@@ -186,6 +187,7 @@ export function NotesSidebar({
   onNoteSelect,
   onAddFolder,
   onAddNote,
+  onQuickNote,
   onEditFolder,
   onDeleteFolder,
   onDeleteNote,
@@ -405,6 +407,18 @@ export function NotesSidebar({
         
         {/* Quick Thought Trigger - full width button */}
         <QuickThoughtTrigger />
+        
+        {/* Quick Note Button */}
+        {onQuickNote && (
+          <Button
+            onClick={onQuickNote}
+            className="w-full mt-2 justify-start gap-2 bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200"
+            size="sm"
+          >
+            <FileText className="h-4 w-4" />
+            <span className="flex-1 text-left">Quick Note</span>
+          </Button>
+        )}
       </div>
       
       {/* Navigation content */}
