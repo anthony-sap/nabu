@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Clock, Lightbulb, MoreVertical, FileText, CheckSquare, Square, Loader2 } from "lucide-react";
+import { Sparkles, Clock, Lightbulb, MoreVertical, FileText, CheckSquare, Square, Loader2, Eye, EyeOff } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,9 +62,10 @@ export function ThoughtsActivityFeed() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedThoughtIds, setSelectedThoughtIds] = useState<Set<string>>(new Set());
   const [showBulkPromoteDialog, setShowBulkPromoteDialog] = useState(false);
+  const [showPromoted, setShowPromoted] = useState(false);
 
   /**
-   * Load thoughts from API
+   * Load thoughts from API with filter
    */
   useEffect(() => {
     const loadThoughts = async () => {
@@ -72,7 +73,7 @@ export function ThoughtsActivityFeed() {
         setIsLoading(true);
         setError(null);
         
-        const response = await fetch("/api/nabu/thoughts");
+        const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
         if (!response.ok) {
           throw new Error("Failed to fetch thoughts");
         }
@@ -94,7 +95,7 @@ export function ThoughtsActivityFeed() {
     };
 
     loadThoughts();
-  }, []);
+  }, [showPromoted]); // Reload when filter changes
 
   const router = useRouter();
 
@@ -104,7 +105,7 @@ export function ThoughtsActivityFeed() {
   const refreshThoughts = () => {
     const loadThoughts = async () => {
       try {
-        const response = await fetch("/api/nabu/thoughts");
+        const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
         if (!response.ok) {
           throw new Error("Failed to fetch thoughts");
         }
@@ -226,6 +227,28 @@ export function ThoughtsActivityFeed() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Filter toggle - not in bulk mode */}
+              {!bulkMode && thoughts.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowPromoted(!showPromoted)}
+                  className="h-8 px-3 text-xs"
+                >
+                  {showPromoted ? (
+                    <>
+                      <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                      Hide Promoted
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Show Promoted
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Bulk mode controls */}
               {bulkMode ? (
                 <>
