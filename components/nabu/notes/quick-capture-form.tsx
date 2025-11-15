@@ -10,6 +10,14 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 /**
+ * Props for QuickCaptureForm
+ */
+interface QuickCaptureFormProps {
+  onSaved?: () => void; // Callback when thought is successfully saved
+  onNoteCreated?: () => void; // Callback when note is successfully created
+}
+
+/**
  * Form component for quickly capturing new thoughts
  * 
  * Features:
@@ -21,7 +29,7 @@ import { useRouter } from "next/navigation";
  *   - Enter in title field moves focus to content
  *   - Cmd/Ctrl + Enter in content saves the thought
  */
-export function QuickCaptureForm() {
+export function QuickCaptureForm({ onSaved, onNoteCreated }: QuickCaptureFormProps = {}) {
   const router = useRouter();
   const [newThought, setNewThought] = useState({ 
     title: "", 
@@ -33,6 +41,7 @@ export function QuickCaptureForm() {
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [wasPasted, setWasPasted] = useState(false);
   const [userOverrideType, setUserOverrideType] = useState<'thought' | 'note' | null>(null);
+  const [editorKey, setEditorKey] = useState(0); // Key to force editor remount
 
   /**
    * Analyze content in real-time with debouncing
@@ -45,7 +54,7 @@ export function QuickCaptureForm() {
       return;
     }
 
-    // Debounce analysis by 500ms
+    // Debounce analysis by 1000ms (1 second) to avoid showing suggestions too quickly
     const timer = setTimeout(() => {
       const result = analyzeContentIntent(
         newThought.content,
@@ -59,7 +68,7 @@ export function QuickCaptureForm() {
       if (wasPasted) {
         setWasPasted(false);
       }
-    }, 500);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [newThought.content, newThought.title, wasPasted]);
@@ -106,8 +115,16 @@ export function QuickCaptureForm() {
       setShowSuggestion(false);
       setUserOverrideType(null);
       
-      // Refresh the page to show new thought
-      router.refresh();
+      // Force editor to remount by changing key
+      setEditorKey(prev => prev + 1);
+      
+      // Call the onSaved callback to refresh the feed
+      if (onSaved) {
+        onSaved();
+      } else {
+        // Fallback to router refresh if no callback provided
+        router.refresh();
+      }
     } catch (error) {
       console.error("Failed to save thought:", error);
       toast.error(
@@ -155,6 +172,14 @@ export function QuickCaptureForm() {
       setClassification(null);
       setShowSuggestion(false);
       setUserOverrideType(null);
+      
+      // Force editor to remount by changing key
+      setEditorKey(prev => prev + 1);
+      
+      // Call the onNoteCreated callback to refresh the sidebar
+      if (onNoteCreated) {
+        onNoteCreated();
+      }
       
       // Navigate to the new note
       if (result.data?.note?.id) {
@@ -213,14 +238,17 @@ export function QuickCaptureForm() {
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent pointer-events-none" />
       <div className="relative space-y-4">
         <div className="space-y-3">
-          {/* Title input field - larger and more prominent */}
+          {/* Title input field - shown when creating a note, hidden for thoughts */}
           <input
             type="text"
-            placeholder="Thought title..."
+            placeholder={userOverrideType === 'note' ? "Note title..." : "Thought title..."}
             value={newThought.title}
             onChange={(e) => setNewThought({ ...newThought, title: e.target.value })}
             disabled={isSaving}
-            className="w-full px-4 py-2.5 bg-background/60 border border-border/40 rounded-lg text-base font-semibold placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 backdrop-blur disabled:opacity-50 disabled:cursor-not-allowed"
+            className={userOverrideType === 'note' 
+              ? "w-full px-4 py-2.5 bg-background/60 border border-border/40 rounded-lg text-base font-semibold placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 backdrop-blur disabled:opacity-50 disabled:cursor-not-allowed"
+              : "hidden"
+            }
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -229,9 +257,10 @@ export function QuickCaptureForm() {
             }}
           />
           
-          {/* Content editor */}
+          {/* Content editor - with toolbar for notes, simple for thoughts */}
           <div onPaste={handlePaste}>
             <LexicalEditor
+              key={editorKey}
               value={newThought.content}
               editorState={newThought.editorState}
               onChange={(plainText, serializedState) => 
@@ -241,9 +270,10 @@ export function QuickCaptureForm() {
                   editorState: serializedState 
                 })
               }
-              placeholder="What's on your mind?"
-              className="min-h-[100px]"
+              placeholder={userOverrideType === 'note' ? "Start writing your note..." : "What's on your mind?"}
+              className={userOverrideType === 'note' ? "min-h-[300px]" : "min-h-[100px]"}
               disabled={isSaving}
+              showToolbar={userOverrideType === 'note'}
             />
           </div>
 

@@ -52,10 +52,17 @@ function formatTimeAgo(dateString: string): string {
 }
 
 /**
+ * Props for ThoughtsActivityFeed
+ */
+interface ThoughtsActivityFeedProps {
+  onNoteCreated?: () => void; // Callback when a note is created from this feed
+}
+
+/**
  * Thoughts Activity Feed Component
  * Displays recent thoughts from the API with tags
  */
-export function ThoughtsActivityFeed() {
+export function ThoughtsActivityFeed({ onNoteCreated }: ThoughtsActivityFeedProps = {}) {
   const [thoughts, setThoughts] = useState<ApiThought[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,7 +214,7 @@ export function ThoughtsActivityFeed() {
       <ScrollArea className="h-full">
         <div className="space-y-6 max-w-4xl mx-auto">
           {/* Quick capture form */}
-          <QuickCaptureForm />
+          <QuickCaptureForm onSaved={refreshThoughts} onNoteCreated={onNoteCreated} />
           
           {/* Header */}
           <div className="flex items-center justify-between mb-2">

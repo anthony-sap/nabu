@@ -274,8 +274,8 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
         {/* Scrollable content area */}
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="space-y-4 px-6 py-4">
-          {/* Title field */}
-          <div>
+          {/* Title field - hidden for thoughts (kept in DB for future use) */}
+          <div className="hidden">
             <label className="text-sm font-medium text-foreground mb-2 block">
               Title (optional)
             </label>

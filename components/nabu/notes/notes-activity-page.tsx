@@ -262,8 +262,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
             throw new Error('Failed to fetch thought');
           }
           
-          // Switch to thoughts view
-          setView("thoughts");
+          // Switch to feed view (thoughts are shown in feed)
+          setView("feed");
           // Note: Scrolling to specific thought or highlighting would be added here
         } catch (error) {
           console.error('Failed to load initial thought:', error);
@@ -1105,7 +1105,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           {/* Content area with padding */}
           <div className="flex-1 overflow-auto">
             {view === "feed" ? (
-              <ThoughtsActivityFeed />
+              <ThoughtsActivityFeed onNoteCreated={refreshFoldersAndNotes} />
             ) : view === "editor" && editingNote ? (
               <NoteEditor
                 noteId={editingNote.id}

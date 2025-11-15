@@ -143,13 +143,17 @@ export function analyzeContentIntent(
 
 /**
  * Determines if a suggestion should be shown based on confidence threshold
- * Only show suggestions when we're reasonably confident (>70%)
+ * Only show suggestions when:
+ * - Classification is "note" (not thought, since thought is the default)
+ * - Confidence is reasonably high (>70%)
  * 
  * @param classification - The classification result
  * @returns Whether to show a suggestion to the user
  */
 export function shouldShowSuggestion(classification: ContentClassification): boolean {
-  return classification.confidence >= 70;
+  // Only show suggestions for Notes (not Thoughts, since Thought is the default)
+  // And only when we're confident (>70%)
+  return classification.type === 'note' && classification.confidence >= 70;
 }
 
 /**
