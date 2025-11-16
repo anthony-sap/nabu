@@ -12,7 +12,7 @@ export const softDeleteAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        if (model == "AuditLog") {
+        if (model == "AuditLog" || model == "WhatsAppMessage") {
           return query(args);
         }
 

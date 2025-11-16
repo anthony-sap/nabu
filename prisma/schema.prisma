@@ -84,28 +84,31 @@ enum TagSource {
 }
 
 model Tenant {
-  id              String            @id @default(cuid())
-  status          StatusEnum        @default(ENABLE)
-  name            String            @db.VarChar(50)
-  createdAt       DateTime          @default(now())
-  createdBy       String?
-  updatedAt       DateTime          @default(now()) @updatedAt
-  updatedBy       String?
-  deletedAt       DateTime?
-  AuditLog        AuditLog[]
-  Account         Account[]
-  User            User[]
-  Folder          Folder[]
-  Tag             Tag[]
-  Note            Note[]
-  Thought         Thought[]
-  NoteLink        NoteLink[]
-  Attachment      Attachment[]
-  Share           Share[]
-  ImageAttachment ImageAttachment[]
-  NoteChunk       NoteChunk[]
-  ThoughtChunk    ThoughtChunk[]
-  EmbeddingJob    EmbeddingJob[]
+  id                  String               @id @default(cuid())
+  status              StatusEnum           @default(ENABLE)
+  name                String               @db.VarChar(50)
+  createdAt           DateTime             @default(now())
+  createdBy           String?
+  updatedAt           DateTime             @default(now()) @updatedAt
+  updatedBy           String?
+  deletedAt           DateTime?
+  AuditLog            AuditLog[]
+  Account             Account[]
+  User                User[]
+  Folder              Folder[]
+  Tag                 Tag[]
+  Note                Note[]
+  Thought             Thought[]
+  NoteLink            NoteLink[]
+  Attachment          Attachment[]
+  Share               Share[]
+  ImageAttachment     ImageAttachment[]
+  NoteChunk           NoteChunk[]
+  ThoughtChunk        ThoughtChunk[]
+  EmbeddingJob        EmbeddingJob[]
+  whatsappIntegration WhatsAppIntegration?
+  userPhoneLinks      UserPhoneLink[]
+  whatsappMessages    WhatsAppMessage[]
 }
 
 model AuditLog {
@@ -162,32 +165,33 @@ model Session {
 }
 
 model User {
-  id                     String     @id @default(cuid())
-  status                 StatusEnum @default(ENABLE)
+  id                     String          @id @default(cuid())
+  status                 StatusEnum      @default(ENABLE)
   firstName              String?
   lastName               String?
-  email                  String?    @unique
+  email                  String?         @unique
   emailVerified          DateTime?
   image                  String?
-  roles                  UserRole[] @default([USER])
+  roles                  UserRole[]      @default([USER])
   tenantId               String?
-  Tenant                 Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdAt              DateTime   @default(now())
+  Tenant                 Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt              DateTime        @default(now())
   createdBy              String?
-  updatedAt              DateTime   @default(now()) @updatedAt
+  updatedAt              DateTime        @default(now()) @updatedAt
   updatedBy              String?
   deletedAt              DateTime?
   accounts               Account[]
   sessions               Session[]
-  stripeCustomerId       String?    @unique @map(name: "stripe_customer_id")
-  stripeSubscriptionId   String?    @unique @map(name: "stripe_subscription_id")
-  stripePriceId          String?    @map(name: "stripe_price_id")
-  stripeCurrentPeriodEnd DateTime?  @map(name: "stripe_current_period_end")
+  stripeCustomerId       String?         @unique @map(name: "stripe_customer_id")
+  stripeSubscriptionId   String?         @unique @map(name: "stripe_subscription_id")
+  stripePriceId          String?         @map(name: "stripe_price_id")
+  stripeCurrentPeriodEnd DateTime?       @map(name: "stripe_current_period_end")
   thoughts               Thought[]
   notes                  Note[]
   folders                Folder[]
   tags                   Tag[]
   shares                 Share[]
+  phoneLinks             UserPhoneLink[]
 }
 
 model VerificationToken {
@@ -545,5 +549,102 @@ model EmbeddingJob {
   @@index([status, createdAt])
   @@index([entityType, entityId])
   @@index([userId])
+  @@index([tenantId])
+}
+
+// WhatsApp Integration Models
+
+// Tenant-level WhatsApp configuration
+model WhatsAppIntegration {
+  id                String    @id @default(cuid())
+  tenantId          String?   @unique
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phoneNumberId     String    // WhatsApp Phone Number ID from Meta
+  businessAccountId String    // WhatsApp Business Account ID
+  phoneNumber       String    // Display number (e.g., +1234567890)
+  accessToken       String    @db.Text // Encrypted access token
+  webhookSecret     String    // For signature verification
+  mode              String    @default("personal") // "personal", "team", "both"
+  isActive          Boolean   @default(true)
+  
+  // Audit fields
+  createdAt         DateTime  @default(now())
+  createdBy         String?
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String?
+  deletedAt         DateTime?
+  deletedBy         String?
+  
+  @@index([tenantId])
+  @@index([phoneNumberId])
+}
+
+// Maps WhatsApp phone numbers to Nabu users
+model UserPhoneLink {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phoneNumber   String    // E.164 format: +1234567890
+  isActive      Boolean   @default(true)
+  linkedAt      DateTime  @default(now())
+  lastMessageAt DateTime? // Track last message received
+  
+  // Audit fields
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  
+  @@unique([phoneNumber, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([phoneNumber])
+}
+
+// One-time tokens for phone number linking
+model WhatsAppLinkToken {
+  id                String    @id @default(cuid())
+  token             String    @unique
+  phoneNumber       String    // E.164 format
+  whatsappMessageId String?   // Original WhatsApp message ID
+  expiresAt         DateTime  // 15 minutes from creation
+  usedAt            DateTime? // Enforce one-time use
+  userId            String?   // Set when used
+  metadata          Json?     // Store WhatsApp context
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([token])
+  @@index([phoneNumber])
+  @@index([expiresAt])
+}
+
+// Raw message storage for debugging and retry
+model WhatsAppMessage {
+  id                String    @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whatsappMessageId String    @unique // WhatsApp's message ID
+  fromNumber        String    // Sender phone number
+  toNumber          String    // Nabu bot number
+  messageType       String    // "text", "image", "audio", "document"
+  content           String?   @db.Text // Text content
+  mediaUrl          String?   // Media URL from WhatsApp
+  mimeType          String?
+  rawPayload        Json      // Full webhook payload
+  processed         Boolean   @default(false)
+  processedAt       DateTime?
+  thoughtId         String?   // Link to created Thought
+  error             String?   @db.Text
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([whatsappMessageId])
+  @@index([fromNumber])
+  @@index([processed])
   @@index([tenantId])
 }
