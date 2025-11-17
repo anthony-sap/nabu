@@ -19,6 +19,7 @@ interface WebhookPayload {
   record: {
     id: string;
     userId: string;
+    tenantId: string;
     entityType: string;
     entityId: string;
     content: string;
@@ -58,10 +59,36 @@ serve(async (req) => {
       );
     }
 
-    // Call OpenAI API
-    const prompt = `Analyze the following content and suggest 3-5 relevant tags for categorization.
+    // Query user's existing tags from their notes in real-time
+    const { data: usedTags, error: tagsError } = await supabase
+      .from("NoteTag")
+      .select(`
+        tag:Tag!inner(name)
+      `)
+      .eq("tenantId", job.tenantId)
+      .is("deletedAt", null)
+      .eq("note.userId", job.userId)
+      .eq("note.tenantId", job.tenantId)
+      .is("note.deletedAt", null);
 
+    // Extract unique tag names
+    const existingTagNames = usedTags 
+      ? [...new Set(usedTags.map((nt: any) => nt.tag?.name).filter(Boolean))]
+      : [];
+
+    console.log(`Found ${existingTagNames.length} existing tags for user ${job.userId}`);
+
+    // Call OpenAI API
+    // Build prompt with existing user tags for context
+    const existingTagsSection = existingTagNames.length > 0
+      ? `\nUser's Existing Tags: ${existingTagNames.join(", ")}\n`
+      : "";
+
+    const prompt = `Analyze the following content and suggest 3-5 relevant tags for categorization.
+${existingTagsSection}
 Rules:
+- Prioritize suggesting relevant tags from the user's existing tags when appropriate
+- Only suggest new tags if the existing tags don't adequately describe the content
 - Return tags as short phrases (1-3 words max)
 - Focus on: topics, themes, categories, projects
 - Make tags actionable and searchable

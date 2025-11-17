@@ -48,7 +48,7 @@ export function TagBadge({
           <Badge
             variant="outline"
             className={cn(
-              "group relative gap-1.5 pr-1 pl-2 py-1 text-xs border-dashed opacity-80 bg-primary/5",
+              "group relative gap-1.5 pr-1 pl-2 py-1 text-xs border-dashed bg-primary/5",
               className
             )}
             style={badgeStyle}
@@ -63,10 +63,10 @@ export function TagBadge({
                   e.stopPropagation();
                   onRemove(id);
                 }}
-                className="ml-1 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity p-0.5"
+                className="ml-1 rounded-sm opacity-50 group-hover:opacity-100 hover:bg-destructive/20 transition-all p-0.5 cursor-pointer"
                 aria-label={`Remove ${name} tag`}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
               </button>
             )}
           </Badge>

@@ -149,9 +149,31 @@ export async function POST(
       data: { consumed: true },
     });
 
+    // Fetch the updated tags for the note to return to frontend
+    const noteWithTags = await prisma.note.findUnique({
+      where: { id: job.entityId },
+      include: {
+        noteTags: {
+          where: { deletedAt: null },
+          include: {
+            tag: true,
+          },
+        },
+      },
+    });
+
+    const updatedTags = noteWithTags?.noteTags.map((nt) => ({
+      id: nt.tag.id,
+      name: nt.tag.name,
+      color: nt.tag.color,
+      source: nt.source,
+      confidence: nt.confidence,
+    })) || [];
+
     return NextResponse.json({
       message: "Tags accepted successfully",
       tagsAdded: tagNames,
+      tags: updatedTags,
     });
   } catch (error) {
     return handleApiError(error);

@@ -13,6 +13,7 @@ import { AddLinkDialog } from "./add-link-dialog";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { MetadataSidebar } from "./metadata-sidebar";
 import { toast } from "sonner";
+import { $getRoot, type LexicalEditor as LexicalEditorType } from "lexical";
 
 /**
  * Props for the NoteEditor component
@@ -132,6 +133,9 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   const [contentTags, setContentTags] = useState<MentionItem[]>([]);
   const [contentMentions, setContentMentions] = useState<MentionItem[]>([]);
   const isSyncingTags = useRef(false); // Prevent infinite loops
+  
+  // Editor ref for programmatic updates
+  const editorRef = useRef<LexicalEditorType | null>(null);
 
   // Links state
   const [links, setLinks] = useState<LinkItem[]>([]);
@@ -309,7 +313,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }
 
   /**
-   * Request tag suggestions from AI
+   * Request tag suggestions from AI (auto-triggered)
    */
   const requestTagSuggestions = useCallback(async () => {
     if (content.length < 200 || tags.length > 0 || pendingJobId) {
@@ -342,6 +346,51 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       // Fail gracefully, don't block save
     }
   }, [content, noteId, tags.length, pendingJobId]);
+
+  /**
+   * Request tag suggestions manually (user-triggered)
+   */
+  const handleRequestTagSuggestions = async () => {
+    if (pendingJobId) {
+      toast.info("Tag suggestions already in progress");
+      return;
+    }
+
+    if (content.length < 200) {
+      toast.error("Note content is too short. Add at least 200 characters to get tag suggestions.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/nabu/tag-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "NOTE",
+          entityId: noteId,
+          content,
+        }),
+      });
+
+      if (response.status === 429) {
+        const data = await response.json();
+        const minutes = Math.ceil((data.retryAfter || 0) / 60);
+        toast.error(`Please wait ${minutes} minute${minutes > 1 ? 's' : ''} before requesting more tag suggestions.`);
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        setPendingJobId(data.jobId);
+        toast.success("Generating tag suggestions...");
+      } else {
+        throw new Error("Failed to request tag suggestions");
+      }
+    } catch (error) {
+      console.error("Error requesting tag suggestions:", error);
+      toast.error("Failed to request tag suggestions");
+    }
+  };
 
   /**
    * Poll for tag suggestion job status
@@ -407,8 +456,13 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         throw new Error("Failed to accept tags");
       }
 
-      // Reload note to get updated tags
-      await loadNote();
+      const result = await response.json();
+      
+      // Update tags state directly without reloading the entire note
+      if (result.tags) {
+        setTags(result.tags);
+      }
+      
       setSuggestedTags([]);
       setShowSuggestionNotification(false);
       setShowSuggestionModal(false);
@@ -647,21 +701,56 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
    */
   const handleRemoveTag = async (tagId: string) => {
     try {
-      const response = await fetch(`/api/nabu/notes/${noteId}/tags/${tagId}`, {
+      const tagToRemove = tags.find(t => t.id === tagId);
+      if (!tagToRemove) return;
+
+      // 1. Delete from API using tag name
+      const response = await fetch(`/api/nabu/notes/${noteId}/tags`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagNames: [tagToRemove.name] }),
       });
 
       if (!response.ok) {
         throw new Error("Failed to remove tag");
       }
 
-      setTags(tags.filter(t => t.id !== tagId));
+      // Get updated tags from response
+      const result = await response.json();
+      if (result.data?.tags) {
+        setTags(result.data.tags);
+      }
+
+      // 2. Remove corresponding #tag mentions from editor content
+      if (editorRef.current) {
+        editorRef.current.update(() => {
+          const root = $getRoot();
+          const nodesToRemove: any[] = [];
+
+          // Find all tag mention nodes with this tag name
+          function traverse(node: any) {
+            if ((node.__type === "custom-beautifulMention" || node.__type === "beautifulMention") 
+                && node.__trigger === "#" 
+                && node.__value?.toLowerCase() === tagToRemove.name.toLowerCase()) {
+              nodesToRemove.push(node);
+            }
+            const children = node.getChildren?.();
+            if (children) {
+              children.forEach((child: any) => traverse(child));
+            }
+          }
+
+          root.getChildren().forEach((child: any) => traverse(child));
+          nodesToRemove.forEach((node: any) => node.remove());
+        });
+      }
+
       toast.success("Tag removed");
     } catch (error) {
       console.error("Error removing tag:", error);
       toast.error("Failed to remove tag");
     }
-  }
+  };
 
   /**
    * Save note to localStorage only (fast, local-only save)
@@ -994,6 +1083,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
                 showToolbar={true}
                 autoFocus={true}
                 noteId={noteId}
+                editorRef={editorRef}
                 className="min-h-[400px]"
               />
             </div>
@@ -1012,6 +1102,8 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
               onRemoveTag={handleRemoveTag}
               onDeleteLink={handleDeleteLink}
               onAddLink={handleAddLink}
+              onRequestTagSuggestions={handleRequestTagSuggestions}
+              isGeneratingTags={!!pendingJobId}
             />
           </div>
         </div>

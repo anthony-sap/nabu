@@ -177,6 +177,7 @@ interface LexicalEditorProps {
   onSourceUrlsChanged?: (sources: SourceInfo[]) => void;
   onTagsChanged?: (tags: MentionItem[]) => void;
   onMentionsChanged?: (mentions: MentionItem[]) => void;
+  editorRef?: React.MutableRefObject<LexicalEditorType | null>; // Ref to access editor instance
 }
 
 /**
@@ -372,6 +373,24 @@ function DelayedAutoFocusPlugin({ shouldAutoFocus }: { shouldAutoFocus: boolean 
 }
 
 /**
+ * Plugin to expose editor instance via ref
+ */
+function EditorRefPlugin({ editorRef }: { editorRef?: React.MutableRefObject<LexicalEditorType | null> }) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (editorRef) {
+      editorRef.current = editor;
+      return () => {
+        editorRef.current = null;
+      };
+    }
+  }, [editor, editorRef]);
+
+  return null;
+}
+
+/**
  * Lexical Rich Text Editor Component
  * Provides a rich text editing experience with formatting capabilities
  */
@@ -387,6 +406,7 @@ export function LexicalEditor({
   onSourceUrlsChanged,
   onTagsChanged,
   onMentionsChanged,
+  editorRef,
 }: LexicalEditorProps) {
   // Store source URLs outside editor state to prevent loss on edits
   const sourceUrlsRef = useRef<string[]>([]);
@@ -561,6 +581,7 @@ export function LexicalEditor({
         <HistoryPlugin />
         <DelayedAutoFocusPlugin shouldAutoFocus={autoFocus} />
         <ContentSyncPlugin plainText={value} serializedState={editorState} />
+        <EditorRefPlugin editorRef={editorRef} />
         
         {/* List Plugins */}
         <ListPlugin />

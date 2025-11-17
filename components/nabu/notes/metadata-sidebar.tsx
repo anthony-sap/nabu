@@ -1,11 +1,12 @@
 "use client";
 
-import { Calendar, Lightbulb } from "lucide-react";
+import { Calendar, Lightbulb, Sparkles, Loader2 } from "lucide-react";
 import { TagBadge } from "./tag-badge";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
 import { RelatedLinksList } from "./related-links-list";
 import { type LinkItem } from "./lexical-editor";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 /**
  * Props for MetadataSidebar component
@@ -29,6 +30,8 @@ interface MetadataSidebarProps {
   onRemoveTag: (tagId: string) => void;
   onDeleteLink: (linkId: string) => void;
   onAddLink: () => void;
+  onRequestTagSuggestions?: () => void;
+  isGeneratingTags?: boolean;
 }
 
 /**
@@ -61,6 +64,8 @@ export function MetadataSidebar({
   onRemoveTag,
   onDeleteLink,
   onAddLink,
+  onRequestTagSuggestions,
+  isGeneratingTags = false,
 }: MetadataSidebarProps) {
   return (
     <div className="space-y-6">
@@ -78,11 +83,29 @@ export function MetadataSidebar({
       )}
 
       {/* Tags Section */}
-      {tags.length > 0 && (
-        <div className="space-y-2">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Tags
           </div>
+          {onRequestTagSuggestions && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRequestTagSuggestions}
+              disabled={isGeneratingTags}
+              className="h-7 px-2 border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 cursor-pointer"
+              title={isGeneratingTags ? "Generating suggestions..." : "Suggest tags with AI"}
+            >
+              {isGeneratingTags ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+              )}
+            </Button>
+          )}
+        </div>
+        {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
               <TagBadge
@@ -97,8 +120,8 @@ export function MetadataSidebar({
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Source URLs Section */}
       {sourceUrls.length > 0 && (
