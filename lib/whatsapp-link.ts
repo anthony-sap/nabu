@@ -198,3 +198,104 @@ export async function getLinkedUser(
   };
 }
 
+/**
+ * Verify code and link phone number to user
+ * 
+ * Used for 2FA-style verification flow where user replies with a 6-digit code
+ * sent to them via WhatsApp.
+ */
+export async function verifyCodeAndLink(
+  phoneNumber: string,
+  code: string,
+  tenantId: string | null
+): Promise<{
+  success: boolean;
+  error?: string;
+  userId?: string;
+}> {
+  try {
+    // Find token by phone number and verification code
+    const linkToken = await prisma.whatsAppLinkToken.findFirst({
+      where: {
+        phoneNumber,
+        verificationCode: code,
+        usedAt: null, // Not yet used
+      },
+      orderBy: {
+        createdAt: "desc", // Get most recent token
+      },
+    });
+
+    if (!linkToken) {
+      return {
+        success: false,
+        error: "Invalid verification code",
+      };
+    }
+
+    // Check if expired (15 minutes)
+    const now = new Date();
+    if (linkToken.expiresAt < now) {
+      return {
+        success: false,
+        error: "Verification code expired. Please request a new one.",
+      };
+    }
+
+    // Get user ID from token metadata
+    const userId = (linkToken.metadata as any)?.userId;
+    
+    if (!userId) {
+      return {
+        success: false,
+        error: "Invalid token metadata",
+      };
+    }
+
+    // Mark token as used
+    await prisma.whatsAppLinkToken.update({
+      where: { id: linkToken.id },
+      data: {
+        usedAt: now,
+        userId,
+      },
+    });
+
+    // Create or update phone link
+    await prisma.userPhoneLink.upsert({
+      where: {
+        phoneNumber_tenantId: {
+          phoneNumber,
+          tenantId: tenantId,
+        },
+      },
+      create: {
+        userId,
+        tenantId,
+        phoneNumber,
+        isActive: true,
+        linkedAt: now,
+        createdBy: userId,
+        updatedBy: userId,
+      },
+      update: {
+        userId,
+        isActive: true,
+        linkedAt: now,
+        updatedBy: userId,
+      },
+    });
+
+    return {
+      success: true,
+      userId,
+    };
+  } catch (error) {
+    console.error("Error in verifyCodeAndLink:", error);
+    return {
+      success: false,
+      error: "Failed to verify code",
+    };
+  }
+}
+

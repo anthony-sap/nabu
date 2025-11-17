@@ -20,6 +20,15 @@ export default async function WhatsAppSettingsPage() {
 
   const user = await getUser();
   
+  // Get full user record with phone number
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user!.id },
+    select: {
+      id: true,
+      phoneNumber: true,
+    },
+  });
+
   // Get user's phone links
   const phoneLinks = await prisma.userPhoneLink.findMany({
     where: {
@@ -47,6 +56,7 @@ export default async function WhatsAppSettingsPage() {
       </p>
 
       <WhatsAppSettingsForm
+        userPhoneNumber={dbUser?.phoneNumber || null}
         phoneLinks={phoneLinks}
         integration={integration}
         botNumber={integration?.phoneNumber}

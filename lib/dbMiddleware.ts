@@ -72,14 +72,15 @@ export const tenantAware = Prisma.defineExtension({
 
         const user = await getCurrentUser();
 
-        const tenantId = user?.tenantId;
+        const sessionTenantId = user?.tenantId;
+        
         if (
           ["findUnique", "findFirst", "findMany", "count"].includes(operation)
         ) {
           if (!args["where"]) {
             args["where"] = {};
           }
-          args["where"]["tenantId"] = tenantId;
+          args["where"]["tenantId"] = sessionTenantId;
         } else if (
           operation === "create" ||
           operation === "createMany" ||
@@ -87,6 +88,15 @@ export const tenantAware = Prisma.defineExtension({
           operation === "update" ||
           operation === "updateMany"
         ) {
+          // Check if tenantId is explicitly provided in the data
+          const dataObject = args?.data ?? {};
+          const explicitTenantId = Array.isArray(dataObject) 
+            ? dataObject[0]?.tenantId 
+            : dataObject?.tenantId;
+          
+          // Use explicit tenantId if provided (e.g., from webhooks), otherwise use session tenantId
+          const tenantId = explicitTenantId !== undefined ? explicitTenantId : sessionTenantId;
+          
           args["data"] = updateArgsDataWithSchema({
             modelName: model,
             operation,

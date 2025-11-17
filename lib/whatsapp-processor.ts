@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { getLinkedUser, generateLinkToken } from "@/lib/whatsapp-link";
 import { getWhatsAppClient } from "@/lib/whatsapp-client";
 import { enqueueThoughtEmbeddingJobs } from "@/lib/embeddings";
+import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { env } from "@/env";
 
 /**
@@ -44,12 +45,15 @@ export async function processWhatsAppMessage(whatsappMessageId: string): Promise
 
     const tenantId = integration.tenantId;
 
+    // Normalize the phone number to E.164 format for consistent matching
+    const normalizedFromNumber = normalizePhoneNumber(message.fromNumber);
+
     // Check if phone number is linked
-    const linkedUser = await getLinkedUser(message.fromNumber, tenantId);
+    const linkedUser = await getLinkedUser(normalizedFromNumber, tenantId);
 
     if (!linkedUser) {
       // Phone not linked - send linking instructions
-      await handleUnlinkedNumber(message.fromNumber, whatsappMessageId, tenantId);
+      await handleUnlinkedNumber(normalizedFromNumber, whatsappMessageId, tenantId);
       
       await prisma.whatsAppMessage.update({
         where: { id: message.id },
@@ -61,8 +65,16 @@ export async function processWhatsAppMessage(whatsappMessageId: string): Promise
       return;
     }
 
-    // Create Thought from message
-    const thought = await createThoughtFromMessage(message, linkedUser.userId, tenantId);
+    // Get the user's tenantId from the database to ensure correct tenant assignment
+    const user = await prisma.user.findUnique({
+      where: { id: linkedUser.userId },
+      select: { tenantId: true },
+    });
+
+    const userTenantId = user?.tenantId || linkedUser.tenantId;
+
+    // Create Thought from message using the user's tenantId
+    const thought = await createThoughtFromMessage(message, linkedUser.userId, userTenantId);
 
     // Mark as processed
     await prisma.whatsAppMessage.update({

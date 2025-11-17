@@ -172,6 +172,7 @@ model User {
   email                  String?         @unique
   emailVerified          DateTime?
   image                  String?
+  phoneNumber            String?         @unique
   roles                  UserRole[]      @default([USER])
   tenantId               String?
   Tenant                 Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -611,6 +612,7 @@ model WhatsAppLinkToken {
   token             String    @unique
   phoneNumber       String    // E.164 format
   whatsappMessageId String?   // Original WhatsApp message ID
+  verificationCode  String?   // 6-digit code for 2FA-style verification
   expiresAt         DateTime  // 15 minutes from creation
   usedAt            DateTime? // Enforce one-time use
   userId            String?   // Set when used
