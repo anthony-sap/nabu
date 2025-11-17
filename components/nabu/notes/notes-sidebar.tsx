@@ -422,8 +422,8 @@ export function NotesSidebar({
       </div>
       
       {/* Navigation content */}
-      <ScrollArea className="flex-1">
-        <div className="p-3 pb-6 space-y-1">
+      <ScrollArea >
+        <div className="p-3 pb-6 space-y-1 ">
           {/* Feed navigation option with premium active state */}
           <div
             className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${

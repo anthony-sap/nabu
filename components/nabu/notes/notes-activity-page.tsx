@@ -13,7 +13,8 @@ import { SearchDialog } from "./search-dialog";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { FolderItem, NoteItem } from "./types";
 import { SearchResult } from "./types-search";
-import { fetchRootFolders, fetchFolderChildren } from "./api";
+import { fetchRootFolders, fetchFolderChildren, fetchFolderNotes } from "./api";
+import { FolderStateStorage } from "./folder-state-storage";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +99,61 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   // Search dialog state
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
 
+  // User ID for localStorage scoping
+  const [userId, setUserId] = useState<string | null>(null);
+
+  /**
+   * Helper: Apply expanded state to folder tree
+   */
+  const applyExpandedState = (folders: FolderItem[], expandedIds: string[]): FolderItem[] => {
+    return folders.map(folder => ({
+      ...folder,
+      expanded: expandedIds.includes(folder.id),
+      children: folder.children ? applyExpandedState(folder.children, expandedIds) : [],
+    }));
+  };
+
+  /**
+   * Helper: Apply cached notes to folder tree
+   */
+  const applyCachedNotes = (
+    folders: FolderItem[],
+    notesCache: Record<string, { notes: NoteItem[]; timestamp: string; expiresAt: string }>
+  ): FolderItem[] => {
+    return folders.map(folder => {
+      const cached = notesCache[folder.id];
+      const cacheValid = cached && new Date(cached.expiresAt) > new Date();
+
+      return {
+        ...folder,
+        notes: cacheValid ? cached.notes : folder.notes,
+        hasLoadedNotes: cacheValid ? true : folder.hasLoadedNotes,
+        children: folder.children ? applyCachedNotes(folder.children, notesCache) : [],
+      };
+    });
+  };
+
+  /**
+   * Helper: Extract all expanded folder IDs from tree
+   */
+  const getExpandedFolderIds = (folders: FolderItem[]): string[] => {
+    const ids: string[] = [];
+    
+    const collect = (items: FolderItem[]) => {
+      items.forEach(item => {
+        if (item.expanded) {
+          ids.push(item.id);
+        }
+        if (item.children) {
+          collect(item.children);
+        }
+      });
+    };
+    
+    collect(folders);
+    return ids;
+  };
+
   /**
    * Load folders from API on component mount
    */
@@ -107,7 +163,33 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
         setIsLoadingFolders(true);
         setFolderLoadError(null);
         const rootFolders = await fetchRootFolders();
-        setFolders(sortFolderItems(rootFolders));
+        
+        // Extract userId from the first folder (if any) for localStorage scoping
+        const firstFolder = rootFolders[0];
+        if (firstFolder && 'userId' in firstFolder) {
+          const userIdFromFolder = (firstFolder as any).userId;
+          setUserId(userIdFromFolder);
+          
+          // Load persisted folder state
+          const savedState = FolderStateStorage.load(userIdFromFolder);
+          
+          if (savedState) {
+            // Apply expanded states
+            let foldersWithState = applyExpandedState(rootFolders, savedState.expandedFolderIds);
+            
+            // Apply cached notes
+            foldersWithState = applyCachedNotes(foldersWithState, savedState.loadedNotesCache);
+            
+            // Clean up expired cache entries
+            FolderStateStorage.cleanupExpired(userIdFromFolder);
+            
+            setFolders(sortFolderItems(foldersWithState));
+          } else {
+            setFolders(sortFolderItems(rootFolders));
+          }
+        } else {
+          setFolders(sortFolderItems(rootFolders));
+        }
       } catch (error) {
         console.error('Failed to load folders:', error);
         setFolderLoadError(error instanceof Error ? error.message : 'Failed to load folders');
@@ -158,6 +240,12 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     try {
       // Reload folders
       const rootFolders = await fetchRootFolders();
+      
+      // Clear and refresh localStorage cache when data changes
+      if (userId) {
+        FolderStateStorage.clear(userId);
+      }
+      
       setFolders(sortFolderItems(rootFolders));
       
       // Reload root notes
@@ -179,11 +267,11 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   };
 
   /**
-   * Setup keyboard shortcut for search (Cmd+Shift+F)
+   * Setup keyboard shortcut for search (Ctrl+F / Cmd+F)
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !e.shiftKey) {
         e.preventDefault();
         setSearchDialogOpen(true);
       }
@@ -381,7 +469,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
 
   /**
    * Recursively toggles the expanded state of a folder in the tree
-   * Lazy loads children if they haven't been loaded yet
+   * Lazy loads notes for the folder if they haven't been loaded yet
    */
   const toggleFolder = async (id: string) => {
     // First, find the folder to check its state
@@ -404,52 +492,77 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     };
     setFolders(updateExpanded(folders));
 
-    // If expanding and children haven't been loaded yet, fetch them
-    if (isExpanding && !folder.hasLoadedChildren && (folder.childCount ?? 0) > 0) {
-      // Set loading state
-      const setLoading = (items: FolderItem[], loading: boolean): FolderItem[] => {
+    // If expanding and notes haven't been loaded yet, fetch them
+    if (isExpanding && !folder.hasLoadedNotes && (folder.noteCount ?? 0) > 0) {
+      // Set loading state for notes
+      const setNotesLoading = (items: FolderItem[], loading: boolean): FolderItem[] => {
         return items.map((item) => {
           if (item.id === id) {
-            return { ...item, isLoading: loading };
+            return { ...item, notesLoading: loading };
           }
           if (item.children) {
-            return { ...item, children: setLoading(item.children, loading) };
+            return { ...item, children: setNotesLoading(item.children, loading) };
           }
           return item;
         });
       };
-      setFolders((current) => setLoading(current, true));
+      setFolders((current) => setNotesLoading(current, true));
 
       try {
-        const children = await fetchFolderChildren(id);
+        const notes = await fetchFolderNotes(id);
         
-        // Insert children into the tree
-        const insertChildren = (items: FolderItem[]): FolderItem[] => {
+        // Insert notes into the folder
+        const insertNotes = (items: FolderItem[]): FolderItem[] => {
           return items.map((item) => {
             if (item.id === id) {
               return {
                 ...item,
-                children: sortFolderItems(children),
-                hasLoadedChildren: true,
-                isLoading: false,
+                notes,
+                hasLoadedNotes: true,
+                notesLoading: false,
               };
             }
             if (item.children) {
-              return { ...item, children: insertChildren(item.children) };
+              return { ...item, children: insertNotes(item.children) };
             }
             return item;
           });
         };
-        setFolders((current) => insertChildren(current));
+        setFolders((current) => {
+          const updated = insertNotes(current);
+          
+          // Cache the loaded notes and save expanded state
+          if (userId) {
+            FolderStateStorage.saveFolderNotes(userId, id, notes);
+            FolderStateStorage.saveExpandedFolders(userId, getExpandedFolderIds(updated));
+          }
+          
+          return updated;
+        });
       } catch (error) {
-        console.error(`Failed to load children for folder ${id}:`, error);
-        // Remove loading state and collapse folder on error
-        setFolders((current) => 
-          setLoading(current, false).map((item) => 
-            item.id === id ? { ...item, expanded: false } : item
-          )
-        );
+        console.error(`Failed to load notes for folder ${id}:`, error);
+        // Remove loading state on error
+        const removeLoading = (items: FolderItem[]): FolderItem[] => {
+          return items.map((item) => {
+            if (item.id === id) {
+              return { ...item, notesLoading: false };
+            }
+            if (item.children) {
+              return { ...item, children: removeLoading(item.children) };
+            }
+            return item;
+          });
+        };
+        setFolders((current) => removeLoading(current));
       }
+    }
+    
+    // Save expanded folder state whenever toggle happens
+    if (userId) {
+      const updatedExpandedIds = isExpanding 
+        ? [...getExpandedFolderIds(folders), id]
+        : getExpandedFolderIds(folders).filter(fid => fid !== id);
+      FolderStateStorage.saveExpandedFolders(userId, updatedExpandedIds);
     }
   };
 

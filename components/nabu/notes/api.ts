@@ -48,8 +48,10 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
     updatedAt: note.updatedAt,
   }));
   
-  // hasLoadedChildren should be true if we have the actual children OR notes data
-  const hasLoadedChildren = !!apiFolder.children || (apiFolder.notes !== undefined);
+  // hasLoadedChildren is true if we have the actual children data
+  const hasLoadedChildren = !!apiFolder.children;
+  // hasLoadedNotes is true if we have the actual notes data
+  const hasLoadedNotes = apiFolder.notes !== undefined;
   
   return {
     id: apiFolder.id,
@@ -59,7 +61,9 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
     expanded: false,
     children: apiFolder.children?.map(transformFolder) || [],
     hasLoadedChildren: hasLoadedChildren,
+    hasLoadedNotes: hasLoadedNotes,
     childCount: childCount,
+    noteCount: notesCount,
     notes: transformedNotes,
   };
 }
@@ -67,13 +71,17 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
 /**
  * Fetch root-level folders for the current user
  * @param includeNotes - Whether to include notes in the response
+ * @param includeFullTree - Whether to fetch the entire folder hierarchy
  * @returns Array of root folders (where parentId is null)
  */
-export async function fetchRootFolders(includeNotes = true): Promise<FolderItem[]> {
+export async function fetchRootFolders(includeNotes = false, includeFullTree = true): Promise<FolderItem[]> {
   try {
     const params = new URLSearchParams();
     if (includeNotes) {
       params.set("includeNotes", "true");
+    }
+    if (includeFullTree) {
+      params.set("includeFullTree", "true");
     }
     
     const url = `/api/nabu/folders${params.toString() ? `?${params.toString()}` : ''}`;
@@ -128,6 +136,38 @@ export async function fetchFolderChildren(parentId: string, includeNotes = true)
     return data.data.map(transformFolder);
   } catch (error) {
     console.error(`Error fetching children for folder ${parentId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch notes for a specific folder
+ * @param folderId - ID of the folder
+ * @returns Array of notes in the folder
+ */
+export async function fetchFolderNotes(folderId: string): Promise<NoteItem[]> {
+  try {
+    const response = await fetch(`/api/nabu/notes?folderId=${folderId}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to fetch notes: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.success || !data.data.notes || !Array.isArray(data.data.notes)) {
+      throw new Error("Invalid response format from server");
+    }
+
+    return data.data.notes.map((note: any) => ({
+      id: note.id,
+      title: note.title,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    }));
+  } catch (error) {
+    console.error(`Error fetching notes for folder ${folderId}:`, error);
     throw error;
   }
 }

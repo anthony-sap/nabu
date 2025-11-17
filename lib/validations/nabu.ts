@@ -178,6 +178,7 @@ export const folderQuerySchema = z.object({
   parentId: z.string().cuid().optional(),
   includeChildren: z.string().transform(val => val === "true").optional(),
   includeNotes: z.string().transform(val => val === "true").optional(),
+  includeFullTree: z.string().transform(val => val === "true").optional(),
 });
 
 export const tagQuerySchema = z.object({

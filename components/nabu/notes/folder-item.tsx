@@ -5,6 +5,7 @@ import { ChevronRight, ChevronDown, FileText, Folder, FolderPlus, FilePlus, Load
 import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FolderItem as FolderItemType } from "./types";
 import { DragData } from "./drag-drop-utils";
 
@@ -102,8 +103,8 @@ function NoteRow({
       }}
     >
       <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-      <span className="text-sm flex-1 truncate">{note.title}</span>
-      <div className="flex items-center gap-1">
+      <span className="text-sm truncate min-w-0 flex-shrink overflow-hidden" title={note.title}>{note.title}</span>
+      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
         <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 tabular-nums">
           {formatDate(note.updatedAt)}
         </span>
@@ -156,8 +157,9 @@ export function FolderItem({
   const hasNotes = item.notes && item.notes.length > 0;
   const isSelected = selectedId === item.id;
   const hasUnloadedChildren = isFolder && !item.hasLoadedChildren && (item.childCount ?? 0) > 0;
-  // Folder can expand if it has loaded children, loaded notes, or indicates unloaded children
-  const canExpand = hasChildren || hasNotes || hasUnloadedChildren;
+  const hasUnloadedNotes = isFolder && !item.hasLoadedNotes && (item.noteCount ?? 0) > 0;
+  // Folder can expand if it has loaded children, loaded notes, or indicates unloaded children/notes
+  const canExpand = hasChildren || hasNotes || hasUnloadedChildren || hasUnloadedNotes;
 
   // Setup drag and drop for folders
   useEffect(() => {
@@ -343,12 +345,12 @@ export function FolderItem({
           </div>
         )}
         
-        {/* Item name */}
-        <span className="text-sm flex-1 truncate">{item.name}</span>
+        {/* Item name - truncate with max width */}
+        <span className="text-sm truncate min-w-0 flex-shrink overflow-hidden" title={item.name}>{item.name}</span>
         
         {/* Action icons for folders on hover */}
         {isFolder && isHovered && (
-          <div className="flex items-center gap-0.5 animate-in fade-in-0 duration-200">
+          <div className="flex items-center gap-0.5 animate-in fade-in-0 duration-200 flex-shrink-0 ml-auto">
             {onEditFolder && (
               <Button
                 size="icon"
@@ -433,8 +435,24 @@ export function FolderItem({
             />
           ))}
           
+          {/* Show loading skeletons while notes are loading */}
+          {item.notesLoading && (
+            <div className="space-y-1">
+              {[...Array(Math.min(3, item.noteCount || 3))].map((_, idx) => (
+                <div
+                  key={`skeleton-${idx}`}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5"
+                  style={{ paddingLeft: `${8 + ((level + 1) * 16) + 16 + 10}px` }}
+                >
+                  <Skeleton className="h-3.5 w-3.5 rounded" />
+                  <Skeleton className="h-4 flex-1 max-w-[60%]" />
+                </div>
+              ))}
+            </div>
+          )}
+          
           {/* Render notes within this folder */}
-          {item.notes && item.notes.length > 0 && (
+          {!item.notesLoading && item.notes && item.notes.length > 0 && (
             <>
               {item.notes.map((note) => (
                 <NoteRow

@@ -37,9 +37,11 @@ export interface FolderItem {
   children?: FolderItem[];
   tags?: string[];
   isLoading?: boolean; // true while fetching children from API
-  hasLoadedChildren?: boolean; // true if children have been fetched from API
-  childCount?: number; // total count of children from API _count.children
-  notes?: NoteItem[]; // notes within this folder (titles only, all notes loaded)
+  hasLoadedChildren?: boolean; // true if folder structure children have been fetched from API
+  hasLoadedNotes?: boolean; // true if notes within this folder have been fetched
+  childCount?: number; // total count of child folders from API _count.children
+  noteCount?: number; // total count of notes from API _count.notes
+  notes?: NoteItem[]; // notes within this folder (titles only)
   notesLoading?: boolean; // true while fetching notes
 }
 
