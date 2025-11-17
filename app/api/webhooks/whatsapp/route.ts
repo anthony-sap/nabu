@@ -70,12 +70,15 @@ async function processWhatsAppWebhook(payload: any): Promise<void> {
   const messages = parseWhatsAppWebhook(payload);
 
   for (const message of messages) {
+    const metadata = payload.entry?.[0]?.changes?.[0]?.value?.metadata;
+    const toPhoneNumberId = metadata?.phone_number_id || "";
+
     // Store raw message for processing
     await prisma.whatsAppMessage.create({
       data: {
         whatsappMessageId: message.messageId,
         fromNumber: message.from,
-        toNumber: payload.entry[0]?.changes[0]?.value?.metadata?.phone_number_id || "",
+        toNumber: toPhoneNumberId,
         messageType: message.type,
         content: message.text?.body || message.image?.caption || null,
         mediaUrl: null, // Will be populated during processing

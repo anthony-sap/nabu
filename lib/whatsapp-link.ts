@@ -19,25 +19,44 @@ export async function generateLinkToken(
   phoneNumber: string,
   whatsappMessageId?: string
 ): Promise<string> {
-  // Generate secure random token
-  const token = crypto.randomBytes(32).toString("base64url");
-  
-  // Token expires in 15 minutes
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  try {
+    console.log("=== generateLinkToken() called ===");
+    console.log("phoneNumber:", phoneNumber);
+    console.log("whatsappMessageId:", whatsappMessageId);
 
-  await prisma.whatsAppLinkToken.create({
-    data: {
-      token,
-      phoneNumber,
-      whatsappMessageId,
-      expiresAt,
-      metadata: {
-        generatedAt: new Date().toISOString(),
+    // Generate secure random token
+    const token = crypto.randomBytes(32).toString("base64url");
+    console.log("Generated token:", token);
+    
+    // Token expires in 15 minutes
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    console.log("Token will expire at:", expiresAt.toISOString());
+
+    const createdToken = await prisma.whatsAppLinkToken.create({
+      data: {
+        token,
+        phoneNumber,
+        whatsappMessageId,
+        expiresAt,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+        },
       },
-    },
-  });
+    });
 
-  return token;
+    console.log("WhatsAppLinkToken created successfully:", {
+      id: createdToken.id,
+      token: createdToken.token,
+      phoneNumber: createdToken.phoneNumber,
+      expiresAt: createdToken.expiresAt,
+    });
+    console.log("=== End generateLinkToken ===");
+
+    return token;
+  } catch (err) {
+    console.error("Error in generateLinkToken:", err);
+    throw err;
+  }
 }
 
 /**
@@ -50,29 +69,53 @@ export async function verifyLinkToken(token: string): Promise<{
   phoneNumber?: string;
   tokenId?: string;
 }> {
-  const linkToken = await prisma.whatsAppLinkToken.findUnique({
-    where: { token },
-  });
+  try {
+    console.log("=== verifyLinkToken() called ===");
+    console.log("Incoming token:", token);
 
-  if (!linkToken) {
+    // Use findMany to see what Prisma returns (and confirm tenant filter behavior)
+    const linkTokens = await prisma.whatsAppLinkToken.findMany({
+      where: { token },
+    });
+    console.log("findMany by token result:", JSON.stringify(linkTokens, null, 2));
+
+    const linkToken = linkTokens[0] ?? null;
+    console.log("Selected linkToken:", linkToken);
+
+    if (!linkToken) {
+      console.log("No link token found for this token.");
+      return { valid: false };
+    }
+
+    // Check if already used
+    if (linkToken.usedAt) {
+      console.log("Link token already used at:", linkToken.usedAt);
+      return { valid: false };
+    }
+
+    // Check if expired
+    const now = new Date();
+    if (linkToken.expiresAt < now) {
+      console.log(
+        "Link token expired. expiresAt:",
+        linkToken.expiresAt.toISOString(),
+        "now:",
+        now.toISOString()
+      );
+      return { valid: false };
+    }
+
+    console.log("Link token is valid. Returning phoneNumber + tokenId.");
+    console.log("=== End verifyLinkToken ===");
+    return {
+      valid: true,
+      phoneNumber: linkToken.phoneNumber,
+      tokenId: linkToken.id,
+    };
+  } catch (err) {
+    console.error("Error in verifyLinkToken:", err);
     return { valid: false };
   }
-
-  // Check if already used
-  if (linkToken.usedAt) {
-    return { valid: false };
-  }
-
-  // Check if expired
-  if (linkToken.expiresAt < new Date()) {
-    return { valid: false };
-  }
-
-  return {
-    valid: true,
-    phoneNumber: linkToken.phoneNumber,
-    tokenId: linkToken.id,
-  };
 }
 
 /**

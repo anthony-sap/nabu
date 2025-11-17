@@ -12,7 +12,8 @@ export const softDeleteAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        if (model == "AuditLog" || model == "WhatsAppMessage") {
+        // Skip soft-delete behaviour for pure log / raw tables
+        if (model == "AuditLog" || model == "WhatsAppMessage" || model == "WhatsAppLinkToken") {
           return query(args);
         }
 
@@ -63,6 +64,9 @@ export const tenantAware = Prisma.defineExtension({
           return query(args);
         }
         if (model == "AuditLog") {
+          return query(args);
+        }
+        if (model == "WhatsAppLinkToken") {
           return query(args);
         }
 

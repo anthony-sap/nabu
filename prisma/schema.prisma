@@ -570,7 +570,7 @@ model WhatsAppIntegration {
   // Audit fields
   createdAt         DateTime  @default(now())
   createdBy         String?
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
   updatedBy         String?
   deletedAt         DateTime?
   deletedBy         String?
@@ -615,11 +615,20 @@ model WhatsAppLinkToken {
   usedAt            DateTime? // Enforce one-time use
   userId            String?   // Set when used
   metadata          Json?     // Store WhatsApp context
-  
+
+  // Multi-tenancy (nullable so tokens can be global if needed)
+  tenantId          String?
+
+  // Audit fields
   createdAt         DateTime  @default(now())
-  
+  createdBy         String?
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String?
+  deletedAt         DateTime?
+  deletedBy         String?
+
   @@index([token])
-  @@index([phoneNumber])
+  @@index([phoneNumber, tenantId])
   @@index([expiresAt])
 }
 

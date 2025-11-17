@@ -20,6 +20,7 @@ export default async function WhatsAppLinkPage({ params }: PageProps) {
 
   // Verify token
   const verification = await verifyLinkToken(token);
+  console.log("WhatsAppLinkPage verification result:", verification);
 
   if (!verification.valid) {
     return (

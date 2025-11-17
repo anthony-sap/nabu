@@ -25,8 +25,24 @@ export async function processWhatsAppMessage(whatsappMessageId: string): Promise
   }
 
   try {
-    // Get tenant from integration (for now, use null for single-tenant)
-    const tenantId = message.tenantId;
+    // Find the WhatsApp integration by phone number ID to get tenantId
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { phoneNumberId: message.toNumber },
+    });
+
+    if (!integration) {
+      console.error(`No WhatsApp integration found for phone number ID: ${message.toNumber}`);
+      await prisma.whatsAppMessage.update({
+        where: { id: message.id },
+        data: {
+          processed: true,
+          error: "No WhatsApp integration found",
+        },
+      });
+      return;
+    }
+
+    const tenantId = integration.tenantId;
 
     // Check if phone number is linked
     const linkedUser = await getLinkedUser(message.fromNumber, tenantId);
@@ -102,7 +118,7 @@ async function handleUnlinkedNumber(
   const token = await generateLinkToken(phoneNumber, whatsappMessageId);
 
   // Send linking instructions
-  const linkUrl = `${env.NEXT_PUBLIC_APP_URL}/whatsapp/link/${token}`;
+  const linkUrl = `${env.NEXT_PUBLIC_APP_URL}/nabu/whatsapp/link/${token}`;
   
   const client = await getWhatsAppClient(tenantId);
   if (!client) {
