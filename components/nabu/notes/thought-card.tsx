@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, FileText, Trash2, MoreVertical, Loader2, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Clock, FileText, Trash2, MoreVertical, Loader2, ArrowRight, CheckCircle2, MessageCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -203,7 +203,14 @@ export function ThoughtCard({
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5">
-                  {/* Title hidden for thoughts - kept in DB for future use */}
+                  {/* Source badge - WhatsApp */}
+                  {thought.source === "WHATSAPP" && (
+                    <Badge variant="outline" className="text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30 flex-shrink-0">
+                      <MessageCircle className="h-2.5 w-2.5 mr-1" />
+                      WhatsApp
+                    </Badge>
+                  )}
+                  {/* Promoted badge */}
                   {isPromoted && (
                     <Badge variant="outline" className="text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30 flex-shrink-0">
                       <CheckCircle2 className="h-2.5 w-2.5 mr-1" />

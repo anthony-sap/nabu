@@ -12,7 +12,8 @@ export const softDeleteAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        if (model == "AuditLog") {
+        // Skip soft-delete behaviour for pure log / raw tables
+        if (model == "AuditLog" || model == "WhatsAppMessage" || model == "WhatsAppLinkToken") {
           return query(args);
         }
 
@@ -65,17 +66,21 @@ export const tenantAware = Prisma.defineExtension({
         if (model == "AuditLog") {
           return query(args);
         }
+        if (model == "WhatsAppLinkToken") {
+          return query(args);
+        }
 
         const user = await getCurrentUser();
 
-        const tenantId = user?.tenantId;
+        const sessionTenantId = user?.tenantId;
+        
         if (
           ["findUnique", "findFirst", "findMany", "count"].includes(operation)
         ) {
           if (!args["where"]) {
             args["where"] = {};
           }
-          args["where"]["tenantId"] = tenantId;
+          args["where"]["tenantId"] = sessionTenantId;
         } else if (
           operation === "create" ||
           operation === "createMany" ||
@@ -83,6 +88,15 @@ export const tenantAware = Prisma.defineExtension({
           operation === "update" ||
           operation === "updateMany"
         ) {
+          // Check if tenantId is explicitly provided in the data
+          const dataObject = args?.data ?? {};
+          const explicitTenantId = Array.isArray(dataObject) 
+            ? dataObject[0]?.tenantId 
+            : dataObject?.tenantId;
+          
+          // Use explicit tenantId if provided (e.g., from webhooks), otherwise use session tenantId
+          const tenantId = explicitTenantId !== undefined ? explicitTenantId : sessionTenantId;
+          
           args["data"] = updateArgsDataWithSchema({
             modelName: model,
             operation,

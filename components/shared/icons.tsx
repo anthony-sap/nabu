@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
@@ -17,8 +18,10 @@ import {
   LayoutPanelLeft,
   LineChart,
   Loader2,
+  Lock,
   LucideIcon,
   LucideProps,
+  MessageCircle,
   MessagesSquare,
   Moon,
   MoreVertical,
@@ -27,6 +30,7 @@ import {
   Puzzle,
   Search,
   Settings,
+  Smartphone,
   SunMedium,
   Trash,
   User,
@@ -134,4 +138,8 @@ export const Icons = {
   ),
   user: User,
   warning: AlertTriangle,
+  alertCircle: AlertCircle,
+  smartphone: Smartphone,
+  lock: Lock,
+  messageCircle: MessageCircle,
 };
