@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { NotesSidebar } from "./notes-sidebar";
 import { NoteDetailView } from "./note-detail-view";
 import { NoteEditor } from "./note-editor";
-import { ThoughtsActivityFeed } from "./thoughts-activity-feed";
+import { TabbedActivityFeed } from "./tabbed-activity-feed";
 import { SearchDialog } from "./search-dialog";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { FolderItem, NoteItem } from "./types";
@@ -54,7 +54,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   // Next.js navigation hooks
   const router = useRouter();
   const pathname = usePathname();
-  // View state: "feed" shows activity feed, "folders" shows selected note detail, "editor" shows note editor
+  // View state: "feed" shows tabbed activity feed, "folders" shows selected note detail, "editor" shows note editor
   const [view, setView] = useState<"feed" | "folders" | "editor">("feed");
   
   // Folder structure with expand/collapse state
@@ -586,10 +586,9 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
     if (item.type === "note") {
       // Navigate to note URL using search params (updates browser history)
       router.push(`/nabu/notes?noteId=${item.id}`);
-    } else {
-      // Folder selection for detail view
-      setView("folders");
-      setSelectedNote(item);
+    } else if (item.type === "folder") {
+      // Folder clicked - just toggle it (no special view)
+      toggleFolder(item.id);
     }
   };
 
@@ -1252,8 +1251,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Search</span>
                 <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium opacity-70">
-                  <span className="text-xs">⌘</span>
-                  <span className="text-xs">⇧</span>F
+                  <span className="text-xs">⌘</span>F
                 </kbd>
               </Button>
             </div>
@@ -1262,7 +1260,12 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           {/* Content area with padding */}
           <div className="flex-1 overflow-auto">
             {view === "feed" ? (
-              <ThoughtsActivityFeed />
+              <TabbedActivityFeed
+                onNoteSelect={(noteId, folderId) => {
+                  setEditingNote({ id: noteId, folderId });
+                  setView("editor");
+                }}
+              />
             ) : view === "editor" && editingNote ? (
               <NoteEditor
                 noteId={editingNote.id}
