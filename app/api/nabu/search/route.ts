@@ -123,8 +123,24 @@ export async function GET(req: NextRequest) {
 
     // Search notes
     if (includeNotes) {
-      // Keyword search using PostgreSQL full-text search
+      // Keyword search using PostgreSQL full-text search with tags
       const keywordNotes = await prisma.$queryRaw<any[]>`
+        WITH note_tags AS (
+          SELECT 
+            nt."noteId",
+            string_agg(DISTINCT t.name, ' ') as tag_names,
+            jsonb_agg(
+              DISTINCT jsonb_build_object(
+                'id', t.id,
+                'name', t.name,
+                'color', t.color
+              )
+            ) FILTER (WHERE t.id IS NOT NULL) as tags
+          FROM "NoteTag" nt
+          JOIN "Tag" t ON t.id = nt."tagId" AND t."deletedAt" IS NULL
+          WHERE nt."deletedAt" IS NULL
+          GROUP BY nt."noteId"
+        )
         SELECT DISTINCT
           n.id,
           n.title,
@@ -133,17 +149,38 @@ export async function GET(req: NextRequest) {
           n."createdAt",
           n."updatedAt",
           'note' as "entityType",
+          COALESCE(nt.tags, '[]'::jsonb) as tags,
           ts_rank(
-            to_tsvector('english', n.title || ' ' || n.content),
+            to_tsvector('english', 
+              n.title || ' ' || 
+              n.content || ' ' ||
+              COALESCE(nt.tag_names, '')
+            ),
             plainto_tsquery('english', ${q})
-          ) as "keywordScore"
+          ) * 
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM "NoteTag" nt2
+              JOIN "Tag" t2 ON t2.id = nt2."tagId"
+              WHERE nt2."noteId" = n.id 
+                AND nt2."deletedAt" IS NULL
+                AND t2."deletedAt" IS NULL
+                AND LOWER(t2.name) = LOWER(${q})
+            ) THEN 2.0
+            ELSE 1.0
+          END as "keywordScore"
         FROM "Note" n
+        LEFT JOIN note_tags nt ON nt."noteId" = n.id
         WHERE n."userId" = ${userId}
           AND n."tenantId" = ${tenantId}
           AND n."deletedAt" IS NULL
           ${noteFolderFilter}
           AND (
-            to_tsvector('english', n.title || ' ' || n.content) @@ plainto_tsquery('english', ${q})
+            to_tsvector('english', 
+              n.title || ' ' || 
+              n.content || ' ' ||
+              COALESCE(nt.tag_names, '')
+            ) @@ plainto_tsquery('english', ${q})
           )
         ORDER BY "keywordScore" DESC
         LIMIT ${limit}
@@ -233,7 +270,7 @@ export async function GET(req: NextRequest) {
 
     // Search thoughts (similar logic)
     if (includeThoughts) {
-      // Keyword search
+      // Keyword search with suggestedTags
       const keywordThoughts = await prisma.$queryRaw<any[]>`
         SELECT DISTINCT
           t.id,
@@ -241,16 +278,29 @@ export async function GET(req: NextRequest) {
           t."noteId",
           t."createdAt",
           t."updatedAt",
+          t."suggestedTags",
           'thought' as "entityType",
           ts_rank(
-            to_tsvector('english', t.content),
+            to_tsvector('english', 
+              t.content || ' ' ||
+              array_to_string(t."suggestedTags", ' ')
+            ),
             plainto_tsquery('english', ${q})
-          ) as "keywordScore"
+          ) * 
+          CASE 
+            WHEN ${q} = ANY(t."suggestedTags") THEN 2.0
+            ELSE 1.0
+          END as "keywordScore"
         FROM "Thought" t
         WHERE t."userId" = ${userId}
           AND t."tenantId" = ${tenantId}
           AND t."deletedAt" IS NULL
-          AND to_tsvector('english', t.content) @@ plainto_tsquery('english', ${q})
+          AND (
+            to_tsvector('english', 
+              t.content || ' ' ||
+              array_to_string(t."suggestedTags", ' ')
+            ) @@ plainto_tsquery('english', ${q})
+          )
         ORDER BY "keywordScore" DESC
         LIMIT ${limit}
       `;

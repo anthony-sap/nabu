@@ -9,7 +9,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useSearch } from "./use-search";
 import { SearchResultItem } from "./search-result-item";
 import { SearchResult } from "./types-search";
@@ -25,20 +25,10 @@ interface SearchDialogProps {
  * Searches across notes and thoughts with filtering
  */
 export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialogProps) {
-  const { query, results, isLoading, error, filters, updateQuery, setFilters, clearResults } =
+  const { query, results, isLoading, error, filters, updateQuery, setFilters, resetSearch } =
     useSearch();
 
-  /**
-   * Reset search when dialog closes
-   */
-  useEffect(() => {
-    if (!open) {
-      updateQuery("");
-      clearResults();
-      setFilters({ type: "all" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  // Note: Removed auto-clear on close to persist search state between dialog opens
 
   /**
    * Handle result selection
@@ -52,8 +42,8 @@ export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialo
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      contentClassName="w-2/3  rounded-3xl border border-border/60 bg-background/95 backdrop-blur-xl"
-      commandClassName="min-h-[560px]"
+      contentClassName="max-w-[95vw] w-full lg:max-w-6xl max-h-[80vh] rounded-3xl border border-border/60 bg-background/95 backdrop-blur-xl"
+      commandClassName="h-full flex flex-col"
     >
       <CommandInput
         placeholder="Search notes and thoughts..."
@@ -62,35 +52,49 @@ export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialo
       />
 
       {/* Filter buttons */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-        <span className="text-xs text-muted-foreground">Filter:</span>
-        <Button
-          size="sm"
-          variant={filters.type === "all" ? "default" : "outline"}
-          onClick={() => setFilters({ type: "all" })}
-          className="h-7 text-xs"
-        >
-          All
-        </Button>
-        <Button
-          size="sm"
-          variant={filters.type === "notes" ? "default" : "outline"}
-          onClick={() => setFilters({ type: "notes" })}
-          className="h-7 text-xs"
-        >
-          Notes
-        </Button>
-        <Button
-          size="sm"
-          variant={filters.type === "thoughts" ? "default" : "outline"}
-          onClick={() => setFilters({ type: "thoughts" })}
-          className="h-7 text-xs"
-        >
-          Thoughts
-        </Button>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Filter:</span>
+          <Button
+            size="sm"
+            variant={filters.type === "all" ? "default" : "outline"}
+            onClick={() => setFilters({ type: "all" })}
+            className="h-7 text-xs"
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.type === "notes" ? "default" : "outline"}
+            onClick={() => setFilters({ type: "notes" })}
+            className="h-7 text-xs"
+          >
+            Notes
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.type === "thoughts" ? "default" : "outline"}
+            onClick={() => setFilters({ type: "thoughts" })}
+            className="h-7 text-xs"
+          >
+            Thoughts
+          </Button>
+        </div>
+        
+        {/* Clear all button */}
+        {query && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetSearch}
+            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear All
+          </Button>
+        )}
       </div>
 
-      <CommandList className="max-h-[440px] px-2 py-2 space-y-2">
+      <CommandList className=" max-h-[calc(80vh-180px)] px-2 py-2 space-y-2">
         {/* Loading state */}
         {isLoading && (
           <div className="flex items-center justify-center py-16">

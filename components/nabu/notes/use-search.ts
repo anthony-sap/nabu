@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { SearchResult, SearchFilters } from "./types-search";
+import { SearchStateStorage } from "./search-state-storage";
 
 /**
  * Debounce timeout reference
@@ -7,14 +8,28 @@ import { SearchResult, SearchFilters } from "./types-search";
 let searchTimeout: NodeJS.Timeout | null = null;
 
 /**
- * Hook for searching notes and thoughts
+ * Hook for searching notes and thoughts with localStorage persistence
  */
-export function useSearch() {
+export function useSearch(userId?: string) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SearchFilters>({ type: "all" });
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  /**
+   * Load persisted search state on mount
+   */
+  useEffect(() => {
+    const savedState = SearchStateStorage.load(userId);
+    if (savedState) {
+      setQuery(savedState.query);
+      setResults(savedState.results);
+      setFilters(savedState.filters);
+    }
+    setIsInitialized(true);
+  }, [userId]);
 
   /**
    * Call the semantic search API (notes + thoughts)
@@ -60,6 +75,18 @@ export function useSearch() {
             ? `${previewSource.slice(0, 150)}...`
             : previewSource;
 
+        // Extract tags based on entity type
+        let tags: string[] = [];
+        if (entityType === "note" && item.tags) {
+          // For notes, tags is a JSONB array of objects [{id, name, color}, ...]
+          tags = Array.isArray(item.tags) 
+            ? item.tags.map((t: any) => t.name).filter(Boolean)
+            : [];
+        } else if (entityType === "thought" && item.suggestedTags) {
+          // For thoughts, suggestedTags is a string array
+          tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
+        }
+
         return {
           id: item.id,
           type: entityType,
@@ -73,7 +100,7 @@ export function useSearch() {
                 color: item.folder.color,
               }
             : undefined,
-          tags: item.tags || [],
+          tags,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
           folderId: item.folderId ?? null,
@@ -81,13 +108,22 @@ export function useSearch() {
       });
 
       setResults(mappedResults);
+      
+      // Save search state to localStorage
+      if (isInitialized) {
+        SearchStateStorage.save({
+          query: trimmedQuery,
+          results: mappedResults,
+          filters,
+        }, userId);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [filters, userId, isInitialized]);
 
   /**
    * Debounced search function
@@ -152,6 +188,17 @@ export function useSearch() {
     setResults([]);
   }, []);
 
+  /**
+   * Reset search - clears query, results, filters, and localStorage
+   */
+  const resetSearch = useCallback(() => {
+    setQuery("");
+    setResults([]);
+    setFilters({ type: "all" });
+    setError(null);
+    SearchStateStorage.clear(userId);
+  }, [userId]);
+
   return {
     query,
     results: filteredResults,
@@ -161,6 +208,7 @@ export function useSearch() {
     updateQuery,
     setFilters,
     clearResults,
+    resetSearch,
   };
 }
 
