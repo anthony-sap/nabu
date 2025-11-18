@@ -23,40 +23,25 @@ export function TabbedActivityFeed({ onNoteSelect }: TabbedActivityFeedProps) {
   const [activeTab, setActiveTab] = useState<"thoughts" | "notes" | "all">("thoughts");
 
   return (
-    <div className="h-full flex flex-col">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 flex flex-col">
-        {/* Tab Triggers */}
-        <div className="flex-shrink-0 border-b border-border/30 bg-background/60 backdrop-blur-sm">
-          <TabsList className="w-full justify-start h-12 bg-transparent p-0 border-0">
-            <TabsTrigger
-              value="thoughts"
-              className="relative h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6"
-            >
-              <Lightbulb className="h-4 w-4 mr-2" />
-              Thoughts
-            </TabsTrigger>
-            <TabsTrigger
-              value="notes"
-              className="relative h-12 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Notes
-            </TabsTrigger>
-          </TabsList>
-        </div>
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="h-full flex flex-col">
+      {/* Tab Content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <TabsContent value="thoughts" className="h-full mt-0 data-[state=inactive]:hidden flex flex-col">
+          <ThoughtsActivityFeed 
+            activeTab={activeTab} 
+            onTabChange={setActiveTab}
+          />
+        </TabsContent>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-hidden">
-          <TabsContent value="thoughts" className="h-full mt-0 data-[state=inactive]:hidden">
-            <ThoughtsActivityFeed />
-          </TabsContent>
-
-          <TabsContent value="notes" className="h-full mt-0 data-[state=inactive]:hidden">
-            <NotesActivityFeed onNoteSelect={onNoteSelect} />
-          </TabsContent>
-        </div>
-      </Tabs>
-    </div>
+        <TabsContent value="notes" className="h-full mt-0 data-[state=inactive]:hidden flex flex-col">
+          <NotesActivityFeed 
+            onNoteSelect={onNoteSelect}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </TabsContent>
+      </div>
+    </Tabs>
   );
 }
 
