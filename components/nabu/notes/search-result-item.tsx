@@ -62,12 +62,10 @@ function highlightMatches(text: string, query: string): ReactNode {
 export function SearchResultItem({ result, onSelect, searchQuery }: SearchResultItemProps) {
   const Icon = result.type === "note" ? FileText : Lightbulb;
   const typeLabel = result.type === "note" ? "Note" : "Thought";
-  const accentClasses =
-    result.type === "note"
-      ? "border-primary/25 bg-primary/5"
-      : "border-amber-200/30 bg-amber-200/5";
-  const hoverGlassClasses =
-    "group-hover:bg-white/15 group-hover:border-white/50 group-hover:shadow-[0_25px_50px_-20px_rgba(15,23,42,0.65)]";
+  const iconColorClass = result.type === "note" ? "text-primary" : "text-amber-500";
+  const badgeColorClass = result.type === "note" 
+    ? "bg-primary/10 text-primary border-primary/20" 
+    : "bg-amber-500/10 text-amber-600 border-amber-500/20";
 
   return (
     <CommandItem
@@ -76,46 +74,40 @@ export function SearchResultItem({ result, onSelect, searchQuery }: SearchResult
       className="px-0 py-0 bg-transparent focus:bg-transparent"
     >
       <div
-        className={`group w-full rounded-3xl border px-5 py-4 transition-all duration-200 backdrop-blur-md ${accentClasses} ${hoverGlassClasses}`}
+        className="group w-full rounded-2xl border border-border/40 bg-card/50 px-5 py-4 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:bg-card/80 cursor-pointer"
       >
         <div className="flex items-start gap-4">
           {/* Icon */}
-          <div className="flex-shrink-0 mt-1 rounded-2xl bg-background/70 p-2.5 shadow-sm group-hover:shadow-lg transition">
-            <Icon
-              className={`h-5 w-5 ${
-                result.type === "note" ? "text-primary" : "text-amber-500"
-              }`}
-            />
+          <div className="flex-shrink-0 mt-1 rounded-xl bg-muted/30 p-2.5 group-hover:bg-muted/50 transition-all">
+            <Icon className={`h-5 w-5 ${iconColorClass}`} />
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex-1 min-w-0 space-y-2">
             {/* Title */}
             <div className="flex items-center gap-2">
               <h4 className="font-semibold text-base text-foreground truncate">
                 {highlightMatches(result.title, searchQuery)}
               </h4>
               <Badge
-                variant="secondary"
-                className={`text-[10px] font-medium ${
-                  result.type === "note" ? "bg-primary/20 text-primary" : "bg-amber-500/20 text-amber-600"
-                }`}
+                variant="outline"
+                className={`text-[10px] font-medium ${badgeColorClass}`}
               >
                 {typeLabel}
               </Badge>
             </div>
 
             {/* Preview */}
-            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+            <p className="text-sm text-muted-foreground/90 line-clamp-2 leading-relaxed">
               {highlightMatches(result.preview, searchQuery)}
             </p>
 
             {/* Metadata */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Folder */}
               {result.folder && (
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Folder className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground/80 bg-muted/20 px-2 py-0.5 rounded-md">
+                  <Folder className="h-3 w-3" />
                   <span>{result.folder.name}</span>
                 </div>
               )}
@@ -123,25 +115,25 @@ export function SearchResultItem({ result, onSelect, searchQuery }: SearchResult
               {/* Tags */}
               {result.tags && result.tags.length > 0 && (
                 <>
-                  {result.tags.slice(0, 2).map((tag, index) => (
+                  {result.tags.slice(0, 3).map((tag, index) => (
                     <Badge
                       key={index}
                       variant="outline"
-                      className="text-[10px] font-normal border-border/40 bg-background/40"
+                      className="text-[10px] font-normal border-primary/20 bg-primary/5 text-primary/90"
                     >
                       #{tag}
                     </Badge>
                   ))}
-                  {result.tags.length > 2 && (
-                    <span className="text-[10px] text-muted-foreground">
-                      +{result.tags.length - 2} more
+                  {result.tags.length > 3 && (
+                    <span className="text-[10px] text-muted-foreground/70">
+                      +{result.tags.length - 3}
                     </span>
                   )}
                 </>
               )}
 
               {/* Time */}
-              <span className="text-[10px] text-muted-foreground ml-auto flex-shrink-0">
+              <span className="text-[10px] text-muted-foreground/70 ml-auto flex-shrink-0 font-medium">
                 {formatTimeAgo(result.updatedAt)}
               </span>
             </div>
