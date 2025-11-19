@@ -653,6 +653,46 @@ export default function FAQPage() {
                   Most deletions are soft deletes—records are marked with a deletedAt timestamp but remain in the database for potential recovery and audit purposes. Soft-deleted items are automatically filtered from all queries. Related records use CASCADE relationships in the database schema, so deleting a note also removes its tags, links, and chunks while maintaining referential integrity.
                 </AccordionContent>
               </AccordionItem>
+
+              <AccordionItem value="trash-restore" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  Can I restore deleted notes and thoughts?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Yes! When you delete a note or thought, it moves to the Trash where you can restore it at any time. The Trash page shows all deleted items (both notes and thoughts) in a unified table view with a Type column, search functionality, and bulk restore capabilities.
+                  </p>
+                  <p>
+                    Deleted items retain all their data—content, tags, folders, attachments, and links—so when you restore them, everything comes back exactly as it was. You can access the Trash from the main navigation menu.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="permanent-deletion" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How long are deleted items kept?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Deleted notes and thoughts are kept in the Trash for <strong className="text-white">60 days</strong> before being permanently removed. This gives you plenty of time to recover accidentally deleted items while ensuring your storage doesn't fill up with old deleted content.
+                  </p>
+                  <p className="mb-3">
+                    The Trash page shows a countdown for each item, indicating how many days remain until permanent deletion. Items closer to permanent deletion are highlighted with a warning badge (red for ≤7 days, yellow for ≤30 days).
+                  </p>
+                  <p>
+                    When an item is permanently deleted after 60 days, the system automatically checks if any attached files (images and attachments) are referenced by other active notes or thoughts. Only unreferenced files are removed from storage, ensuring shared files aren't accidentally deleted.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="trash-bulk-actions" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  Can I restore multiple items at once?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  Absolutely! The Trash page supports bulk operations for both notes and thoughts. You can select multiple items using checkboxes (or use "Select All") and restore them all with one click. The table view shows the Type column to distinguish between notes and thoughts, making it easy to scan through deleted items, search by title or content, and perform batch operations efficiently.
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </div>
 

@@ -90,6 +90,48 @@ export async function GET(req: NextRequest) {
         GROUP BY ft.id, ft.name, ft.color, ft."parentId", ft."userId", ft."tenantId", ft.level, ft.path, ft."order"
         ORDER BY ft.path, ft."order", ft.name;
       `;
+console.log(`
+        WITH RECURSIVE folder_tree AS (
+          -- Base: root folders
+          SELECT 
+            id, name, color, "parentId", "userId", "tenantId", "order",
+            0 as level,
+            ARRAY[id] as path
+          FROM "Folder"
+          WHERE "userId" = ${userId}
+            AND ("tenantId" = ${tenantId} OR ("tenantId" IS NULL AND ${tenantId}::text IS NULL))
+            AND "deletedAt" IS NULL 
+            AND "parentId" IS NULL
+          
+          UNION ALL
+          
+          -- Recursive: child folders
+          SELECT 
+            f.id, f.name, f.color, f."parentId", f."userId", f."tenantId", f."order",
+            ft.level + 1,
+            ft.path || f.id
+          FROM "Folder" f
+          INNER JOIN folder_tree ft ON f."parentId" = ft.id
+          WHERE f."deletedAt" IS NULL
+        )
+        SELECT 
+          ft.id,
+          ft.name,
+          ft.color,
+          ft."parentId",
+          ft."userId",
+          ft."tenantId",
+          ft.level,
+          ft.path,
+          ft."order",
+          COUNT(DISTINCT n.id)::int as note_count,
+          COUNT(DISTINCT cf.id)::int as child_count
+        FROM folder_tree ft
+        LEFT JOIN "Note" n ON n."folderId" = ft.id AND n."deletedAt" IS NULL
+        LEFT JOIN "Folder" cf ON cf."parentId" = ft.id AND cf."deletedAt" IS NULL
+        GROUP BY ft.id, ft.name, ft.color, ft."parentId", ft."userId", ft."tenantId", ft.level, ft.path, ft."order"
+        ORDER BY ft.path, ft."order", ft.name;
+      `);
 
       // Transform flat results into nested structure
       const folderMap = new Map<string, any>();

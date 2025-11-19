@@ -273,6 +273,7 @@ model Note {
   updatedAt                DateTime          @default(now()) @updatedAt
   updatedBy                String?
   deletedAt                DateTime?
+  deletedBy                String?
   noteTags             NoteTag[]
   attachments          Attachment[]
   images               ImageAttachment[]
@@ -307,6 +308,7 @@ model Thought {
   updatedAt            DateTime      @default(now()) @updatedAt
   updatedBy            String?
   deletedAt            DateTime?
+  deletedBy            String?
   attachments          Attachment[]
   chunks               ThoughtChunk[] // Chunked content for embeddings
 
@@ -402,6 +404,7 @@ model Attachment {
   updatedAt     DateTime  @default(now()) @updatedAt
   updatedBy     String?
   deletedAt     DateTime?
+  deletedBy     String?
 
   @@index([tenantId])
   @@index([noteId])
