@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
         ORDER BY ft.path, ft."order", ft.name;
       `;
 
+
       // Transform flat results into nested structure
       const folderMap = new Map<string, any>();
       const rootFolders: any[] = [];

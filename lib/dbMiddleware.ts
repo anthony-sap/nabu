@@ -40,12 +40,26 @@ export const softDeleteAware = Prisma.defineExtension({
             operation,
           )
         ) {
+          // Check for special flag to include deleted records (for trash page)
+          const includeDeleted = args["includeDeleted"];
+          
+          if (includeDeleted) {
+            console.log(`[Middleware] includeDeleted flag detected for ${model}.${operation}`);
+          }
+          
           if (!args["where"]) {
             args["where"] = {};
           }
-          if (!(args["where"] && args["where"]["deletedAt"])) {
+          
+          // Only apply deletedAt filter if not explicitly requesting deleted items
+          if (!includeDeleted && !(args["where"] && args["where"]["deletedAt"])) {
             args["where"]["deletedAt"] = null;
+          } else if (includeDeleted) {
+            console.log(`[Middleware] Skipping deletedAt filter for ${model}.${operation}`);
           }
+          
+          // Remove the includeDeleted flag from args so it doesn't cause issues
+          delete args["includeDeleted"];
         }
 
         return query(args);
