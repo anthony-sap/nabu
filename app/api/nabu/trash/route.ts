@@ -21,10 +21,6 @@ export async function GET(req: NextRequest) {
     const { userId, tenantId } = await getUserContext();
     const { searchParams } = new URL(req.url);
     
-    console.log("=== TRASH API DEBUG ===");
-    console.log("User ID:", userId);
-    console.log("Tenant ID:", tenantId);
-    
     // Pagination
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25")));
@@ -47,9 +43,6 @@ export async function GET(req: NextRequest) {
       deletedAt: { not: null },
     };
     
-    console.log("Note where clause:", JSON.stringify(noteWhere, null, 2));
-    console.log("Thought where clause:", JSON.stringify(thoughtWhere, null, 2));
-
     // Add search filter if provided
     if (search && search.trim()) {
       noteWhere.OR = [
@@ -60,8 +53,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Query both notes and thoughts using includeDeleted flag to bypass soft-delete filter
-    console.log("Querying notes and thoughts with includeDeleted: true");
-    
     const [notes, thoughts] = await Promise.all([
       prisma.note.findMany({
         where: noteWhere,
@@ -121,22 +112,7 @@ export async function GET(req: NextRequest) {
       } as any), // Cast to any because includeDeleted is a custom flag
     ]);
 
-    console.log("Query results:");
-    console.log(`  Notes found: ${notes?.length || 0}`);
-    console.log(`  Thoughts found: ${thoughts?.length || 0}`);
-    
-    if (notes && notes.length > 0) {
-      console.log("  Sample note:", { id: notes[0].id, title: notes[0].title, deletedAt: notes[0].deletedAt });
-    } else {
-      console.log("  No notes found - checking if tenantAware middleware is interfering...");
-    }
-    
-    if (thoughts && thoughts.length > 0) {
-      console.log("  Sample thought:", { id: thoughts[0].id, content: thoughts[0].content.substring(0, 50), deletedAt: thoughts[0].deletedAt });
-    } else {
-      console.log("  No thoughts found - checking if tenantAware middleware is interfering...");
-    }
-    
+   
     // Debug: Try a raw count query to see total deleted items in DB
     const rawNoteCount = await prisma.$queryRaw`
       SELECT COUNT(*) as count 
@@ -145,7 +121,6 @@ export async function GET(req: NextRequest) {
         AND "tenantId" = ${tenantId}
         AND "deletedAt" IS NOT NULL
     `;
-    console.log("  Raw note count (bypassing all middleware):", rawNoteCount);
     
     const rawThoughtCount = await prisma.$queryRaw`
       SELECT COUNT(*) as count 
@@ -154,7 +129,6 @@ export async function GET(req: NextRequest) {
         AND "tenantId" = ${tenantId}
         AND "deletedAt" IS NOT NULL
     `;
-    console.log("  Raw thought count (bypassing all middleware):", rawThoughtCount);
 
     // Helper function to calculate days left and create snippet
     const processItem = (item: any, type: "note" | "thought") => {
@@ -205,11 +179,6 @@ export async function GET(req: NextRequest) {
     const total = allItems.length;
     const paginatedItems = allItems.slice(skip, skip + limit);
     const totalPages = Math.ceil(total / limit);
-
-    console.log("Final results:");
-    console.log(`  Total items: ${total}`);
-    console.log(`  Paginated items: ${paginatedItems.length}`);
-    console.log("=== END TRASH API DEBUG ===");
 
     return new Response(
       JSON.stringify(
