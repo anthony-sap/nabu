@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Lightbulb, Sparkles, Loader2 } from "lucide-react";
+import { Calendar, Lightbulb, Sparkles, Loader2, Plus } from "lucide-react";
 import { TagBadge } from "./tag-badge";
 import { SourceUrlList, SourceInfo } from "./source-url-list";
 import { RelatedLinksList } from "./related-links-list";
@@ -30,6 +30,7 @@ interface MetadataSidebarProps {
   onRemoveTag: (tagId: string) => void;
   onDeleteLink: (linkId: string) => void;
   onAddLink: () => void;
+  onAddTag: () => void;
   onRequestTagSuggestions?: () => void;
   isGeneratingTags?: boolean;
 }
@@ -64,6 +65,7 @@ export function MetadataSidebar({
   onRemoveTag,
   onDeleteLink,
   onAddLink,
+  onAddTag,
   onRequestTagSuggestions,
   isGeneratingTags = false,
 }: MetadataSidebarProps) {
@@ -88,22 +90,33 @@ export function MetadataSidebar({
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Tags
           </div>
-          {onRequestTagSuggestions && (
+          <div className="flex gap-1">
             <Button
               variant="outline"
               size="sm"
-              onClick={onRequestTagSuggestions}
-              disabled={isGeneratingTags}
-              className="h-7 px-2 border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 cursor-pointer"
-              title={isGeneratingTags ? "Generating suggestions..." : "Suggest tags with AI"}
+              onClick={onAddTag}
+              className="h-7 px-2"
+              title="Add tag manually"
             >
-              {isGeneratingTags ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-              )}
+              <Plus className="h-3.5 w-3.5" />
             </Button>
-          )}
+            {onRequestTagSuggestions && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRequestTagSuggestions}
+                disabled={isGeneratingTags}
+                className="h-7 px-2 border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 cursor-pointer"
+                title={isGeneratingTags ? "Generating suggestions..." : "Suggest tags with AI"}
+              >
+                {isGeneratingTags ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                )}
+              </Button>
+            )}
+          </div>
         </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">

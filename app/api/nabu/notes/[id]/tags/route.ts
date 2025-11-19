@@ -38,8 +38,6 @@ export async function POST(
     if (!note) {
       return errorResponse("Note not found", 404);
     }
-
-    console.log("➕ POST - Adding tags:", tagNames);
     
     // Process each tag
     const results = await Promise.all(
@@ -55,7 +53,6 @@ export async function POST(
         });
 
         if (!tag) {
-          console.log(`✨ Creating new tag: ${tagName}`);
           // Create new tag with USER_ADDED source
           tag = await prisma.tag.create({
             data: {
@@ -87,12 +84,9 @@ export async function POST(
           },
         });
 
-        console.log(`🔍 Link status for ${tagName} - Active:`, activeLink, "Deleted:", deletedLink);
-
         if (activeLink) {
-          console.log(`✓ NoteTag already active for tag: ${tagName}`);
+          // Already linked, skip
         } else if (deletedLink) {
-          console.log(`♻️ Restoring soft-deleted NoteTag for tag: ${tagName}`);
           // Restore the soft-deleted link
           await prisma.noteTag.update({
             where: {
@@ -107,7 +101,6 @@ export async function POST(
             },
           });
         } else {
-          console.log(`🔗 Creating new NoteTag for tag: ${tagName}`);
           // Create link between note and tag
           await prisma.noteTag.create({
             data: {
@@ -131,7 +124,6 @@ export async function POST(
     });
 
     // Fetch updated tags for this note (same pattern as GET endpoint)
-    console.log(`📦 Fetching updated NoteTags for noteId: ${noteId}`);
     const noteWithTags = await prisma.note.findUnique({
       where: { id: noteId },
       select: {
@@ -155,8 +147,6 @@ export async function POST(
       },
     });
 
-    console.log(`✅ Found note with ${noteWithTags?.noteTags?.length || 0} NoteTags`);
-
     const tags = (noteWithTags?.noteTags || []).map((nt) => ({
       id: nt.tag.id,
       name: nt.tag.name,
@@ -164,8 +154,6 @@ export async function POST(
       source: nt.source,
       confidence: nt.confidence,
     }));
-
-    console.log(`📤 POST returning ${tags.length} tags:`, tags);
 
     return new Response(JSON.stringify(successResponse({ tags })), {
       status: 200,
@@ -209,8 +197,6 @@ export async function DELETE(
     if (!note) {
       return errorResponse("Note not found", 404);
     }
-
-    console.log("🔍 DELETE - Looking for tags with names:", tagNames);
     
     // Find tags by names
     const tags = await prisma.tag.findMany({
@@ -221,8 +207,6 @@ export async function DELETE(
         deletedAt: null,
       },
     });
-
-    console.log("📦 Found tags to remove:", tags);
 
     // Soft delete links between note and tags (set deletedAt)
     if (tags.length > 0) {
@@ -236,8 +220,6 @@ export async function DELETE(
           deletedAt: new Date(),
         },
       });
-      
-      console.log(`🗑️ Soft deleted ${deleteResult.count} NoteTag records`);
 
       // Update lastTagModifiedAt on note
       await prisma.note.update({
@@ -246,18 +228,7 @@ export async function DELETE(
           lastTagModifiedAt: new Date(),
         },
       });
-    } else {
-      console.log("⚠️ No tags found to delete");
     }
-
-    // Debug: Check what's actually in the database
-    const allNoteTags = await prisma.$queryRaw`
-      SELECT nt.*, t.name, t.color 
-      FROM "NoteTag" nt
-      INNER JOIN "Tag" t ON t.id = nt."tagId"
-      WHERE nt."noteId" = ${noteId}
-    `;
-    console.log(`🔍 RAW QUERY - All NoteTags for noteId ${noteId}:`, allNoteTags);
 
     // Fetch remaining tags for this note (same pattern as GET endpoint)
     const noteWithTags = await prisma.note.findUnique({
@@ -283,8 +254,6 @@ export async function DELETE(
       },
     });
 
-    console.log(`📊 Found note with ${noteWithTags?.noteTags?.length || 0} NoteTags after delete`);
-
     const remainingTags = (noteWithTags?.noteTags || []).map((nt) => ({
       id: nt.tag.id,
       name: nt.tag.name,
@@ -292,8 +261,6 @@ export async function DELETE(
       source: nt.source,
       confidence: nt.confidence,
     }));
-
-    console.log(`📤 Returning ${remainingTags.length} tags:`, remainingTags);
 
     return new Response(JSON.stringify(successResponse({ tags: remainingTags })), {
       status: 200,

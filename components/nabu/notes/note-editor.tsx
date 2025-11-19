@@ -10,6 +10,7 @@ import { SourceInfo } from "./source-url-list";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
 import { TagSuggestionModal } from "./tag-suggestion-modal";
 import { AddLinkDialog } from "./add-link-dialog";
+import { AddTagDialog } from "./add-tag-dialog";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { MetadataSidebar } from "./metadata-sidebar";
 import { toast } from "sonner";
@@ -672,6 +673,15 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   };
 
   /**
+   * Handle adding a tag (opens dialog)
+   */
+  const [showAddTagDialog, setShowAddTagDialog] = useState(false);
+
+  const handleAddTag = () => {
+    setShowAddTagDialog(true);
+  };
+
+  /**
    * Handle dismissing suggested tags
    */
   const handleDismissTags = async () => {
@@ -1102,6 +1112,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
               onRemoveTag={handleRemoveTag}
               onDeleteLink={handleDeleteLink}
               onAddLink={handleAddLink}
+              onAddTag={handleAddTag}
               onRequestTagSuggestions={handleRequestTagSuggestions}
               isGeneratingTags={!!pendingJobId}
             />
@@ -1128,6 +1139,14 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         onOpenChange={setShowAddLinkDialog}
         noteId={noteId}
         onLinkAdded={setLinks}
+      />
+
+      {/* Add tag dialog */}
+      <AddTagDialog
+        open={showAddTagDialog}
+        onOpenChange={setShowAddTagDialog}
+        noteId={noteId}
+        onTagAdded={setTags}
       />
     </div>
   );
