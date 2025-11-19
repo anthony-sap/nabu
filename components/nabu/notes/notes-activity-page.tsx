@@ -1074,16 +1074,22 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   };
 
   const closeFolderModal = () => {
+    // Close dialog immediately for smooth animation
     setFolderModalOpen(false);
-    setFolderModalMode("create");
-    setFolderModalParentId(null);
-    setEditingFolderId(null);
-    setNewFolderName("");
-    setFolderNameError("");
-    setFolderColorError(null);
-    setFolderCreateError(null);
-    setIsCreatingFolder(false);
-    setNewFolderColor("#00B3A6");
+    
+    // Reset all state after dialog animation completes (300ms)
+    // This prevents infinite re-render loops by batching state updates
+    setTimeout(() => {
+      setFolderModalMode("create");
+      setFolderModalParentId(null);
+      setEditingFolderId(null);
+      setNewFolderName("");
+      setFolderNameError("");
+      setFolderColorError(null);
+      setFolderCreateError(null);
+      setIsCreatingFolder(false);
+      setNewFolderColor("#00B3A6");
+    }, 300);
   };
 
   const handleFolderSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1283,7 +1289,11 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
         </div>
       </div>
 
-      <Dialog open={folderModalOpen} onOpenChange={(open) => (open ? setFolderModalOpen(true) : closeFolderModal())}>
+      <Dialog open={folderModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          closeFolderModal();
+        }
+      }}>
         <DialogContent className="max-w-sm">
           <form onSubmit={handleFolderSubmit} className="space-y-6">
             <DialogHeader>
