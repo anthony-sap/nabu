@@ -15,17 +15,7 @@
  */
 
 export interface WebhookClassification {
-  type:
-    | "meeting_transcript"
-    | "call_transcript"
-    | "system_log"
-    | "chat_export"
-    | "crm_note"
-    | "ticket_update"
-    | "analytics_event"
-    | "calendar_event"
-    | "email_forward"
-    | "generic_doc";
+  type: string; // Any classification type - not limited to predefined types
   confidence: number; // 0-100
   reason: string;
   extractedContent?: string; // Cleaned text for Note.content

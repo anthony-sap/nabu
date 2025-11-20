@@ -3,6 +3,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { init } from "https://esm.sh/@paralleldrive/cuid2@2.2.2";
+
+// Initialize CUID generator for IDs
+const createId = init({ length: 25 });
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
@@ -27,17 +31,7 @@ interface WebhookPayload {
 }
 
 interface WebhookClassification {
-  type:
-    | "meeting_transcript"
-    | "call_transcript"
-    | "system_log"
-    | "chat_export"
-    | "crm_note"
-    | "ticket_update"
-    | "analytics_event"
-    | "calendar_event"
-    | "email_forward"
-    | "generic_doc";
+  type: string; // Any classification type - not limited to predefined types
   confidence: number;
   reason: string;
   extractedContent?: string;
@@ -105,19 +99,82 @@ serve(async (req) => {
     const webhookName = webhookEndpoint?.name || null;
     const webhookDescription = webhookEndpoint?.description || null;
 
-    // Step 1: Classify webhook payload
-    const classification = await classifyWebhookPayload(
+    // Step 1: Classify webhook payload using AI (with fallback to heuristic)
+    let classification: WebhookClassification;
+    const aiClassification = await classifyWithAI(
       job.headers,
       job.body,
       webhookName || undefined,
       webhookDescription || undefined
     );
 
-    // Step 2: Extract refined content and title
-    const refinedContent = classification.extractedContent || note.content || "";
-    const refinedTitle = classification.extractedTitle || note.title || "";
+    if (aiClassification) {
+      classification = aiClassification;
+      console.log(`AI classification: ${classification.type} (confidence: ${classification.confidence})`);
+    } else {
+      // Fallback to heuristic classification
+      classification = await classifyWebhookPayload(
+        job.headers,
+        job.body,
+        webhookName || undefined,
+        webhookDescription || undefined
+      );
+      console.log(`Heuristic classification: ${classification.type} (confidence: ${classification.confidence})`);
+    }
 
-    // Step 3: Update Note with classification and refined content
+    // Step 2: Extract title using AI (with fallback to heuristic)
+    const refinedContent = classification.extractedContent || note.content || "";
+    let refinedTitle = note.title || "";
+
+    console.log(`[Title Extraction] Starting title extraction process`);
+    console.log(`[Title Extraction] Current note title: ${refinedTitle}`);
+    console.log(`[Title Extraction] Content length: ${refinedContent.length}`);
+    console.log(`[Title Extraction] Classification type: ${classification.type}`);
+
+    // Try AI title extraction first
+    console.log(`[Title Extraction] Attempting AI title extraction...`);
+    const aiTitle = await extractTitleWithAI(
+      refinedContent,
+      classification.type,
+      webhookName || undefined,
+      webhookDescription || undefined
+    );
+
+    if (aiTitle) {
+      refinedTitle = aiTitle;
+      console.log(`[Title Extraction] ✅ AI extracted title: "${refinedTitle}"`);
+    } else {
+      console.log(`[Title Extraction] ⚠️ AI title extraction failed, falling back to heuristic`);
+      // Fallback to heuristic title extraction
+      refinedTitle = classification.extractedTitle || extractTitleFromBody(
+        job.body,
+        job.headers,
+        classification,
+        webhookName || undefined
+      );
+      console.log(`[Title Extraction] ✅ Heuristic extracted title: "${refinedTitle}"`);
+    }
+    
+    console.log(`[Title Extraction] Final title to use: "${refinedTitle}"`);
+
+    // Step 3: Determine folder using AI
+    const folderResult = await determineFolderWithAI(
+      refinedTitle,
+      refinedContent,
+      classification.type,
+      note.userId,
+      job.tenantId,
+      supabase
+    );
+
+    let folderId = folderResult.folderId;
+    if (folderResult.folderName && !folderId) {
+      console.log(`AI suggested folder but creation failed: ${folderResult.folderName}`);
+    } else if (folderId) {
+      console.log(`AI assigned folder: ${folderResult.folderName} (${folderId})`);
+    }
+
+    // Step 4: Update Note with classification, refined content, title, and folder
     const noteMeta = (note.meta as any) || {};
     noteMeta.classification = {
       type: classification.type,
@@ -130,6 +187,7 @@ serve(async (req) => {
       .update({
         title: refinedTitle || note.title,
         content: refinedContent || note.content,
+        folderId: folderId || null,
         meta: noteMeta,
         updatedAt: new Date().toISOString(),
       })
@@ -146,6 +204,7 @@ serve(async (req) => {
         const { error: tagJobError } = await supabase
           .from("TagSuggestionJob")
           .insert({
+            id: createId(),
             tenantId: job.tenantId,
             userId: note.userId,
             entityType: "NOTE",
@@ -222,6 +281,379 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Classify webhook payload using AI
+ */
+async function classifyWithAI(
+  headers: Record<string, string>,
+  body: any,
+  webhookName?: string,
+  webhookDescription?: string
+): Promise<WebhookClassification | null> {
+  if (!OPENAI_API_KEY) {
+    console.warn("OpenAI API key not configured, skipping AI classification");
+    return null;
+  }
+
+  try {
+    const textContent = extractTextFromBody(body);
+    const contentPreview = textContent.substring(0, 2000); // Limit content for API
+
+    const prompt = `Analyze this webhook payload and classify it into the most appropriate type/category.
+
+Webhook name: ${webhookName || "Not specified"}
+Webhook description: ${webhookDescription || "Not specified"}
+Content: ${contentPreview}
+
+Classify this into the most appropriate category (e.g., meeting_transcript, crm_note, ticket_update, calendar_event, invoice, purchase_order, etc.).
+You can use any category that best fits the content - don't limit yourself to predefined types.
+
+Return JSON: {"type": "category_name", "confidence": 0-100, "reason": "explanation"}`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that classifies webhook payloads. Always return valid JSON.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 150,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("OpenAI API error:", response.status, errorBody);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content?.trim();
+    
+    if (!content) {
+      return null;
+    }
+
+    // Parse JSON response (may be wrapped in code blocks)
+    let jsonStr = content;
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+    }
+
+    const classification = JSON.parse(jsonStr);
+    
+    return {
+      type: classification.type || "generic_doc",
+      confidence: Math.min(Math.max(classification.confidence || 50, 0), 100),
+      reason: classification.reason || "AI classification",
+      extractedContent: textContent,
+    };
+  } catch (error) {
+    console.error("Error in AI classification:", error);
+    return null;
+  }
+}
+
+/**
+ * Extract title using AI
+ */
+async function extractTitleWithAI(
+  content: string,
+  classificationType: string,
+  webhookName?: string,
+  webhookDescription?: string
+): Promise<string | null> {
+  console.log("[AI Title] Starting title extraction");
+  console.log("[AI Title] Inputs:", {
+    contentLength: content.length,
+    contentPreview: content.substring(0, 200),
+    classificationType,
+    webhookName,
+    webhookDescription,
+  });
+
+  if (!OPENAI_API_KEY) {
+    console.warn("[AI Title] OpenAI API key not configured, skipping AI title extraction");
+    return null;
+  }
+
+  console.log("[AI Title] OpenAI API key configured, model:", OPENAI_MODEL);
+
+  try {
+    const contentPreview = content.substring(0, 1000); // Limit content for API
+    console.log("[AI Title] Content preview length:", contentPreview.length);
+
+    const prompt = `Generate a concise, meaningful title (3-8 words) for this webhook content.
+The title should capture the main topic or subject.
+
+Classification: ${classificationType}
+Content: ${contentPreview}
+Webhook context: ${webhookName || "Unknown"} - ${webhookDescription || "No description"}
+
+Return ONLY the title text, nothing else. No quotes, no explanations.`;
+
+    console.log("[AI Title] Sending request to OpenAI API...");
+    const requestBody = {
+      model: OPENAI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that generates concise titles. Return only the title text, no quotes or explanations.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 30,
+      temperature: 0.7,
+    };
+    console.log("[AI Title] Request body:", JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("[AI Title] OpenAI API response status:", response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("[AI Title] OpenAI API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("[AI Title] OpenAI API response:", JSON.stringify(data, null, 2));
+
+    const title = data.choices[0]?.message?.content?.trim();
+    console.log("[AI Title] Raw title from API:", title);
+    
+    if (!title) {
+      console.warn("[AI Title] No title returned from API");
+      return null;
+    }
+
+    // Remove quotes if present
+    const cleanTitle = title.replace(/^["']|["']$/g, '').trim();
+    console.log("[AI Title] Cleaned title:", cleanTitle);
+    
+    // Ensure reasonable length (max 100 chars)
+    const finalTitle = cleanTitle.length > 100 
+      ? cleanTitle.substring(0, 100) + '...' 
+      : cleanTitle;
+    
+    console.log("[AI Title] Final title:", finalTitle);
+    console.log("[AI Title] Title extraction successful");
+    return finalTitle;
+  } catch (error) {
+    console.error("[AI Title] Error in AI title extraction:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return null;
+  }
+}
+
+/**
+ * Determine folder using AI
+ */
+async function determineFolderWithAI(
+  title: string,
+  content: string,
+  classificationType: string,
+  userId: string,
+  tenantId: string | null,
+  supabase: any
+): Promise<{ folderId: string | null; folderName: string | null }> {
+  if (!OPENAI_API_KEY) {
+    console.warn("OpenAI API key not configured, skipping AI folder routing");
+    return { folderId: null, folderName: null };
+  }
+
+  try {
+    // Fetch user's existing folders
+    let folderQuery = supabase
+      .from("Folder")
+      .select("id, name")
+      .eq("userId", userId)
+      .is("deletedAt", null);
+    
+    if (tenantId) {
+      folderQuery = folderQuery.eq("tenantId", tenantId);
+    } else {
+      folderQuery = folderQuery.is("tenantId", null);
+    }
+
+    const { data: folders, error: foldersError } = await folderQuery.order("name", { ascending: true });
+
+    if (foldersError) {
+      console.error("Error fetching folders:", foldersError);
+      return { folderId: null, folderName: null };
+    }
+
+    // Get note counts for each folder
+    const folderList = folders || [];
+    const foldersWithCounts = await Promise.all(
+      folderList.map(async (folder: { id: string; name: string }) => {
+        let noteCountQuery = supabase
+          .from("Note")
+          .select("*", { count: "exact", head: true })
+          .eq("folderId", folder.id)
+          .is("deletedAt", null);
+        
+        if (tenantId) {
+          noteCountQuery = noteCountQuery.eq("tenantId", tenantId);
+        } else {
+          noteCountQuery = noteCountQuery.is("tenantId", null);
+        }
+
+        const { count } = await noteCountQuery;
+        
+        return {
+          id: folder.id,
+          name: folder.name,
+          noteCount: count || 0,
+        };
+      })
+    );
+
+    const foldersText = foldersWithCounts.length > 0
+      ? foldersWithCounts.map(f => `- ${f.name} (${f.noteCount} notes)`).join("\n")
+      : "No existing folders";
+
+    const contentPreview = content.substring(0, 1500); // Limit content for API
+
+    const prompt = `Analyze this note and determine the best folder for it.
+
+Note title: ${title}
+Note content: ${contentPreview}
+Classification: ${classificationType}
+
+User's existing folders:
+${foldersText}
+
+Determine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.
+
+Return JSON:
+- If existing folder matches: {"type": "existing", "folderId": "...", "folderName": "...", "confidence": 0-100}
+- If new folder needed: {"type": "new", "folderName": "...", "confidence": 0-100, "reason": "why this folder name"}`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that organizes notes into folders. Always return valid JSON.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 200,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("OpenAI API error:", response.status, errorBody);
+      return { folderId: null, folderName: null };
+    }
+
+    const data = await response.json();
+    const responseContent = data.choices[0]?.message?.content?.trim();
+    
+    if (!responseContent) {
+      return { folderId: null, folderName: null };
+    }
+
+    // Parse JSON response (may be wrapped in code blocks)
+    let jsonStr = responseContent;
+    const jsonMatch = responseContent.match(/```json\s*([\s\S]*?)\s*```/) || responseContent.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+    }
+
+    const result = JSON.parse(jsonStr);
+
+    if (result.type === "existing" && result.folderId && result.confidence > 70) {
+      // Verify folder exists and belongs to user
+      const folder = foldersWithCounts.find((f: { id: string }) => f.id === result.folderId);
+      if (folder) {
+        return { folderId: result.folderId, folderName: folder.name };
+      }
+    }
+
+    if (result.type === "new" && result.folderName) {
+      const newFolderName = result.folderName.trim();
+      
+      // Check if folder with same name already exists (case-insensitive)
+      const existingFolder = foldersWithCounts.find(
+        (f: { name: string }) => f.name.toLowerCase() === newFolderName.toLowerCase()
+      );
+
+      if (existingFolder) {
+        // Use existing folder
+        return { folderId: existingFolder.id, folderName: existingFolder.name };
+      }
+
+      // Create new folder
+      const { data: createdFolder, error: createError } = await supabase
+        .from("Folder")
+        .insert({
+          name: newFolderName,
+          userId: userId,
+          tenantId: tenantId,
+          color: "#00B3A6", // Default mint color
+          status: "ENABLE",
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error("Error creating folder:", createError);
+        return { folderId: null, folderName: null };
+      }
+
+      return { folderId: createdFolder.id, folderName: createdFolder.name };
+    }
+
+    return { folderId: null, folderName: null };
+  } catch (error) {
+    console.error("Error in AI folder routing:", error);
+    return { folderId: null, folderName: null };
+  }
+}
 
 /**
  * Classify webhook payload (duplicated from lib/ai/webhook-classifier.ts for Deno compatibility)

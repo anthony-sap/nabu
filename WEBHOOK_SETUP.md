@@ -135,7 +135,7 @@ Configure Supabase to trigger the edge function when webhook jobs are created.
    - **Events**: `INSERT`
    - **Type**: `HTTP Request`
    - **Method**: `POST`
-   - **URL**: `https://your-project-ref.supabase.co/functions/v1/process-webhook`
+   - **URL**: `https://ihnthvgzawryjhtnulce.supabase.co/functions/v1/process-webhook`
    - **HTTP Headers**:
      ```
      Authorization: Bearer YOUR_SERVICE_ROLE_KEY
@@ -155,7 +155,7 @@ BEGIN
     -- Call edge function via HTTP
     PERFORM
       net.http_post(
-        url := 'https://your-project-ref.supabase.co/functions/v1/process-webhook',
+        url := 'https://ihnthvgzawryjhtnulce.supabase.co/functions/v1/process-webhook',
         headers := jsonb_build_object(
           'Content-Type', 'application/json',
           'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
@@ -499,4 +499,5 @@ For issues or questions:
 - Check database logs in Supabase Dashboard
 - Review `WebhookProcessingJob.error` field for processing errors
 - Verify all environment variables are set correctly
+
 
