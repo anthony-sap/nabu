@@ -109,6 +109,8 @@ model Tenant {
   whatsappIntegration WhatsAppIntegration?
   userPhoneLinks      UserPhoneLink[]
   whatsappMessages    WhatsAppMessage[]
+  webhookEndpoints     WebhookEndpoint[]
+  webhookProcessingJobs WebhookProcessingJob[]
 }
 
 model AuditLog {
@@ -193,6 +195,7 @@ model User {
   tags                   Tag[]
   shares                 Share[]
   phoneLinks             UserPhoneLink[]
+  webhookEndpoints        WebhookEndpoint[]
 }
 
 model VerificationToken {
@@ -261,6 +264,7 @@ model Note {
   contentState         String?           @db.Text // Lexical editor serialized state (JSON)
   sourceThoughts       String[]
   summary              String?           @db.Text
+  meta                 Json?             // Metadata for webhooks, classification, etc.
   visibility           NoteVisibility    @default(PRIVATE)
   status               StatusEnum        @default(ENABLE)
   tagSuggestionStatus      String?           // "pending", "completed", null
@@ -281,6 +285,7 @@ model Note {
   incomingLinks        NoteLink[]        @relation("NoteIncoming")
   thoughts             Thought[]
   chunks               NoteChunk[]       // Chunked content for embeddings
+  webhookProcessingJobs WebhookProcessingJob[]
 
   @@index([tenantId, userId])
   @@index([folderId])
@@ -660,5 +665,65 @@ model WhatsAppMessage {
   @@index([whatsappMessageId])
   @@index([fromNumber])
   @@index([processed])
+  @@index([tenantId])
+}
+
+// Webhook Integration Models
+
+// User-level webhook endpoint configuration
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String    @unique // Unguessable token for webhook URL
+  name        String    // User-friendly name
+  description String?   // Optional description
+  isActive    Boolean   @default(true)
+  
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  createdBy   String?
+  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  deletedBy   String?
+  
+  // Relations
+  processingJobs WebhookProcessingJob[]
+  
+  @@index([userId, tenantId])
+  @@index([token])
+}
+
+// Background job queue for processing webhook payloads
+model WebhookProcessingJob {
+  id                String    @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  noteId            String
+  note              Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  webhookEndpointId String
+  webhookEndpoint   WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  status            JobStatus @default(PENDING)
+  
+  // Raw payload data for processing
+  headers           Json      // HTTP headers
+  body              Json      // Parsed body or raw text
+  rawBody           String?    @db.Text // Original raw body
+  method            String    // HTTP method
+  ipAddress         String?    // Client IP address
+  
+  // Error tracking
+  error             String?    @db.Text
+  
+  // Audit fields
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @default(now()) @updatedAt
+  
+  @@index([noteId])
+  @@index([webhookEndpointId])
+  @@index([status, createdAt])
   @@index([tenantId])
 }
