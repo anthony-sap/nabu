@@ -104,6 +104,8 @@ serve(async (req) => {
     const aiClassification = await classifyWithAI(
       job.headers,
       job.body,
+      OPENAI_API_KEY || "",
+      OPENAI_MODEL,
       webhookName || undefined,
       webhookDescription || undefined
     );
@@ -130,6 +132,8 @@ serve(async (req) => {
     const aiTitle = await extractTitleWithAI(
       refinedContent,
       classification.type,
+      OPENAI_API_KEY || "",
+      OPENAI_MODEL,
       webhookName || undefined,
       webhookDescription || undefined
     );
@@ -153,6 +157,8 @@ serve(async (req) => {
       classification.type,
       note.userId,
       job.tenantId,
+      OPENAI_API_KEY || "",
+      OPENAI_MODEL,
       supabase
     );
 
@@ -195,6 +201,8 @@ serve(async (req) => {
           refinedContent,
           note.userId,
           job.tenantId,
+          OPENAI_API_KEY || "",
+          OPENAI_MODEL,
           supabase
         );
       } catch (tagError) {
@@ -268,11 +276,12 @@ serve(async (req) => {
 async function classifyWithAI(
   headers: Record<string, string>,
   body: any,
+  apiKey: string,
+  model: string,
   webhookName?: string,
   webhookDescription?: string
 ): Promise<WebhookClassification | null> {
-  if (!OPENAI_API_KEY) {
-    console.warn("OpenAI API key not configured, skipping AI classification");
+  if (!apiKey) {
     return null;
   }
 
@@ -298,7 +307,7 @@ Return JSON: {"type": "category_name", "confidence": 0-100, "reason": "explanati
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model,
         messages: [
           {
             role: "system",
@@ -354,10 +363,12 @@ Return JSON: {"type": "category_name", "confidence": 0-100, "reason": "explanati
 async function extractTitleWithAI(
   content: string,
   classificationType: string,
+  apiKey: string,
+  model: string,
   webhookName?: string,
   webhookDescription?: string
 ): Promise<string | null> {
-  if (!OPENAI_API_KEY) {
+  if (!apiKey) {
     return null;
   }
 
@@ -374,7 +385,7 @@ Webhook context: ${webhookName || "Unknown"} - ${webhookDescription || "No descr
 Return ONLY the title text, nothing else. No quotes, no explanations.`;
 
     const requestBody = {
-      model: OPENAI_MODEL,
+      model,
       messages: [
         {
           role: "system",
@@ -393,7 +404,7 @@ Return ONLY the title text, nothing else. No quotes, no explanations.`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
     });
@@ -431,7 +442,136 @@ Return ONLY the title text, nothing else. No quotes, no explanations.`;
 }
 
 /**
- * Determine folder using AI
+ * Suggest folder using AI (pure function, no Supabase)
+ */
+async function suggestFolderWithAI(
+  title: string,
+  content: string,
+  classificationType: string,
+  folders: Array<{ id: string; name: string; noteCount: number }>,
+  apiKey: string,
+  model: string
+): Promise<{ type: "existing" | "new"; folderId?: string; folderName: string; confidence: number; reason?: string } | null> {
+  if (!apiKey) {
+    return null;
+  }
+
+  try {
+    const foldersText = folders.length > 0
+      ? folders.map(f => `- ${f.name} (${f.noteCount} notes)`).join("\n")
+      : "No existing folders";
+
+    const contentPreview = content.substring(0, 1500); // Limit content for API
+
+    const prompt = `Analyze this note and determine the best folder for it.
+
+Note title: ${title}
+Note content: ${contentPreview}
+Classification: ${classificationType}
+
+User's existing folders:
+${foldersText}
+
+Determine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.
+
+Return JSON:
+- If existing folder matches: {"type": "existing", "folderId": "...", "folderName": "...", "confidence": 0-100}
+- If new folder needed: {"type": "new", "folderName": "...", "confidence": 0-100, "reason": "why this folder name"}`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that organizes notes into folders. Always return valid JSON.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: 200,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("OpenAI API error:", response.status, errorBody);
+      return null;
+    }
+
+    const data = await response.json();
+    const responseContent = data.choices[0]?.message?.content?.trim();
+    
+    if (!responseContent) {
+      return null;
+    }
+
+    // Parse JSON response (may be wrapped in code blocks)
+    let jsonStr = responseContent;
+    const jsonMatch = responseContent.match(/```json\s*([\s\S]*?)\s*```/) || responseContent.match(/```\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+    }
+
+    const result = JSON.parse(jsonStr);
+
+    // Validate and normalize the result
+    if (result.type === "existing" && result.folderId && result.confidence > 70) {
+      // Verify folder exists in the provided list
+      const folder = folders.find((f: { id: string }) => f.id === result.folderId);
+      if (folder) {
+        return {
+          type: "existing",
+          folderId: result.folderId,
+          folderName: folder.name,
+          confidence: Math.min(Math.max(result.confidence || 50, 0), 100),
+        };
+      }
+    }
+
+    if (result.type === "new" && result.folderName) {
+      const newFolderName = result.folderName.trim();
+      
+      // Check if folder with same name already exists (case-insensitive)
+      const existingFolder = folders.find(
+        (f: { name: string }) => f.name.toLowerCase() === newFolderName.toLowerCase()
+      );
+
+      if (existingFolder) {
+        // Use existing folder instead
+        return {
+          type: "existing",
+          folderId: existingFolder.id,
+          folderName: existingFolder.name,
+          confidence: 100,
+        };
+      }
+
+      return {
+        type: "new",
+        folderName: newFolderName,
+        confidence: Math.min(Math.max(result.confidence || 50, 0), 100),
+        reason: result.reason,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error in AI folder routing:", error);
+    return null;
+  }
+}
+
+/**
+ * Determine folder using AI (handles Supabase operations)
  */
 async function determineFolderWithAI(
   title: string,
@@ -439,13 +579,10 @@ async function determineFolderWithAI(
   classificationType: string,
   userId: string,
   tenantId: string | null,
+  apiKey: string,
+  model: string,
   supabase: any
 ): Promise<{ folderId: string | null; folderName: string | null }> {
-  if (!OPENAI_API_KEY) {
-    console.warn("OpenAI API key not configured, skipping AI folder routing");
-    return { folderId: null, folderName: null };
-  }
-
   try {
     // Fetch user's existing folders
     let folderQuery = supabase
@@ -493,100 +630,32 @@ async function determineFolderWithAI(
       })
     );
 
-    const foldersText = foldersWithCounts.length > 0
-      ? foldersWithCounts.map(f => `- ${f.name} (${f.noteCount} notes)`).join("\n")
-      : "No existing folders";
+    // Call pure AI function
+    const suggestion = await suggestFolderWithAI(
+      title,
+      content,
+      classificationType,
+      foldersWithCounts,
+      apiKey,
+      model
+    );
 
-    const contentPreview = content.substring(0, 1500); // Limit content for API
-
-    const prompt = `Analyze this note and determine the best folder for it.
-
-Note title: ${title}
-Note content: ${contentPreview}
-Classification: ${classificationType}
-
-User's existing folders:
-${foldersText}
-
-Determine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.
-
-Return JSON:
-- If existing folder matches: {"type": "existing", "folderId": "...", "folderName": "...", "confidence": 0-100}
-- If new folder needed: {"type": "new", "folderName": "...", "confidence": 0-100, "reason": "why this folder name"}`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant that organizes notes into folders. Always return valid JSON.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 200,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("OpenAI API error:", response.status, errorBody);
+    if (!suggestion) {
       return { folderId: null, folderName: null };
     }
 
-    const data = await response.json();
-    const responseContent = data.choices[0]?.message?.content?.trim();
-    
-    if (!responseContent) {
-      return { folderId: null, folderName: null };
+    if (suggestion.type === "existing" && suggestion.folderId) {
+      return { folderId: suggestion.folderId, folderName: suggestion.folderName };
     }
 
-    // Parse JSON response (may be wrapped in code blocks)
-    let jsonStr = responseContent;
-    const jsonMatch = responseContent.match(/```json\s*([\s\S]*?)\s*```/) || responseContent.match(/```\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
-    const result = JSON.parse(jsonStr);
-
-    if (result.type === "existing" && result.folderId && result.confidence > 70) {
-      // Verify folder exists and belongs to user
-      const folder = foldersWithCounts.find((f: { id: string }) => f.id === result.folderId);
-      if (folder) {
-        return { folderId: result.folderId, folderName: folder.name };
-      }
-    }
-
-    if (result.type === "new" && result.folderName) {
-      const newFolderName = result.folderName.trim();
-      
-      // Check if folder with same name already exists (case-insensitive)
-      const existingFolder = foldersWithCounts.find(
-        (f: { name: string }) => f.name.toLowerCase() === newFolderName.toLowerCase()
-      );
-
-      if (existingFolder) {
-        // Use existing folder
-        return { folderId: existingFolder.id, folderName: existingFolder.name };
-      }
-
+    if (suggestion.type === "new" && suggestion.folderName) {
       // Create new folder
       const folderId = createId();
       const { data: createdFolder, error: createError } = await supabase
         .from("Folder")
         .insert({
           id: folderId,
-          name: newFolderName,
+          name: suggestion.folderName,
           userId: userId,
           tenantId: tenantId,
           color: "#00B3A6", // Default mint color
@@ -1216,48 +1285,22 @@ function extractTitleFromBody(
 }
 
 /**
- * Automatically apply AI-generated tags to a note
+ * Suggest tags using AI (pure function, no Supabase)
  */
-async function applyTagsToNote(
-  noteId: string,
+async function suggestTagsWithAI(
   content: string,
-  userId: string,
-  tenantId: string | null,
-  supabase: any
+  existingTags: string[],
+  apiKey: string,
+  model: string
 ): Promise<string[]> {
-  if (!OPENAI_API_KEY) {
+  if (!apiKey) {
     return [];
   }
 
   try {
-    // Query user's existing tags
-    let tagQuery = supabase
-      .from("Tag")
-      .select("name")
-      .eq("userId", userId)
-      .is("deletedAt", null);
-
-    if (tenantId) {
-      tagQuery = tagQuery.eq("tenantId", tenantId);
-    } else {
-      tagQuery = tagQuery.is("tenantId", null);
-    }
-
-    const { data: usedTags, error: tagsError } = await tagQuery;
-
-    if (tagsError) {
-      console.error("[Tag Application] Error fetching existing tags:", tagsError);
-      // Continue anyway - we can still generate tags
-    }
-
-    // Extract unique tag names
-    const existingTagNames = usedTags 
-      ? [...new Set(usedTags.map((tag: any) => tag.name).filter(Boolean))]
-      : [];
-
     // Build prompt with existing user tags for context
-    const existingTagsSection = existingTagNames.length > 0
-      ? `\nUser's Existing Tags: ${existingTagNames.join(", ")}\n`
+    const existingTagsSection = existingTags.length > 0
+      ? `\nUser's Existing Tags: ${existingTags.join(", ")}\n`
       : "";
 
     const contentPreview = content.substring(0, 1000); // Limit content for API
@@ -1284,10 +1327,10 @@ Tags:`;
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: OPENAI_MODEL,
+          model,
           messages: [
             {
               role: "system",
@@ -1323,6 +1366,59 @@ Tags:`;
       .map((tag: string) => tag.trim())
       .filter((tag: string) => tag.length > 0 && tag.length < 50)
       .slice(0, 5); // Max 5 tags
+
+    return suggestedTags;
+  } catch (error) {
+    console.error("[Tag Application] Error in tag suggestion:", error);
+    return [];
+  }
+}
+
+/**
+ * Automatically apply AI-generated tags to a note (handles Supabase operations)
+ */
+async function applyTagsToNote(
+  noteId: string,
+  content: string,
+  userId: string,
+  tenantId: string | null,
+  apiKey: string,
+  model: string,
+  supabase: any
+): Promise<string[]> {
+  try {
+    // Query user's existing tags
+    let tagQuery = supabase
+      .from("Tag")
+      .select("name")
+      .eq("userId", userId)
+      .is("deletedAt", null);
+
+    if (tenantId) {
+      tagQuery = tagQuery.eq("tenantId", tenantId);
+    } else {
+      tagQuery = tagQuery.is("tenantId", null);
+    }
+
+    const { data: usedTags, error: tagsError } = await tagQuery;
+
+    if (tagsError) {
+      console.error("[Tag Application] Error fetching existing tags:", tagsError);
+      // Continue anyway - we can still generate tags
+    }
+
+    // Extract unique tag names
+    const existingTagNames = usedTags 
+      ? [...new Set(usedTags.map((tag: any) => tag.name).filter(Boolean))]
+      : [];
+
+    // Call pure AI function
+    const suggestedTags = await suggestTagsWithAI(
+      content,
+      existingTagNames,
+      apiKey,
+      model
+    );
 
     if (suggestedTags.length === 0) {
       return [];
