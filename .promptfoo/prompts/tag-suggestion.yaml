@@ -1,0 +1,28 @@
+# Tag Suggestion Prompts
+# Extracted from lib/ai/webhook-ai-processor.ts and supabase/functions/process-tag-suggestion/index.ts
+
+prompts:
+  # Tag suggestion
+  - id: tag-suggestion
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that suggests relevant tags for notes and thoughts.
+      - role: user
+        content: |
+          Analyze the following content and suggest 3-5 relevant tags for categorization.
+          {{existing_tags_section}}
+          Rules:
+          - Prioritize suggesting relevant tags from the user's existing tags when appropriate
+          - Only suggest new tags if the existing tags don't adequately describe the content
+          - Return tags as short phrases (1-3 words max)
+          - Focus on: topics, themes, categories, projects
+          - Make tags actionable and searchable
+          - Return ONLY tag names, comma-separated
+          - No explanations, no numbering
+
+          Content:
+          {{content}}
+
+          Tags:
+

@@ -2,6 +2,9 @@
 # Dont ignore devreadyai folder
 !.devreadyai/
 !.devreadyai/**
+!.promptfoo/
+!.promptfoo/**
+
 
 docker-data
 
@@ -47,3 +50,7 @@ next-env.d.ts
 .vscode
 .contentlayer
 test-results
+
+# promptfoo outputs
+.promptfoo/outputs/
+.promptfoo/.promptfoo/

@@ -1,0 +1,126 @@
+# Tag Suggestion Test Cases
+# Tests for tag suggestion functionality
+# Prompts are defined in .promptfoo/promptfooconfig.yaml
+
+tests:
+  # Tag suggestion with existing tags
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: |
+        User's Existing Tags: work, project, meeting, customer, feedback, support, technical, bug, feature
+      content: |
+        Meeting notes from project kickoff. Discussed timeline, deliverables, and team assignments.
+        Key decisions: Use React for frontend, Node.js for backend. Target launch date: Q1 2025.
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 3 && tags.length <= 5;
+        description: "Should suggest 3-5 tags"
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim());
+          return tags.every(tag => tag.length > 0 && tag.length < 50);
+        description: "Each tag should be 1-50 characters"
+      - type: contains-any
+        value: ["project", "meeting", "work"]
+        transform: "lowercase"
+        description: "Should prioritize existing relevant tags"
+
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: |
+        User's Existing Tags: customer, feedback, support, bug, feature, technical
+      content: |
+        Customer complaint: Application crashes when uploading large files. Error occurs after 10MB.
+        Steps to reproduce: 1. Login 2. Go to upload page 3. Select file > 10MB 4. Click upload
+        Error message: "File size limit exceeded"
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 3 && tags.length <= 5;
+        description: "Should suggest 3-5 tags"
+      - type: contains-any
+        value: ["customer", "bug", "support"]
+        transform: "lowercase"
+        description: "Should use relevant existing tags"
+
+  # Tag suggestion without existing tags
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: ""
+      content: |
+        Research findings on machine learning applications in healthcare.
+        Key insights: Improved diagnostic accuracy by 15%, personalized treatment recommendations show promise.
+        Next steps: Conduct larger clinical trial, publish findings.
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 3 && tags.length <= 5;
+        description: "Should suggest 3-5 tags"
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim());
+          return tags.every(tag => tag.split(' ').length <= 3);
+        description: "Each tag should be 1-3 words max"
+      - type: contains-any
+        value: ["machine learning", "healthcare", "research", "ml"]
+        transform: "lowercase"
+        description: "Should suggest relevant new tags"
+
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: ""
+      content: |
+        Quick note: Need to follow up with Sarah about the Q4 budget proposal.
+        Deadline is next Friday. Should include marketing and engineering allocations.
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 3 && tags.length <= 5;
+        description: "Should suggest 3-5 tags"
+      - type: contains-any
+        value: ["q4", "budget", "follow up", "planning"]
+        transform: "lowercase"
+        description: "Should capture key topics"
+
+  # Edge cases
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: |
+        User's Existing Tags: work, personal, todo, reminder
+      content: "Reminder: Call dentist tomorrow at 2pm"
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 1 && tags.length <= 5;
+        description: "Should suggest at least 1 tag for short content"
+      - type: contains-any
+        value: ["reminder", "personal", "todo"]
+        transform: "lowercase"
+        description: "Should use relevant existing tags"
+
+  - vars:
+      prompt: tag-suggestion
+      existing_tags_section: |
+        User's Existing Tags: project, meeting, customer, technical, bug, feature
+      content: |
+        Very long technical document about implementing a new authentication system.
+        Includes OAuth2 flow, JWT tokens, refresh tokens, session management, security best practices,
+        rate limiting, password hashing, multi-factor authentication, and integration with existing systems.
+        Technical stack: Node.js, Express, PostgreSQL, Redis. Timeline: 6 weeks. Team: 3 developers.
+    assert:
+      - type: javascript
+        value: |
+          const tags = output.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          return tags.length >= 3 && tags.length <= 5;
+        description: "Should suggest 3-5 tags even for long content"
+      - type: contains-any
+        value: ["technical", "project", "authentication"]
+        transform: "lowercase"
+        description: "Should capture main technical topics"
+

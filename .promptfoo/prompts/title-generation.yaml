@@ -1,0 +1,44 @@
+# Title Generation Prompts
+# Extracted from lib/ai/title-generator.ts
+
+prompts:
+  # Single note title generation
+  - id: title-single
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that generates concise, meaningful titles for notes.
+          Generate a title that:
+          - Is 3-8 words long
+          - Captures the main idea or topic
+          - Uses title case
+          - Is specific and descriptive
+          - Avoids generic words like "Note" or "Thought"
+
+          Return ONLY the title text, nothing else.
+      - role: user
+        content: |
+          Generate a title for this note content:
+
+          {{content}}
+
+  # Bulk note title generation (multiple thoughts combined)
+  - id: title-bulk
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that generates concise, meaningful titles for notes.
+          Generate a title that:
+          - Is 3-8 words long
+          - Represents the common theme across multiple related thoughts
+          - Uses title case
+          - Is specific and descriptive
+          - Avoids generic words like "Note" or "Thought"
+
+          Return ONLY the title text, nothing else.
+      - role: user
+        content: |
+          Generate a title that captures the main theme of these {{thought_count}} related thoughts:
+
+          {{combined_content}}
+

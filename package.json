@@ -18,7 +18,15 @@
     "prisma": "prisma",
     "postinstall": "prisma generate",
     "seed": "tsx run.ts scripts/seed.ts",
-    "tsx": "tsx run.ts"
+    "tsx": "tsx run.ts",
+    "promptfoo:eval": "promptfoo eval -c .promptfoo/promptfooconfig.yaml",
+    "promptfoo:eval:title-single": "promptfoo eval -c .promptfoo/promptfooconfig-title-single.yaml",
+    "promptfoo:eval:title-bulk": "promptfoo eval -c .promptfoo/promptfooconfig-title-bulk.yaml",
+    "promptfoo:eval:webhook-classify": "promptfoo eval -c .promptfoo/promptfooconfig-webhook-classify.yaml",
+    "promptfoo:eval:webhook-title": "promptfoo eval -c .promptfoo/promptfooconfig-webhook-title.yaml",
+    "promptfoo:eval:webhook-folder": "promptfoo eval -c .promptfoo/promptfooconfig-webhook-folder.yaml",
+    "promptfoo:eval:tag-suggestion": "promptfoo eval -c .promptfoo/promptfooconfig-tag-suggestion.yaml",
+    "promptfoo:view": "promptfoo view"
   },
   "prisma": {
     "seed": "tsx run.ts scripts/seed.ts"
@@ -147,6 +155,7 @@
     "tsx": "^4.20.3",
     "typescript": "5.8.3",
     "unist-util-visit": "^5.0.0",
-    "whatwg-fetch": "^3.6.20"
+    "whatwg-fetch": "^3.6.20",
+    "promptfoo": "^0.119.9"
   }
 }

@@ -1,0 +1,58 @@
+# Webhook Folder Suggestion
+# Test this prompt individually: npm run promptfoo:eval:webhook-folder
+
+description: "Webhook Folder Suggestion"
+
+providers:
+  - openai:gpt-4o-mini
+  - openai:gpt-4o
+  - openai:gpt-3.5-turbo
+
+defaultTest:
+  options:
+    temperature: 0.3
+    max_tokens: 200
+
+prompts:
+  - id: webhook-folder
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that organizes notes into folders. Always return valid JSON."
+        },
+        {
+          "role": "user",
+          "content": "Analyze this note and determine the best folder for it.\n\nNote title: {{title}}\nNote content: {{content}}\nClassification: {{classification_type}}\n\nUser's existing folders:\n{{folders_text}}\n\nDetermine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.\n\nReturn JSON:\n- If existing folder matches: {\"type\": \"existing\", \"folderId\": \"...\", \"folderName\": \"...\", \"confidence\": 0-100}\n- If new folder needed: {\"type\": \"new\", \"folderName\": \"...\", \"confidence\": 0-100, \"reason\": \"why this folder name\"}"
+        }
+      ]
+
+tests:
+  - vars:
+      prompt: webhook-folder
+      title: "Q4 Planning Meeting Notes"
+      content: "Discussed budget allocations, team structure, and key milestones for Q4."
+      classification_type: "meeting_transcript"
+      folders_text: |
+        - Work (15 notes)
+        - Personal (8 notes)
+        - Projects (12 notes)
+        - Meetings (20 notes)
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "folderName": "string", "confidence": "number"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type === "existing" || result.type === "new";
+        description: "Should specify folder type"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.confidence >= 0 && result.confidence <= 100;
+        description: "Should have valid confidence score"
+
+output:
+  path: .promptfoo/outputs
+

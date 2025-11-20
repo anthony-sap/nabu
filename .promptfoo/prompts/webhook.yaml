@@ -1,0 +1,63 @@
+# Webhook-related Prompts
+# Extracted from lib/ai/webhook-ai-processor.ts
+
+prompts:
+  # Webhook classification
+  - id: webhook-classify
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that classifies webhook payloads. Always return valid JSON.
+      - role: user
+        content: |
+          Analyze this webhook payload and classify it into the most appropriate type/category.
+
+          Webhook name: {{webhook_name}}
+          Webhook description: {{webhook_description}}
+          Content: {{content}}
+
+          Classify this into the most appropriate category (e.g., meeting_transcript, crm_note, ticket_update, calendar_event, invoice, purchase_order, etc.).
+          You can use any category that best fits the content - don't limit yourself to predefined types.
+
+          Return JSON: {"type": "category_name", "confidence": 0-100, "reason": "explanation"}
+
+  # Webhook title extraction
+  - id: webhook-title
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that generates concise titles. Return only the title text, no quotes or explanations.
+      - role: user
+        content: |
+          Generate a concise, meaningful title (3-8 words) for this webhook content.
+          The title should capture the main topic or subject of the content presented. use meta data to assist with further context.
+
+          Classification: {{classification_type}}
+          Content: {{content}}
+          Webhook context: {{webhook_name}} - {{webhook_description}}
+
+          Return ONLY the title text, nothing else. No quotes, no explanations.
+
+  # Folder suggestion for webhooks
+  - id: webhook-folder
+    messages:
+      - role: system
+        content: |
+          You are a helpful assistant that organizes notes into folders. Always return valid JSON.
+      - role: user
+        content: |
+          Analyze this note and determine the best folder for it.
+
+          Note title: {{title}}
+          Note content: {{content}}
+          Classification: {{classification_type}}
+
+          User's existing folders:
+          {{folders_text}}
+
+          Determine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.
+
+          Return JSON:
+          - If existing folder matches: {"type": "existing", "folderId": "...", "folderName": "...", "confidence": 0-100}
+          - If new folder needed: {"type": "new", "folderName": "...", "confidence": 0-100, "reason": "why this folder name"}
+

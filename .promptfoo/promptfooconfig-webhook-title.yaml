@@ -1,0 +1,67 @@
+# Webhook Title Extraction
+# Test this prompt individually: npm run promptfoo:eval:webhook-title
+
+description: "Webhook Title Extraction"
+
+providers:
+  - openai:gpt-4o-mini
+  - openai:gpt-4o
+  - openai:gpt-3.5-turbo
+
+defaultTest:
+  options:
+    temperature: 0.7
+    max_tokens: 30
+
+prompts:
+  - id: webhook-title
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that generates concise titles. Return only the title text, no quotes or explanations."
+        },
+        {
+          "role": "user",
+          "content": "Generate a concise, meaningful title (3-8 words) for this webhook content.\nThe title should capture the main topic or subject of the content presented. use meta data to assist with further context.\n\nClassification: {{classification_type}}\nContent: {{content}}\nWebhook context: {{webhook_name}} - {{webhook_description}}\n\nReturn ONLY the title text, nothing else. No quotes, no explanations."
+        }
+      ]
+
+tests:
+  - vars:
+      prompt: webhook-title
+      classification_type: "meeting_transcript"
+      webhook_name: "Zoom Meeting"
+      webhook_description: "Meeting transcript webhook"
+      content: |
+        Meeting Transcript - Q4 Planning Session
+        Participants: Sarah, John, Mike
+        Discussion covered budget allocations, team structure, and key milestones.
+    assert:
+      - type: javascript
+        value: "output.split(' ').length >= 3 && output.split(' ').length <= 8"
+        description: "Should be 3-8 words"
+      - type: not-contains
+        value: '"'
+        description: "Should not be wrapped in quotes"
+      - type: contains-any
+        value: ["Q4", "Planning", "Meeting"]
+        description: "Should capture main topic"
+
+  - vars:
+      prompt: webhook-title
+      classification_type: "crm_note"
+      webhook_name: "Salesforce"
+      webhook_description: "Account update"
+      content: "Account Acme Corporation updated. Status changed to Active. New contact added: John Doe."
+    assert:
+      - type: javascript
+        value: "output.length >= 3 && output.length <= 100"
+        description: "Should be reasonable length"
+      - type: contains-any
+        value: ["Acme", "Account", "Corporation"]
+        description: "Should reference key entities"
+
+output:
+  path: .promptfoo/outputs
+

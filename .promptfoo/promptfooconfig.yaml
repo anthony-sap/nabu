@@ -1,0 +1,121 @@
+# Promptfoo Configuration for Nabu Project
+# Evaluates all AI prompts used in the project for accuracy and model comparison
+
+description: "Nabu AI Prompt Evaluation - Title Generation, Webhook Processing, and Tag Suggestions"
+
+# Providers to compare (models)
+providers:
+  - openai:gpt-4o-mini
+  - openai:gpt-4o
+  - openai:gpt-3.5-turbo
+  # Uncomment if you have Anthropic API key:
+  # - anthropic:claude-3-5-sonnet-20241022
+  # - anthropic:claude-3-opus-20240229
+
+# Default provider settings
+defaultTest:
+  options:
+    temperature: 0.7
+    max_tokens: 5000
+
+# Define all prompts at the top level
+# Using raw JSON format for chat messages
+prompts:
+  # Title Generation Prompts
+  - id: title-single
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that generates concise, meaningful titles for notes.\nGenerate a title that:\n- Is 3-8 words long\n- Captures the main idea or topic\n- Uses title case\n- Is specific and descriptive\n- Avoids generic words like \"Note\" or \"Thought\"\n\nReturn ONLY the title text, nothing else."
+        },
+        {
+          "role": "user",
+          "content": "Generate a title for this note content:\n\n{{content}}"
+        }
+      ]
+
+  - id: title-bulk
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that generates concise, meaningful titles for notes.\nGenerate a title that:\n- Is 3-8 words long\n- Represents the common theme across multiple related thoughts\n- Uses title case\n- Is specific and descriptive\n- Avoids generic words like \"Note\" or \"Thought\"\n\nReturn ONLY the title text, nothing else."
+        },
+        {
+          "role": "user",
+          "content": "Generate a title that captures the main theme of these {{thought_count}} related thoughts:\n\n{{combined_content}}"
+        }
+      ]
+
+  # Webhook Prompts
+  - id: webhook-classify
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that classifies webhook payloads. Always return valid JSON."
+        },
+        {
+          "role": "user",
+          "content": "Analyze this webhook payload and classify it into the most appropriate type/category.\n\nWebhook name: {{webhook_name}}\nWebhook description: {{webhook_description}}\nContent: {{content}}\n\nClassify this into the most appropriate category (e.g., meeting_transcript, crm_note, ticket_update, calendar_event, invoice, purchase_order, etc.).\nYou can use any category that best fits the content - don't limit yourself to predefined types.\n\nReturn JSON: {\"type\": \"category_name\", \"confidence\": 0-100, \"reason\": \"explanation\"}"
+        }
+      ]
+
+  - id: webhook-title
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that generates concise titles. Return only the title text, no quotes or explanations."
+        },
+        {
+          "role": "user",
+          "content": "Generate a concise, meaningful title (3-8 words) for this webhook content.\nThe title should capture the main topic or subject of the content presented. use meta data to assist with further context.\n\nClassification: {{classification_type}}\nContent: {{content}}\nWebhook context: {{webhook_name}} - {{webhook_description}}\n\nReturn ONLY the title text, nothing else. No quotes, no explanations."
+        }
+      ]
+
+  - id: webhook-folder
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that organizes notes into folders. Always return valid JSON."
+        },
+        {
+          "role": "user",
+          "content": "Analyze this note and determine the best folder for it.\n\nNote title: {{title}}\nNote content: {{content}}\nClassification: {{classification_type}}\n\nUser's existing folders:\n{{folders_text}}\n\nDetermine if this note should go in an existing folder (if confidence > 70%) or suggest a new folder name.\n\nReturn JSON:\n- If existing folder matches: {\"type\": \"existing\", \"folderId\": \"...\", \"folderName\": \"...\", \"confidence\": 0-100}\n- If new folder needed: {\"type\": \"new\", \"folderName\": \"...\", \"confidence\": 0-100, \"reason\": \"why this folder name\"}"
+        }
+      ]
+
+  # Tag Suggestion Prompt
+  - id: tag-suggestion
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that suggests relevant tags for notes and thoughts."
+        },
+        {
+          "role": "user",
+          "content": "Analyze the following content and suggest 3-5 relevant tags for categorization.\n{{existing_tags_section}}\nRules:\n- Prioritize suggesting relevant tags from the user's existing tags when appropriate\n- Only suggest new tags if the existing tags don't adequately describe the content\n- Return tags as short phrases (1-3 words max)\n- Focus on: topics, themes, categories, projects\n- Make tags actionable and searchable\n- Return ONLY tag names, comma-separated\n- No explanations, no numbering\n\nContent:\n{{content}}\n\nTags:"
+        }
+      ]
+
+# Include test case files (these should only contain tests, no prompts)
+includes:
+  - .promptfoo/tests/title-generation-tests.yaml
+  - .promptfoo/tests/webhook-tests.yaml
+  - .promptfoo/tests/tag-tests.yaml
+
+# Output settings
+output:
+  path: .promptfoo/outputs
+
+# Evaluation settings
+evaluateOptions:
+  maxConcurrency: 5
+  retry:
+    attempts: 2
+    delay: 1000
+
