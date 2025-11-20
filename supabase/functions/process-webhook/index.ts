@@ -126,13 +126,7 @@ serve(async (req) => {
     const refinedContent = classification.extractedContent || note.content || "";
     let refinedTitle = note.title || "";
 
-    console.log(`[Title Extraction] Starting title extraction process`);
-    console.log(`[Title Extraction] Current note title: ${refinedTitle}`);
-    console.log(`[Title Extraction] Content length: ${refinedContent.length}`);
-    console.log(`[Title Extraction] Classification type: ${classification.type}`);
-
     // Try AI title extraction first
-    console.log(`[Title Extraction] Attempting AI title extraction...`);
     const aiTitle = await extractTitleWithAI(
       refinedContent,
       classification.type,
@@ -142,9 +136,7 @@ serve(async (req) => {
 
     if (aiTitle) {
       refinedTitle = aiTitle;
-      console.log(`[Title Extraction] ✅ AI extracted title: "${refinedTitle}"`);
     } else {
-      console.log(`[Title Extraction] ⚠️ AI title extraction failed, falling back to heuristic`);
       // Fallback to heuristic title extraction
       refinedTitle = classification.extractedTitle || extractTitleFromBody(
         job.body,
@@ -152,10 +144,7 @@ serve(async (req) => {
         classification,
         webhookName || undefined
       );
-      console.log(`[Title Extraction] ✅ Heuristic extracted title: "${refinedTitle}"`);
     }
-    
-    console.log(`[Title Extraction] Final title to use: "${refinedTitle}"`);
 
     // Step 3: Determine folder using AI
     const folderResult = await determineFolderWithAI(
@@ -201,15 +190,13 @@ serve(async (req) => {
     // Step 4: Automatically apply tags (if content is substantial)
     if (refinedContent.length >= 200) {
       try {
-        console.log(`[Tag Application] Starting automatic tag application for note ${job.noteId}`);
-        const appliedTags = await applyTagsToNote(
+        await applyTagsToNote(
           job.noteId,
           refinedContent,
           note.userId,
           job.tenantId,
           supabase
         );
-        console.log(`[Tag Application] ✅ Applied ${appliedTags.length} tags: ${appliedTags.join(", ")}`);
       } catch (tagError) {
         console.error("[Tag Application] Error applying tags:", tagError);
         // Don't fail the whole job if tag application fails
@@ -370,28 +357,15 @@ async function extractTitleWithAI(
   webhookName?: string,
   webhookDescription?: string
 ): Promise<string | null> {
-  console.log("[AI Title] Starting title extraction");
-  console.log("[AI Title] Inputs:", {
-    contentLength: content.length,
-    contentPreview: content.substring(0, 200),
-    classificationType,
-    webhookName,
-    webhookDescription,
-  });
-
   if (!OPENAI_API_KEY) {
-    console.warn("[AI Title] OpenAI API key not configured, skipping AI title extraction");
     return null;
   }
 
-  console.log("[AI Title] OpenAI API key configured, model:", OPENAI_MODEL);
-
   try {
     const contentPreview = content.substring(0, 1000); // Limit content for API
-    console.log("[AI Title] Content preview length:", contentPreview.length);
 
     const prompt = `Generate a concise, meaningful title (3-8 words) for this webhook content.
-The title should capture the main topic or subject.
+The title should capture the main topic or subject of the content presented. use meta data to assist with further context.
 
 Classification: ${classificationType}
 Content: ${contentPreview}
@@ -399,7 +373,6 @@ Webhook context: ${webhookName || "Unknown"} - ${webhookDescription || "No descr
 
 Return ONLY the title text, nothing else. No quotes, no explanations.`;
 
-    console.log("[AI Title] Sending request to OpenAI API...");
     const requestBody = {
       model: OPENAI_MODEL,
       messages: [
@@ -415,7 +388,6 @@ Return ONLY the title text, nothing else. No quotes, no explanations.`;
       max_tokens: 30,
       temperature: 0.7,
     };
-    console.log("[AI Title] Request body:", JSON.stringify(requestBody, null, 2));
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -425,8 +397,6 @@ Return ONLY the title text, nothing else. No quotes, no explanations.`;
       },
       body: JSON.stringify(requestBody),
     });
-
-    console.log("[AI Title] OpenAI API response status:", response.status, response.statusText);
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -439,33 +409,23 @@ Return ONLY the title text, nothing else. No quotes, no explanations.`;
     }
 
     const data = await response.json();
-    console.log("[AI Title] OpenAI API response:", JSON.stringify(data, null, 2));
-
     const title = data.choices[0]?.message?.content?.trim();
-    console.log("[AI Title] Raw title from API:", title);
     
     if (!title) {
-      console.warn("[AI Title] No title returned from API");
       return null;
     }
 
     // Remove quotes if present
     const cleanTitle = title.replace(/^["']|["']$/g, '').trim();
-    console.log("[AI Title] Cleaned title:", cleanTitle);
     
     // Ensure reasonable length (max 100 chars)
     const finalTitle = cleanTitle.length > 100 
       ? cleanTitle.substring(0, 100) + '...' 
       : cleanTitle;
     
-    console.log("[AI Title] Final title:", finalTitle);
-    console.log("[AI Title] Title extraction successful");
     return finalTitle;
   } catch (error) {
-    console.error("[AI Title] Error in AI title extraction:", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error("[AI Title] Error in AI title extraction:", error);
     return null;
   }
 }
@@ -621,9 +581,11 @@ Return JSON:
       }
 
       // Create new folder
+      const folderId = createId();
       const { data: createdFolder, error: createError } = await supabase
         .from("Folder")
         .insert({
+          id: folderId,
           name: newFolderName,
           userId: userId,
           tenantId: tenantId,
@@ -1264,15 +1226,11 @@ async function applyTagsToNote(
   supabase: any
 ): Promise<string[]> {
   if (!OPENAI_API_KEY) {
-    console.warn("[Tag Application] OpenAI API key not configured, skipping tag application");
     return [];
   }
 
   try {
-    console.log(`[Tag Application] Fetching existing tags for user ${userId}`);
-    
     // Query user's existing tags
-    // Get all tags for this user (simpler approach - get all user tags)
     let tagQuery = supabase
       .from("Tag")
       .select("name")
@@ -1297,8 +1255,6 @@ async function applyTagsToNote(
       ? [...new Set(usedTags.map((tag: any) => tag.name).filter(Boolean))]
       : [];
 
-    console.log(`[Tag Application] Found ${existingTagNames.length} existing tags`);
-
     // Build prompt with existing user tags for context
     const existingTagsSection = existingTagNames.length > 0
       ? `\nUser's Existing Tags: ${existingTagNames.join(", ")}\n`
@@ -1322,7 +1278,6 @@ ${contentPreview}
 
 Tags:`;
 
-    console.log("[Tag Application] Calling OpenAI API for tag generation...");
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -1362,8 +1317,6 @@ Tags:`;
     const openaiData = await openaiResponse.json();
     const suggestionsText = openaiData.choices[0]?.message?.content?.trim() || "";
 
-    console.log(`[Tag Application] OpenAI response: ${suggestionsText}`);
-
     // Parse tags from response
     const suggestedTags = suggestionsText
       .split(",")
@@ -1372,11 +1325,8 @@ Tags:`;
       .slice(0, 5); // Max 5 tags
 
     if (suggestedTags.length === 0) {
-      console.warn("[Tag Application] No valid tags generated from AI");
       return [];
     }
-
-    console.log(`[Tag Application] Parsed ${suggestedTags.length} tags: ${suggestedTags.join(", ")}`);
 
     // Apply each tag to the note
     const appliedTags: string[] = [];
@@ -1403,10 +1353,11 @@ Tags:`;
 
         if (findError || !existingTags || existingTags.length === 0) {
           // Create new tag
-          console.log(`[Tag Application] Creating new tag: ${tagName}`);
+          const tagIdNew = createId();
           const { data: newTag, error: createError } = await supabase
             .from("Tag")
             .insert({
+              id: tagIdNew,
               name: tagName,
               userId: userId,
               tenantId: tenantId,
@@ -1426,7 +1377,6 @@ Tags:`;
         } else {
           // Use existing tag
           tagId = existingTags[0].id;
-          console.log(`[Tag Application] Using existing tag: ${tagName} (${tagId})`);
         }
 
         // Check if NoteTag link already exists
@@ -1446,7 +1396,6 @@ Tags:`;
         if (existingLink) {
           if (existingLink.deletedAt) {
             // Restore soft-deleted link
-            console.log(`[Tag Application] Restoring soft-deleted link for tag: ${tagName}`);
             const { error: updateError } = await supabase
               .from("NoteTag")
               .update({
@@ -1463,12 +1412,10 @@ Tags:`;
             }
           } else {
             // Already linked, skip
-            console.log(`[Tag Application] Tag ${tagName} already linked, skipping`);
             continue;
           }
         } else {
           // Create new NoteTag link
-          console.log(`[Tag Application] Creating NoteTag link for: ${tagName}`);
           const { error: insertError } = await supabase
             .from("NoteTag")
             .insert({
@@ -1493,7 +1440,6 @@ Tags:`;
       }
     }
 
-    console.log(`[Tag Application] Successfully applied ${appliedTags.length} tags`);
     return appliedTags;
   } catch (error) {
     console.error("[Tag Application] Error in tag application:", error);
