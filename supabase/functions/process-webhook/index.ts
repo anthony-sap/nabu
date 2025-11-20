@@ -198,28 +198,21 @@ serve(async (req) => {
       throw noteUpdateError;
     }
 
-    // Step 4: Enqueue tag suggestions (if content is substantial)
+    // Step 4: Automatically apply tags (if content is substantial)
     if (refinedContent.length >= 200) {
       try {
-        const { error: tagJobError } = await supabase
-          .from("TagSuggestionJob")
-          .insert({
-            id: createId(),
-            tenantId: job.tenantId,
-            userId: note.userId,
-            entityType: "NOTE",
-            entityId: job.noteId,
-            content: refinedContent.substring(0, 1000), // Limit for API
-            status: "PENDING",
-          });
-
-        if (tagJobError) {
-          console.error("Error creating tag suggestion job:", tagJobError);
-          // Don't fail the whole job if tag suggestions fail
-        }
+        console.log(`[Tag Application] Starting automatic tag application for note ${job.noteId}`);
+        const appliedTags = await applyTagsToNote(
+          job.noteId,
+          refinedContent,
+          note.userId,
+          job.tenantId,
+          supabase
+        );
+        console.log(`[Tag Application] ✅ Applied ${appliedTags.length} tags: ${appliedTags.join(", ")}`);
       } catch (tagError) {
-        console.error("Error enqueueing tag suggestions:", tagError);
-        // Continue processing
+        console.error("[Tag Application] Error applying tags:", tagError);
+        // Don't fail the whole job if tag application fails
       }
     }
 
@@ -1258,6 +1251,254 @@ function extractTitleFromBody(
     minute: "2-digit"
   });
   return `Webhook - ${dateStr}`;
+}
+
+/**
+ * Automatically apply AI-generated tags to a note
+ */
+async function applyTagsToNote(
+  noteId: string,
+  content: string,
+  userId: string,
+  tenantId: string | null,
+  supabase: any
+): Promise<string[]> {
+  if (!OPENAI_API_KEY) {
+    console.warn("[Tag Application] OpenAI API key not configured, skipping tag application");
+    return [];
+  }
+
+  try {
+    console.log(`[Tag Application] Fetching existing tags for user ${userId}`);
+    
+    // Query user's existing tags
+    // Get all tags for this user (simpler approach - get all user tags)
+    let tagQuery = supabase
+      .from("Tag")
+      .select("name")
+      .eq("userId", userId)
+      .is("deletedAt", null);
+
+    if (tenantId) {
+      tagQuery = tagQuery.eq("tenantId", tenantId);
+    } else {
+      tagQuery = tagQuery.is("tenantId", null);
+    }
+
+    const { data: usedTags, error: tagsError } = await tagQuery;
+
+    if (tagsError) {
+      console.error("[Tag Application] Error fetching existing tags:", tagsError);
+      // Continue anyway - we can still generate tags
+    }
+
+    // Extract unique tag names
+    const existingTagNames = usedTags 
+      ? [...new Set(usedTags.map((tag: any) => tag.name).filter(Boolean))]
+      : [];
+
+    console.log(`[Tag Application] Found ${existingTagNames.length} existing tags`);
+
+    // Build prompt with existing user tags for context
+    const existingTagsSection = existingTagNames.length > 0
+      ? `\nUser's Existing Tags: ${existingTagNames.join(", ")}\n`
+      : "";
+
+    const contentPreview = content.substring(0, 1000); // Limit content for API
+
+    const prompt = `Analyze the following content and suggest 3-5 relevant tags for categorization.
+${existingTagsSection}
+Rules:
+- Prioritize suggesting relevant tags from the user's existing tags when appropriate
+- Only suggest new tags if the existing tags don't adequately describe the content
+- Return tags as short phrases (1-3 words max)
+- Focus on: topics, themes, categories, projects
+- Make tags actionable and searchable
+- Return ONLY tag names, comma-separated
+- No explanations, no numbering
+
+Content:
+${contentPreview}
+
+Tags:`;
+
+    console.log("[Tag Application] Calling OpenAI API for tag generation...");
+    const openaiResponse = await fetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant that suggests relevant tags for notes and thoughts.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        }),
+      }
+    );
+
+    if (!openaiResponse.ok) {
+      const errorBody = await openaiResponse.text();
+      console.error("[Tag Application] OpenAI API error:", {
+        status: openaiResponse.status,
+        statusText: openaiResponse.statusText,
+        body: errorBody,
+      });
+      return [];
+    }
+
+    const openaiData = await openaiResponse.json();
+    const suggestionsText = openaiData.choices[0]?.message?.content?.trim() || "";
+
+    console.log(`[Tag Application] OpenAI response: ${suggestionsText}`);
+
+    // Parse tags from response
+    const suggestedTags = suggestionsText
+      .split(",")
+      .map((tag: string) => tag.trim())
+      .filter((tag: string) => tag.length > 0 && tag.length < 50)
+      .slice(0, 5); // Max 5 tags
+
+    if (suggestedTags.length === 0) {
+      console.warn("[Tag Application] No valid tags generated from AI");
+      return [];
+    }
+
+    console.log(`[Tag Application] Parsed ${suggestedTags.length} tags: ${suggestedTags.join(", ")}`);
+
+    // Apply each tag to the note
+    const appliedTags: string[] = [];
+
+    for (const tagName of suggestedTags) {
+      try {
+        // Find existing tag (case-insensitive)
+        let tagQuery = supabase
+          .from("Tag")
+          .select("id, name")
+          .eq("userId", userId)
+          .is("deletedAt", null)
+          .ilike("name", tagName); // Case-insensitive search
+
+        if (tenantId) {
+          tagQuery = tagQuery.eq("tenantId", tenantId);
+        } else {
+          tagQuery = tagQuery.is("tenantId", null);
+        }
+
+        const { data: existingTags, error: findError } = await tagQuery.limit(1);
+
+        let tagId: string;
+
+        if (findError || !existingTags || existingTags.length === 0) {
+          // Create new tag
+          console.log(`[Tag Application] Creating new tag: ${tagName}`);
+          const { data: newTag, error: createError } = await supabase
+            .from("Tag")
+            .insert({
+              name: tagName,
+              userId: userId,
+              tenantId: tenantId,
+              status: "ENABLE",
+              createdBy: userId,
+              updatedBy: userId,
+            })
+            .select()
+            .single();
+
+          if (createError || !newTag) {
+            console.error(`[Tag Application] Error creating tag ${tagName}:`, createError);
+            continue;
+          }
+
+          tagId = newTag.id;
+        } else {
+          // Use existing tag
+          tagId = existingTags[0].id;
+          console.log(`[Tag Application] Using existing tag: ${tagName} (${tagId})`);
+        }
+
+        // Check if NoteTag link already exists
+        const { data: existingLink, error: linkError } = await supabase
+          .from("NoteTag")
+          .select("deletedAt")
+          .eq("noteId", noteId)
+          .eq("tagId", tagId)
+          .single();
+
+        if (linkError && linkError.code !== "PGRST116") {
+          // PGRST116 = not found, which is fine
+          console.error(`[Tag Application] Error checking NoteTag link:`, linkError);
+          continue;
+        }
+
+        if (existingLink) {
+          if (existingLink.deletedAt) {
+            // Restore soft-deleted link
+            console.log(`[Tag Application] Restoring soft-deleted link for tag: ${tagName}`);
+            const { error: updateError } = await supabase
+              .from("NoteTag")
+              .update({
+                deletedAt: null,
+                source: "AI_SUGGESTED",
+                updatedBy: userId,
+              })
+              .eq("noteId", noteId)
+              .eq("tagId", tagId);
+
+            if (updateError) {
+              console.error(`[Tag Application] Error restoring NoteTag link:`, updateError);
+              continue;
+            }
+          } else {
+            // Already linked, skip
+            console.log(`[Tag Application] Tag ${tagName} already linked, skipping`);
+            continue;
+          }
+        } else {
+          // Create new NoteTag link
+          console.log(`[Tag Application] Creating NoteTag link for: ${tagName}`);
+          const { error: insertError } = await supabase
+            .from("NoteTag")
+            .insert({
+              noteId: noteId,
+              tagId: tagId,
+              tenantId: tenantId,
+              source: "AI_SUGGESTED",
+              createdBy: userId,
+              updatedBy: userId,
+            });
+
+          if (insertError) {
+            console.error(`[Tag Application] Error creating NoteTag link:`, insertError);
+            continue;
+          }
+        }
+
+        appliedTags.push(tagName);
+      } catch (tagError) {
+        console.error(`[Tag Application] Error processing tag ${tagName}:`, tagError);
+        // Continue with next tag
+      }
+    }
+
+    console.log(`[Tag Application] Successfully applied ${appliedTags.length} tags`);
+    return appliedTags;
+  } catch (error) {
+    console.error("[Tag Application] Error in tag application:", error);
+    return [];
+  }
 }
 
 /**
