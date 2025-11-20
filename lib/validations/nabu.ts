@@ -225,3 +225,38 @@ export type ThoughtCreate = z.infer<typeof thoughtCreateSchema>;
 export type ThoughtUpdate = z.infer<typeof thoughtUpdateSchema>;
 export type ThoughtResponse = z.infer<typeof thoughtResponseSchema>;
 
+// ============================================================================
+// Webhook Schemas
+// ============================================================================
+
+export const webhookCreateSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  description: z.string().max(1000).optional(),
+});
+
+export const webhookUpdateSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+export const webhookResponseSchema = z.object({
+  id: z.string(),
+  tenantId: z.string().nullable(),
+  userId: z.string(),
+  token: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  deletedAt: z.date().nullable(),
+  _count: z.object({
+    processingJobs: z.number(),
+  }).optional(),
+});
+
+export type WebhookCreate = z.infer<typeof webhookCreateSchema>;
+export type WebhookUpdate = z.infer<typeof webhookUpdateSchema>;
+export type WebhookResponse = z.infer<typeof webhookResponseSchema>;
+

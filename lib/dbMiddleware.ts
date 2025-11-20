@@ -12,8 +12,8 @@ export const softDeleteAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        // Skip soft-delete behaviour for pure log / raw tables
-        if (model == "AuditLog" || model == "WhatsAppMessage" || model == "WhatsAppLinkToken") {
+        // Skip soft-delete behaviour for pure log / raw tables and job queues
+        if (model == "AuditLog" || model == "WhatsAppMessage" || model == "WhatsAppLinkToken" || model == "WebhookProcessingJob" || model == "EmbeddingJob" || model == "TagSuggestionJob") {
           return query(args);
         }
 
