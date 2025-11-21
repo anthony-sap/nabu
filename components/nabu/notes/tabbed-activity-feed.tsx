@@ -67,43 +67,21 @@ export function TabbedActivityFeed({ onNoteSelect, initialTab }: TabbedActivityF
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full flex flex-col">
-      {/* Tab Headers */}
-      <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
-        <TabsTrigger 
-          value="thoughts" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-        >
-          <Lightbulb className="h-4 w-4 mr-2" />
-          Thoughts
-        </TabsTrigger>
-        <TabsTrigger 
-          value="notes"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-        >
-          <FileText className="h-4 w-4 mr-2" />
-          Notes
-        </TabsTrigger>
-      </TabsList>
-
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <TabsContent value="thoughts" className="h-full mt-0 data-[state=inactive]:hidden flex flex-col">
-          <ThoughtsActivityFeed 
-            activeTab={activeTab} 
-            onTabChange={handleTabChange}
-          />
-        </TabsContent>
-
-        <TabsContent value="notes" className="h-full mt-0 data-[state=inactive]:hidden flex flex-col">
-          <NotesActivityFeed 
-            onNoteSelect={onNoteSelect}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-          />
-        </TabsContent>
-      </div>
-    </Tabs>
+    <div className="h-full flex flex-col">
+      {/* Tab Content - tabs are now rendered inside each feed component */}
+      {activeTab === "thoughts" ? (
+        <ThoughtsActivityFeed 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+        />
+      ) : (
+        <NotesActivityFeed 
+          onNoteSelect={onNoteSelect}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
+      )}
+    </div>
   );
 }
 

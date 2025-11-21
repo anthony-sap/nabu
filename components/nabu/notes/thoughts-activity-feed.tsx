@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, Clock, Lightbulb, MoreVertical, FileText, CheckSquare, Square, Loader2, Eye, EyeOff } from "lucide-react";
 import {
   DropdownMenu,
@@ -272,6 +273,30 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
       {/* Quick capture form - fixed at top */}
       <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-6">
         <QuickCaptureForm onSaved={refreshThoughts} />
+      </div>
+
+      {/* Tabs - below quick capture */}
+      <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pb-4">
+        <Tabs value="thoughts" className="w-full">
+          <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-0">
+            <TabsTrigger 
+              value="thoughts" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              onClick={() => onTabChange?.("thoughts")}
+            >
+              <Lightbulb className="h-4 w-4 mr-2" />
+              Thoughts
+            </TabsTrigger>
+            <TabsTrigger 
+              value="notes"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              onClick={() => onTabChange?.("notes")}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Notes
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Scrollable content */}
