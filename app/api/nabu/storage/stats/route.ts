@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
         height: file.height,
         noteId: file.noteId,
         noteTitle: file.note.title,
-        noteUrl: `/nabu/notes/${file.noteId}`,
+        noteUrl: `/notes?noteId=${file.noteId}`,
         url: file.url,
         createdAt: file.createdAt,
       })),

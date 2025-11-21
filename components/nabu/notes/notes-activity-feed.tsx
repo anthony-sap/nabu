@@ -10,10 +10,10 @@
 import { useState, useEffect } from "react";
 import { Loader2, FileText, Plus, Lightbulb } from "lucide-react";
 import { NoteSummaryCard } from "./note-summary-card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -117,29 +117,31 @@ export function NotesActivityFeed({ onNoteSelect, activeTab, onTabChange }: Note
 
   return (
     <div className="h-full flex flex-col">
-      {/* Tab Triggers - at top of notes view */}
-      {onTabChange && (
-        <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-6">
-          <TabsList className="inline-flex bg-muted/30 p-1 rounded-lg border border-border/30">
-            <TabsTrigger
-              value="thoughts"
-              onClick={() => onTabChange("thoughts")}
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm"
+    
+
+      {/* Tabs - below quick capture */}
+      <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pb-4">
+        <Tabs value="notes" className="w-full">
+          <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-0">
+            <TabsTrigger 
+              value="thoughts" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              onClick={() => onTabChange?.("thoughts")}
             >
               <Lightbulb className="h-4 w-4 mr-2" />
               Thoughts
             </TabsTrigger>
-            <TabsTrigger
+            <TabsTrigger 
               value="notes"
-              onClick={() => onTabChange("notes")}
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              onClick={() => onTabChange?.("notes")}
             >
               <FileText className="h-4 w-4 mr-2" />
               Notes
             </TabsTrigger>
           </TabsList>
-        </div>
-      )}
+        </Tabs>
+      </div>
 
       {/* Header with Create Note button */}
       <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-4 pb-4">
@@ -152,7 +154,7 @@ export function NotesActivityFeed({ onNoteSelect, activeTab, onTabChange }: Note
             </Badge>
           </div>
           <Button
-            onClick={() => router.push("/nabu/notes?new=true")}
+            onClick={() => router.push("/notes?new=true")}
             size="sm"
             className="gap-2"
           >

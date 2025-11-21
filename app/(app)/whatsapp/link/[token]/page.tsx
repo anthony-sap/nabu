@@ -37,7 +37,7 @@ export default async function WhatsAppLinkPage({ params }: PageProps) {
   const authenticated = await isAuthenticated();
   if (!authenticated) {
     // Redirect to login with return URL
-    redirect(`/api/auth/login?returnUrl=/nabu/whatsapp/link/${token}`);
+    redirect(`/api/auth/login?returnUrl=/whatsapp/link/${token}`);
   }
 
   const user = await getUser();

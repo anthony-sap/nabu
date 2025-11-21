@@ -9,4 +9,3 @@ export default async function TrashRoute() {
   return <TrashPage />;
 }
 
-

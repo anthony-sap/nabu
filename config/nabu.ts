@@ -7,15 +7,15 @@ import { NavItem } from "types";
 export const nabuNavLinks: NavItem[] = [
   {
     title: "Notes",
-    href: "/nabu/notes",
+    href: "/notes",
   },
   {
     title: "Feed",
-    href: "/nabu",
+    href: "/",
   },
   {
     title: "Trash",
-    href: "/nabu/trash",
+    href: "/trash",
   },
 ];
 

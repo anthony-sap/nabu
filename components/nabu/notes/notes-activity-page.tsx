@@ -38,6 +38,7 @@ import {
 interface NotesActivityPageProps {
   initialNoteId?: string;
   initialThoughtId?: string;
+  initialTab?: "thoughts" | "notes";
 }
 
 /**
@@ -50,7 +51,7 @@ interface NotesActivityPageProps {
  * - Dual view system (feed vs folder/note detail)
  * - URL-based routing for notes and thoughts
  */
-export default function NotesActivityPage({ initialNoteId, initialThoughtId }: NotesActivityPageProps = {}) {
+export default function NotesActivityPage({ initialNoteId, initialThoughtId, initialTab }: NotesActivityPageProps = {}) {
   // Next.js navigation hooks
   const router = useRouter();
   const pathname = usePathname();
@@ -296,14 +297,14 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
               toast.error("Note not found", {
                 description: "This note may have been deleted or you don't have access to it."
               });
-              router.push('/nabu/notes');
+              router.push('/notes');
               return;
             }
             if (response.status === 403) {
               toast.error("Access denied", {
                 description: "You don't have permission to view this note."
               });
-              router.push('/nabu/notes');
+              router.push('/notes');
               return;
             }
             throw new Error('Failed to fetch note');
@@ -324,7 +325,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           toast.error("Failed to load note", {
             description: "An error occurred while loading the note. Please try again."
           });
-          router.push('/nabu/notes');
+          router.push('/notes');
         }
       }
       
@@ -337,14 +338,14 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
               toast.error("Thought not found", {
                 description: "This thought may have been deleted or you don't have access to it."
               });
-              router.push('/nabu/notes');
+              router.push('/notes');
               return;
             }
             if (response.status === 403) {
               toast.error("Access denied", {
                 description: "You don't have permission to view this thought."
               });
-              router.push('/nabu/notes');
+              router.push('/notes');
               return;
             }
             throw new Error('Failed to fetch thought');
@@ -358,12 +359,12 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           toast.error("Failed to load thought", {
             description: "An error occurred while loading the thought. Please try again."
           });
-          router.push('/nabu/notes');
+          router.push('/notes');
         }
       }
       
       // If no specific note/thought, show default view
-      else if (pathname === '/nabu/notes') {
+      else if (pathname === '/notes') {
         setView("feed");
         setEditingNote(null);
       }
@@ -391,10 +392,10 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   const handleSearchResultSelect = async (result: SearchResult) => {
     if (result.type === "note") {
       // Navigate to note URL using search params
-      router.push(`/nabu/notes?noteId=${result.id}`);
+      router.push(`/notes?noteId=${result.id}`);
     } else if (result.type === "thought") {
       // Navigate to thought URL using search params
-      router.push(`/nabu/notes?thoughtId=${result.id}`);
+      router.push(`/notes?thoughtId=${result.id}`);
     }
   };
 
@@ -575,7 +576,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
       setSelectedNote(null);
       setEditingNote(null);
       // Update URL to base /notes path
-      router.push('/nabu/notes');
+      router.push('/notes');
     }
   };
 
@@ -585,7 +586,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
   const handleNoteSelect = (item: FolderItem) => {
     if (item.type === "note") {
       // Navigate to note URL using search params (updates browser history)
-      router.push(`/nabu/notes?noteId=${item.id}`);
+      router.push(`/notes?noteId=${item.id}`);
     } else if (item.type === "folder") {
       // Folder clicked - just toggle it (no special view)
       toggleFolder(item.id);
@@ -767,7 +768,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
       addNoteToFolder(folderId, newNote);
       
       // Navigate to new note URL using search params
-      router.push(`/nabu/notes?noteId=${payload.data.id}`);
+      router.push(`/notes?noteId=${payload.data.id}`);
     } catch (error) {
       console.error("Failed to create note:", error);
       // TODO: Show error toast to user
@@ -813,7 +814,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
       await refreshFoldersAndNotes();
       
       // Navigate to new note URL using search params
-      router.push(`/nabu/notes?noteId=${payload.data.id}`);
+      router.push(`/notes?noteId=${payload.data.id}`);
     } catch (error) {
       console.error("Failed to create quick note:", error);
       toast.error("Failed to create note. Please try again.");
@@ -1267,6 +1268,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           <div className="flex-1 overflow-auto">
             {view === "feed" ? (
               <TabbedActivityFeed
+                initialTab={initialTab}
                 onNoteSelect={(noteId, folderId) => {
                   setEditingNote({ id: noteId, folderId });
                   setView("editor");
