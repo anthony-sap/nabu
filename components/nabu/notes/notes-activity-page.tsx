@@ -38,6 +38,7 @@ import {
 interface NotesActivityPageProps {
   initialNoteId?: string;
   initialThoughtId?: string;
+  initialTab?: "thoughts" | "notes";
 }
 
 /**
@@ -50,7 +51,7 @@ interface NotesActivityPageProps {
  * - Dual view system (feed vs folder/note detail)
  * - URL-based routing for notes and thoughts
  */
-export default function NotesActivityPage({ initialNoteId, initialThoughtId }: NotesActivityPageProps = {}) {
+export default function NotesActivityPage({ initialNoteId, initialThoughtId, initialTab }: NotesActivityPageProps = {}) {
   // Next.js navigation hooks
   const router = useRouter();
   const pathname = usePathname();
@@ -1267,6 +1268,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId }: N
           <div className="flex-1 overflow-auto">
             {view === "feed" ? (
               <TabbedActivityFeed
+                initialTab={initialTab}
                 onNoteSelect={(noteId, folderId) => {
                   setEditingNote({ id: noteId, folderId });
                   setView("editor");

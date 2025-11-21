@@ -8,12 +8,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, FileText, Plus, Lightbulb } from "lucide-react";
+import { Loader2, FileText, Plus } from "lucide-react";
 import { NoteSummaryCard } from "./note-summary-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -117,30 +116,6 @@ export function NotesActivityFeed({ onNoteSelect, activeTab, onTabChange }: Note
 
   return (
     <div className="h-full flex flex-col">
-      {/* Tab Triggers - at top of notes view */}
-      {onTabChange && (
-        <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-6">
-          <TabsList className="inline-flex bg-muted/30 p-1 rounded-lg border border-border/30">
-            <TabsTrigger
-              value="thoughts"
-              onClick={() => onTabChange("thoughts")}
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm"
-            >
-              <Lightbulb className="h-4 w-4 mr-2" />
-              Thoughts
-            </TabsTrigger>
-            <TabsTrigger
-              value="notes"
-              onClick={() => onTabChange("notes")}
-              className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Notes
-            </TabsTrigger>
-          </TabsList>
-        </div>
-      )}
-
       {/* Header with Create Note button */}
       <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-4 pb-4">
         <div className="flex items-center justify-between">
