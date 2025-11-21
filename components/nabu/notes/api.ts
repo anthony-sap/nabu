@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { FolderItem, NoteItem } from "./types";
 
 /**
@@ -142,16 +143,44 @@ export async function fetchFolderChildren(parentId: string, includeNotes = true)
 
 /**
  * Fetch notes for a specific folder
- * @param folderId - ID of the folder
+ * @param folderId - ID of the folder, or null/undefined for uncategorized notes
  * @returns Array of notes in the folder
  */
-export async function fetchFolderNotes(folderId: string): Promise<NoteItem[]> {
+export async function fetchFolderNotes(folderId: string | null | undefined): Promise<NoteItem[]> {
   try {
-    const response = await fetch(`/api/nabu/notes?folderId=${folderId}`);
+    // Normalize null/undefined to 'null' string for uncategorized notes
+    const normalizedFolderId = folderId === null || folderId === undefined ? 'null' : folderId;
+    
+    // Validate folderId format - should be 'null' or a valid CUID
+    if (normalizedFolderId !== 'null') {
+      if (!normalizedFolderId || typeof normalizedFolderId !== 'string') {
+        throw new Error(`Invalid folderId: ${folderId}. Expected a valid folder ID or null for uncategorized notes.`);
+      }
+      // Validate CUID format using zod (matches backend validation)
+      const cuidValidation = z.string().cuid().safeParse(normalizedFolderId);
+      if (!cuidValidation.success) {
+        throw new Error(`Invalid folderId format: ${folderId}. Expected a valid CUID or null for uncategorized notes.`);
+      }
+    }
+    
+    const response = await fetch(`/api/nabu/notes?folderId=${normalizedFolderId}`);
     
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to fetch notes: ${response.status}`);
+      // Read the actual error message from the API response body
+      let errorMessage = `Failed to fetch notes: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+        // Include validation details if available
+        if (errorData.message) {
+          errorMessage = `${errorMessage} - ${errorData.message}`;
+        }
+      } catch (parseError) {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+        console.error("Failed to parse error response:", parseError);
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

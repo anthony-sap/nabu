@@ -43,13 +43,13 @@ export function TabbedActivityFeed({ onNoteSelect, initialTab }: TabbedActivityF
       // Update URL to include default tab
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", initialTab);
-      router.replace(`/nabu/notes?${params.toString()}`, { scroll: false });
+      router.replace(`/notes?${params.toString()}`, { scroll: false });
     } else if (!tabFromUrl) {
       // Default to thoughts and update URL
       setActiveTab("thoughts");
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", "thoughts");
-      router.replace(`/nabu/notes?${params.toString()}`, { scroll: false });
+      router.replace(`/notes?${params.toString()}`, { scroll: false });
     }
   }, [searchParams, initialTab, router]);
 
@@ -63,7 +63,7 @@ export function TabbedActivityFeed({ onNoteSelect, initialTab }: TabbedActivityF
     // Update URL with new tab param, preserving other params
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", newTab);
-    router.push(`/nabu/notes?${params.toString()}`, { scroll: false });
+    router.push(`/notes?${params.toString()}`, { scroll: false });
   };
 
   return (

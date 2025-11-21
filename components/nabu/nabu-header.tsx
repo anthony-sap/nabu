@@ -13,7 +13,7 @@ export function NabuHeader() {
     <header className="sticky top-0 z-40 bg-[#0a1428]/70 backdrop-blur border-b border-white/5">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <div className="flex items-center gap-3">
-          <Link href="/nabu" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-2xl bg-[var(--nabu-deep)] relative shadow-inner ring-1 ring-white/10">
               <div className="absolute inset-1 rounded-2xl bg-[var(--nabu-deep)]"/>
               {/* Mint tablet minimal glyph */}

@@ -105,7 +105,7 @@ export function UserAccountNav() {
 
               <li className="text-foreground hover:bg-muted rounded-lg">
                 <Link
-                  href="/nabu/webhooks"
+                  href="/webhooks"
                   onClick={closeDrawer}
                   className="flex w-full items-center gap-3 px-2.5 py-2"
                 >
@@ -185,7 +185,7 @@ export function UserAccountNav() {
 
         <DropdownMenuItem asChild>
           <Link
-            href="/nabu/webhooks"
+            href="/webhooks"
             className="flex items-center space-x-2.5"
           >
             <Webhook className="size-4" />

@@ -79,8 +79,35 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
         setError(null);
         
         const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
+        
         if (!response.ok) {
-          throw new Error("Failed to fetch thoughts");
+          // Read the actual error message from the API response body
+          let errorMessage = `Failed to fetch thoughts (${response.status})`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+            // Include additional context if available
+            if (errorData.message && errorData.error !== errorData.message) {
+              errorMessage = `${errorData.error || errorMessage} - ${errorData.message}`;
+            }
+            // Log detailed error information for debugging
+            console.error("Thoughts API error:", {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData.error,
+              message: errorData.message,
+              fullResponse: errorData,
+            });
+          } catch (parseError) {
+            // If response is not JSON, try to get status text
+            errorMessage = response.statusText || errorMessage;
+            console.error("Failed to parse error response:", {
+              status: response.status,
+              statusText: response.statusText,
+              parseError,
+            });
+          }
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -90,6 +117,8 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
           setThoughts(sorted);
+        } else {
+          throw new Error("Invalid response format from server");
         }
       } catch (err) {
         console.error("Failed to load thoughts:", err);
@@ -111,8 +140,35 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
     const loadThoughts = async () => {
       try {
         const response = await fetch(`/api/nabu/thoughts?includePromoted=${showPromoted}`);
+        
         if (!response.ok) {
-          throw new Error("Failed to fetch thoughts");
+          // Read the actual error message from the API response body
+          let errorMessage = `Failed to fetch thoughts (${response.status})`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+            // Include additional context if available
+            if (errorData.message && errorData.error !== errorData.message) {
+              errorMessage = `${errorData.error || errorMessage} - ${errorData.message}`;
+            }
+            // Log detailed error information for debugging
+            console.error("Thoughts API error (refresh):", {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData.error,
+              message: errorData.message,
+              fullResponse: errorData,
+            });
+          } catch (parseError) {
+            // If response is not JSON, try to get status text
+            errorMessage = response.statusText || errorMessage;
+            console.error("Failed to parse error response (refresh):", {
+              status: response.status,
+              statusText: response.statusText,
+              parseError,
+            });
+          }
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -121,9 +177,13 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
           setThoughts(sorted);
+        } else {
+          throw new Error("Invalid response format from server");
         }
       } catch (err) {
         console.error("Failed to refresh thoughts:", err);
+        // Set error state so user can see what went wrong
+        setError(err instanceof Error ? err.message : "Failed to refresh thoughts");
       }
     };
 

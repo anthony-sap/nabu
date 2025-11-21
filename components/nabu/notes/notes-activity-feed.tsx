@@ -127,7 +127,7 @@ export function NotesActivityFeed({ onNoteSelect, activeTab, onTabChange }: Note
             </Badge>
           </div>
           <Button
-            onClick={() => router.push("/nabu/notes?new=true")}
+            onClick={() => router.push("/notes?new=true")}
             size="sm"
             className="gap-2"
           >

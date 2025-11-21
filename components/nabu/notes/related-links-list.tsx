@@ -62,7 +62,7 @@ export function RelatedLinksList({ links, onDeleteLink, onAddLink, className }: 
    * Handle click on link - navigate to note
    */
   const handleLinkClick = (link: LinkItem) => {
-    router.push(`/nabu/notes?noteId=${link.toNoteId}`);
+    router.push(`/notes?noteId=${link.toNoteId}`);
   };
 
   /**

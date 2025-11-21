@@ -711,7 +711,7 @@ export default function FAQPage() {
               <a href="/register">Get started free</a>
             </Button>
             <Button variant="outline" size="lg" className="border-white/15 hover:bg-white/5 hover:border-white/35 text-white">
-              <a href="/nabu">Learn more</a>
+              <a href="/">Learn more</a>
             </Button>
           </div>
         </div>
@@ -734,7 +734,7 @@ export default function FAQPage() {
             <div>
               <h3 className="text-sm font-semibold text-white mb-3">Product</h3>
               <ul className="space-y-2 text-sm text-white/60">
-                <li><a href="/nabu" className="hover:text-[var(--nabu-mint)] transition-colors">Features</a></li>
+                <li><a href="/" className="hover:text-[var(--nabu-mint)] transition-colors">Features</a></li>
                 <li><a href="/pricing" className="hover:text-[var(--nabu-mint)] transition-colors">Pricing</a></li>
                 <li><a href="/faq" className="hover:text-[var(--nabu-mint)] transition-colors">FAQ</a></li>
               </ul>

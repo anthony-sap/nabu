@@ -41,7 +41,7 @@ export function WhatsAppLinkConfirm({ token, phoneNumber, userId }: WhatsAppLink
       }
 
       // Success - redirect to thoughts page
-      router.push("/nabu/thoughts?linked=true");
+      router.push("/notes?tab=thoughts&linked=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -88,7 +88,7 @@ export function WhatsAppLinkConfirm({ token, phoneNumber, userId }: WhatsAppLink
           
           <Button
             variant="outline"
-            onClick={() => router.push("/nabu")}
+            onClick={() => router.push("/")}
             disabled={isLoading}
           >
             Cancel
