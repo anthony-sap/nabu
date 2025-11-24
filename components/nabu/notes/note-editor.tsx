@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Folder, Loader2, Check, AlertCircle, Trash2, Sparkles, X, History, Save } from "lucide-react";
 import { LexicalEditor, type MentionItem, type LinkItem } from "./lexical-editor";
 import { SourceInfo } from "./source-url-list";
 import { TagSuggestionNotification } from "./tag-suggestion-notification";
@@ -13,6 +13,9 @@ import { AddLinkDialog } from "./add-link-dialog";
 import { AddTagDialog } from "./add-tag-dialog";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { MetadataSidebar } from "./metadata-sidebar";
+import { ManualVersionDialog } from "./manual-version-dialog";
+import { VersionHistoryPanel } from "./version-history-panel";
+import { VersionPreviewModal } from "./version-preview-modal";
 import { toast } from "sonner";
 import { $getRoot, type LexicalEditor as LexicalEditorType } from "lexical";
 
@@ -149,6 +152,12 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
     content: string;
   }>>([]);
 
+  // Version history state
+  const [showManualVersionDialog, setShowManualVersionDialog] = useState(false);
+  const [showVersionHistoryPanel, setShowVersionHistoryPanel] = useState(false);
+  const [showVersionPreview, setShowVersionPreview] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
   
 
   /**
@@ -156,6 +165,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
    */
   useEffect(() => {
     loadNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId]);
 
   async function loadNote() {
@@ -777,6 +787,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
 
   /**
    * Save note to server (slower, persistent save)
+   * Also checks if a version snapshot should be created (every 5 minutes)
    */
   const saveToServer = useCallback(async () => {
     if (isLoading || saveStatus === "syncing") return;
@@ -808,6 +819,27 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
 
       // Remove from localStorage after successful server sync
       LocalStorageUtils.removeNote(noteId);
+
+      // Check if we should create an autosave version (every 5 minutes)
+      try {
+        const versionCheckResponse = await fetch(`/api/nabu/notes/${noteId}/versions/should-create`);
+        if (versionCheckResponse.ok) {
+          const { data } = await versionCheckResponse.json();
+          if (data?.shouldCreate) {
+            // Create autosave version in the background (fire-and-forget)
+            fetch(`/api/nabu/notes/${noteId}/versions`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reason: "autosave" }),
+            }).catch((err) => {
+              console.error("Failed to create autosave version:", err);
+            });
+          }
+        }
+      } catch (versionError) {
+        // Don't fail the save if version creation fails
+        console.error("Version check failed:", versionError);
+      }
 
       // Request tag suggestions if eligible (will create new job if pendingJobId is null)
       await requestTagSuggestions();
@@ -991,8 +1023,31 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           )}
         </div>
 
-        {/* Save status indicator and close button */}
+        {/* Save status indicator and action buttons */}
         <div className="flex items-center gap-3">
+          {/* Version control buttons */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowVersionHistoryPanel(!showVersionHistoryPanel)}
+            className="hover:bg-muted/50 transition-all duration-200"
+            title="View version history"
+          >
+            <History className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">History</span>
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowManualVersionDialog(true)}
+            className="hover:bg-muted/50 transition-all duration-200"
+            title="Save a manual version snapshot"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Save Version</span>
+          </Button>
+
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {saveStatus === "saved-locally" && lastSaved && (
               <>
@@ -1101,23 +1156,40 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         </ScrollArea>
 
         {/* Metadata Sidebar - Fixed/Scrollable independently */}
-        <div className="hidden lg:block w-[280px] border-l border-border/30 overflow-y-auto">
-          <div className="sticky top-0 px-6 py-8">
-            <MetadataSidebar
-              createdAt={createdAt}
-              tags={tags}
-              sourceUrls={sourceUrls}
-              links={links}
-              sourceThoughts={sourceThoughts}
-              onRemoveTag={handleRemoveTag}
-              onDeleteLink={handleDeleteLink}
-              onAddLink={handleAddLink}
-              onAddTag={handleAddTag}
-              onRequestTagSuggestions={handleRequestTagSuggestions}
-              isGeneratingTags={!!pendingJobId}
-            />
+        {!showVersionHistoryPanel && (
+          <div className="hidden lg:block w-[280px] border-l border-border/30 overflow-y-auto">
+            <div className="sticky top-0 px-6 py-8">
+              <MetadataSidebar
+                createdAt={createdAt}
+                tags={tags}
+                sourceUrls={sourceUrls}
+                links={links}
+                sourceThoughts={sourceThoughts}
+                onRemoveTag={handleRemoveTag}
+                onDeleteLink={handleDeleteLink}
+                onAddLink={handleAddLink}
+                onAddTag={handleAddTag}
+                onRequestTagSuggestions={handleRequestTagSuggestions}
+                isGeneratingTags={!!pendingJobId}
+              />
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Version History Panel - Replaces metadata sidebar when open */}
+        <VersionHistoryPanel
+          noteId={noteId}
+          isOpen={showVersionHistoryPanel}
+          onPreview={(versionId) => {
+            setSelectedVersionId(versionId);
+            setShowVersionPreview(true);
+          }}
+          onRestore={(versionId) => {
+            setSelectedVersionId(versionId);
+            setShowVersionPreview(true);
+          }}
+          className="hidden lg:block"
+        />
       </div>
 
       {/* Tag suggestion modal */}
@@ -1147,6 +1219,35 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
         onOpenChange={setShowAddTagDialog}
         noteId={noteId}
         onTagAdded={setTags}
+      />
+
+      {/* Manual version dialog */}
+      <ManualVersionDialog
+        open={showManualVersionDialog}
+        onOpenChange={setShowManualVersionDialog}
+        noteId={noteId}
+        onVersionCreated={() => {
+          toast.success("Version saved successfully");
+          // Force refresh of version history panel
+          setShowVersionHistoryPanel(false);
+          setTimeout(() => setShowVersionHistoryPanel(true), 100);
+        }}
+      />
+
+      {/* Version preview modal */}
+      <VersionPreviewModal
+        open={showVersionPreview}
+        onOpenChange={setShowVersionPreview}
+        noteId={noteId}
+        versionId={selectedVersionId}
+        onRestore={async (versionId) => {
+          // Reload the note after restore
+          await loadNote();
+          
+          // Refresh version history
+          setShowVersionHistoryPanel(false);
+          setTimeout(() => setShowVersionHistoryPanel(true), 100);
+        }}
       />
     </div>
   );
