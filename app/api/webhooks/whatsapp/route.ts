@@ -73,6 +73,49 @@ async function processWhatsAppWebhook(payload: any): Promise<void> {
     const metadata = payload.entry?.[0]?.changes?.[0]?.value?.metadata;
     const toPhoneNumberId = metadata?.phone_number_id || "";
 
+    // Find the WhatsApp integration to get tenantId and check entitlements
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { phoneNumberId: toPhoneNumberId },
+      include: { tenant: { include: { User: { take: 1 } } } },
+    });
+
+    if (!integration || !integration.tenant) {
+      console.error(`No WhatsApp integration found for phone number ID: ${toPhoneNumberId}`);
+      return;
+    }
+
+    // Check entitlements - get first user from tenant for entitlement check
+    const tenantUser = integration.tenant.User[0];
+    if (!tenantUser) {
+      console.error(`No user found for tenant: ${integration.tenantId}`);
+      return;
+    }
+
+    // Check if user has WhatsApp entitlement
+    const { getEntitlementsForUser } = await import("@/lib/entitlements/service");
+    const entitlements = await getEntitlementsForUser(tenantUser.id);
+    
+    if (!entitlements.canUseWhatsApp) {
+      console.warn(`WhatsApp message received but user ${tenantUser.id} does not have WhatsApp entitlement`);
+      // Still store the message but mark it with an error
+      await prisma.whatsAppMessage.create({
+        data: {
+          whatsappMessageId: message.messageId,
+          fromNumber: message.from,
+          toNumber: toPhoneNumberId,
+          messageType: message.type,
+          content: message.text?.body || message.image?.caption || null,
+          mediaUrl: null,
+          mimeType: message.image?.mime_type || message.audio?.mime_type || null,
+          rawPayload: message,
+          processed: true,
+          error: "WhatsApp integration not available on current plan",
+          tenantId: integration.tenantId,
+        },
+      });
+      return;
+    }
+
     // Store raw message for processing
     await prisma.whatsAppMessage.create({
       data: {
@@ -85,6 +128,7 @@ async function processWhatsAppWebhook(payload: any): Promise<void> {
         mimeType: message.image?.mime_type || message.audio?.mime_type || null,
         rawPayload: message,
         processed: false,
+        tenantId: integration.tenantId,
       },
     });
 

@@ -19,6 +19,34 @@ export async function POST(req: NextRequest) {
     const { userId, tenantId } = await getUserContext();
     const body = await req.json();
 
+    // Check entitlements
+    const { getEntitlementsForUser } = await import("@/lib/entitlements/service");
+    const entitlements = await getEntitlementsForUser(userId);
+    
+    if (!entitlements.canUseWebhooks) {
+      return errorResponse(
+        "Webhooks are not available on your current plan. Upgrade to Personal to use webhooks.",
+        403
+      );
+    }
+
+    // Check webhook endpoint limit
+    const existingWebhooks = await prisma.webhookEndpoint.count({
+      where: {
+        userId,
+        tenantId,
+        deletedAt: null,
+      },
+    });
+
+    const limit = entitlements.maxWebhookEndpoints;
+    if (limit !== 'unmetered' && typeof limit === 'number' && existingWebhooks >= limit) {
+      return errorResponse(
+        `You have reached your webhook endpoint limit (${limit}). Upgrade your plan for more endpoints.`,
+        403
+      );
+    }
+
     // Validate request body
     const validationResult = webhookCreateSchema.safeParse(body);
 

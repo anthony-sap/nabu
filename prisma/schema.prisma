@@ -112,6 +112,7 @@ model Tenant {
   webhookEndpoints     WebhookEndpoint[]
   webhookProcessingJobs WebhookProcessingJob[]
   NoteVersion         NoteVersion[]
+  UsageLog            UsageLog[]
 }
 
 model AuditLog {
@@ -190,6 +191,7 @@ model User {
   stripeSubscriptionId   String?         @unique @map(name: "stripe_subscription_id")
   stripePriceId          String?         @map(name: "stripe_price_id")
   stripeCurrentPeriodEnd DateTime?       @map(name: "stripe_current_period_end")
+  plan                   String          @default("free") // 'free' | 'personal' | 'teams'
   thoughts               Thought[]
   notes                  Note[]
   folders                Folder[]
@@ -197,6 +199,8 @@ model User {
   shares                 Share[]
   phoneLinks             UserPhoneLink[]
   webhookEndpoints        WebhookEndpoint[]
+  usageLogs              UsageLog[]
+  workspaceMemberships   WorkspaceMembership[]
 }
 
 model VerificationToken {
@@ -213,6 +217,7 @@ model Folder {
   tenant      Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?    // Phase 3: Team folders
   name        String
   color       String?
   description String?
@@ -229,6 +234,7 @@ model Folder {
   notes       Note[]
 
   @@index([tenantId, userId])
+  @@index([workspaceId])
 }
 
 model Tag {
@@ -237,6 +243,7 @@ model Tag {
   tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?  // Phase 3: Team tags
   name      String
   color     String?
   type      TagType?
@@ -249,7 +256,9 @@ model Tag {
   noteTags  NoteTag[]
 
   @@unique([tenantId, userId, name])
+  @@unique([workspaceId, name]) // Team tags are unique per workspace
   @@index([tenantId, userId])
+  @@index([workspaceId])
 }
 
 model Note {
@@ -258,6 +267,7 @@ model Note {
   tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId               String
   user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId          String?           // Phase 3: Team notes
   folderId             String?
   folder               Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
   title                String
@@ -291,6 +301,7 @@ model Note {
 
   @@index([tenantId, userId])
   @@index([folderId])
+  @@index([workspaceId])
 }
 
 model Thought {
@@ -299,6 +310,7 @@ model Thought {
   tenant               Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId               String
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId          String?       // Phase 3: Team thoughts
   noteId               String?
   note                 Note?         @relation(fields: [noteId], references: [id], onDelete: SetNull)
   content              String        @db.Text
@@ -321,6 +333,7 @@ model Thought {
 
   @@index([tenantId, userId])
   @@index([noteId])
+  @@index([workspaceId])
 }
 
 model NoteTag {
@@ -759,4 +772,126 @@ model NoteVersion {
   @@index([noteId, createdAt])
   @@index([noteId, reason])
   @@index([tenantId])
+}
+
+// Usage tracking for entitlements and billing
+model UsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  month      String   // '2025-11' format: YYYY-MM
+  metricType String   // 'ai_actions', 'automation_runs', 'webhook_calls', 'linked_docs'
+  count      Int      @default(0)
+  
+  // Audit fields
+  createdAt  DateTime @default(now())
+  createdBy  String?
+  updatedAt  DateTime @default(now()) @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  
+  @@unique([userId, tenantId, month, metricType])
+  @@index([userId, month])
+  @@index([tenantId, month])
+  @@index([metricType])
+}
+
+// Workspace models for Teams plan (Phase 3)
+model Workspace {
+  id             String   @id @default(cuid())
+  name           String
+  planCode       String   @default("teams") // 'teams'
+  billingMode    String   @default("self_service") // 'self_service' | 'offline_invoice'
+  customPlan     Boolean  @default(false)
+  
+  // Stripe billing (self-service)
+  stripeCustomerId       String?  @unique
+  stripeSubscriptionId   String?  @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Custom entitlements (Phase 4)
+  entitlementsOverride Json?
+  
+  // Contract info (Phase 4)
+  contractSeats        Int?
+  contractStart        DateTime?
+  contractEnd          DateTime?
+  paymentTermsDays     Int?
+  billingCompanyName   String?
+  billingContactEmail  String?
+  billingAddress       String?
+  
+  // Audit fields
+  createdAt    DateTime @default(now())
+  createdBy    String?
+  updatedAt    DateTime @default(now()) @updatedAt
+  updatedBy    String?
+  deletedAt    DateTime?
+  
+  memberships  WorkspaceMembership[]
+  invites      WorkspaceInvite[]
+  usageSnapshots WorkspaceUsageSnapshot[]
+  
+  @@index([planCode])
+  @@index([billingMode])
+}
+
+// Usage snapshots for workspace billing (Phase 4)
+model WorkspaceUsageSnapshot {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  month          String   // '2025-11' format: YYYY-MM
+  seats          Int      // Active seats
+  aiActions      Int      @default(0)
+  automationRuns Int      @default(0)
+  storageGB      Float    @default(0)
+  createdAt      DateTime @default(now())
+  
+  @@unique([workspaceId, month])
+  @@index([workspaceId])
+  @@index([month])
+}
+
+model WorkspaceMembership {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    // 'owner' | 'admin' | 'member' | 'guest'
+  status      String    @default("active") // 'pending' | 'active' | 'deactivated'
+  
+  invitedById String?
+  invitedAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([status])
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        String    // 'admin' | 'member' | 'guest'
+  token       String    @unique
+  expiresAt   DateTime
+  createdById String
+  createdAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
 }

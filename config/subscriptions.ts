@@ -1,20 +1,27 @@
 import { PlansRow, SubscriptionPlan } from "types";
 import { env } from "@/env";
 
+/**
+ * Pricing data aligned with entitlements tiers:
+ * - Free: "Capture & Find" - Solo use, great capture + powerful search
+ * - Personal: "Connected Brain" - Power user tier with integrations and AI
+ * - Teams: "Shared Brain & Workflows" - For teams with collaboration
+ */
 export const pricingData: SubscriptionPlan[] = [
   {
-    title: "Starter",
-    description: "For Beginners",
+    title: "Free",
+    description: "Capture & Find - Solo use, great capture + powerful search",
     benefits: [
-      "Up to 100 monthly posts",
-      "Basic analytics and reporting",
-      "Access to standard templates",
+      "Web capture, Notes, Folders, Tags",
+      "Hybrid search (full-text + embeddings)",
+      "AI tag suggestions",
+      "Rich text + images/screenshots",
+      "Version history",
     ],
     limitations: [
-      "No priority access to new features.",
-      "Limited customer support",
-      "No custom branding",
-      "Limited access to business resources.",
+      "No external integrations or automations",
+      "Limited manual AI actions (trial pack)",
+      "Limited note sharing recipients",
     ],
     prices: {
       monthly: 0,
@@ -26,18 +33,21 @@ export const pricingData: SubscriptionPlan[] = [
     },
   },
   {
-    title: "Pro",
-    description: "Unlock Advanced Features",
+    title: "Personal",
+    description: "Connected Brain - Power user tier with integrations and AI",
     benefits: [
-      "Up to 500 monthly posts",
-      "Advanced analytics and reporting",
-      "Access to business templates",
-      "Priority customer support",
-      "Exclusive webinars and training.",
+      "Everything in Free, plus:",
+      "WhatsApp integration",
+      "Inbound webhooks",
+      "AI chat inside Notes",
+      "Manual AI actions (summarize, expand, questions, tasks) with good quota",
+      "Linked AI docs (agendas, briefs, follow-up drafts)",
+      "Basic note-triggered automations",
     ],
     limitations: [
-      "No custom branding",
-      "Limited access to business resources.",
+      "No team collaboration",
+      "No Microsoft Teams integration",
+      "No email/calendar ingestion",
     ],
     prices: {
       monthly: 15,
@@ -49,14 +59,18 @@ export const pricingData: SubscriptionPlan[] = [
     },
   },
   {
-    title: "Business",
-    description: "For Power Users",
+    title: "Teams",
+    description: "Shared Brain & Workflows - For teams with collaboration",
     benefits: [
-      "Unlimited posts",
-      "Real-time analytics and reporting",
-      "Access to all templates, including custom branding",
-      "24/7 business customer support",
-      "Personalized onboarding and account management.",
+      "Everything in Personal, plus:",
+      "Team workspaces with shared Folders/Tags",
+      "Real-time collaborative editing",
+      "Fine-grained folder/tag/note permissions",
+      "Microsoft Teams integration",
+      "Incoming email ingestion (workspace + per-user)",
+      "Calendar integration (meeting notes + context)",
+      "AI triggers & multi-step workflows",
+      "User management, role-based access, workspace analytics",
     ],
     limitations: [],
     prices: {
@@ -71,9 +85,9 @@ export const pricingData: SubscriptionPlan[] = [
 ];
 
 export const plansColumns = [
-  "starter",
-  "pro",
-  "business",
+  "free",
+  "personal",
+  "teams",
   "enterprise",
 ] as const;
 

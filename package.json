@@ -18,6 +18,7 @@
     "prisma": "prisma",
     "postinstall": "prisma generate",
     "seed": "tsx run.ts scripts/seed.ts",
+    "seed:test-users": "tsx run.ts scripts/seed-test-users.ts",
     "tsx": "tsx run.ts",
     "promptfoo:eval": "promptfoo eval -c .promptfoo/promptfooconfig.yaml",
     "promptfoo:eval:title-single": "promptfoo eval -c .promptfoo/promptfooconfig-title-single.yaml",
