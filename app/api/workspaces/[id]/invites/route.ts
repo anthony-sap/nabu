@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { getUserContext, successResponse, errorResponse, handleApiError } from "@/lib/nabu-helpers";
 import { getEntitlementsForWorkspace } from "@/lib/entitlements/service";
 import { canManageMembers } from "@/lib/workspace/permissions";
+import { sendInviteEmail } from "@/lib/email/send-invite";
 import crypto from "crypto";
 
 /**
@@ -71,6 +72,16 @@ export async function POST(
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
+    // Get inviter info for email
+    const inviter = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+
+    const inviterName = inviter?.firstName && inviter?.lastName
+      ? `${inviter.firstName} ${inviter.lastName}`
+      : inviter?.email || "A team member";
+
     // Create invite
     const invite = await prisma.workspaceInvite.create({
       data: {
@@ -83,8 +94,19 @@ export async function POST(
       },
     });
 
-    // TODO: Send email with invite link
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invites/${token}`;
+    // Send invite email (async, don't block response)
+    sendInviteEmail({
+      recipientEmail: invite.email,
+      workspaceName: workspace?.name || "Unknown Workspace",
+      inviterName,
+      role: invite.role,
+      inviteToken: token,
+      expiresAt,
+    }).catch((err) => {
+      console.error("[Invite] Failed to send invite email:", err);
+    });
+
+    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`;
 
     return NextResponse.json(
       successResponse(

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Color from "color";
 import { Loader2, Search } from "lucide-react";
@@ -13,7 +13,7 @@ import { SearchDialog } from "./search-dialog";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { FolderItem, NoteItem } from "./types";
 import { SearchResult } from "./types-search";
-import { fetchRootFolders, fetchFolderChildren, fetchFolderNotes } from "./api";
+import { fetchRootFolders, fetchFolderChildren, fetchFolderNotes, fetchGroupedFolders, WorkspaceSection } from "./api";
 import { FolderStateStorage } from "./folder-state-storage";
 import {
   Dialog,
@@ -39,6 +39,7 @@ interface NotesActivityPageProps {
   initialNoteId?: string;
   initialThoughtId?: string;
   initialTab?: "thoughts" | "notes";
+  createNewNote?: boolean;
 }
 
 /**
@@ -51,7 +52,7 @@ interface NotesActivityPageProps {
  * - Dual view system (feed vs folder/note detail)
  * - URL-based routing for notes and thoughts
  */
-export default function NotesActivityPage({ initialNoteId, initialThoughtId, initialTab }: NotesActivityPageProps = {}) {
+export default function NotesActivityPage({ initialNoteId, initialThoughtId, initialTab, createNewNote }: NotesActivityPageProps = {}) {
   // Next.js navigation hooks
   const router = useRouter();
   const pathname = usePathname();
@@ -63,6 +64,12 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
   
   // Root-level notes (uncategorised)
   const [rootNotes, setRootNotes] = useState<NoteItem[]>([]);
+  
+  // Workspace sections (teams folders)
+  const [workspaces, setWorkspaces] = useState<WorkspaceSection[]>([]);
+  
+  // Expanded sidebar sections (personal + workspace IDs)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['personal']));
   
   // Loading state for initial folder fetch
   const [isLoadingFolders, setIsLoadingFolders] = useState(true);
@@ -156,40 +163,34 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
   };
 
   /**
-   * Load folders from API on component mount
+   * Load folders from API on component mount (grouped by personal/workspaces)
    */
   useEffect(() => {
     const loadFolders = async () => {
       try {
         setIsLoadingFolders(true);
         setFolderLoadError(null);
-        const rootFolders = await fetchRootFolders();
         
-        // Extract userId from the first folder (if any) for localStorage scoping
-        const firstFolder = rootFolders[0];
-        if (firstFolder && 'userId' in firstFolder) {
-          const userIdFromFolder = (firstFolder as any).userId;
-          setUserId(userIdFromFolder);
-          
-          // Load persisted folder state
-          const savedState = FolderStateStorage.load(userIdFromFolder);
-          
-          if (savedState) {
-            // Apply expanded states
-            let foldersWithState = applyExpandedState(rootFolders, savedState.expandedFolderIds);
-            
-            // Apply cached notes
-            foldersWithState = applyCachedNotes(foldersWithState, savedState.loadedNotesCache);
-            
-            // Clean up expired cache entries
-            FolderStateStorage.cleanupExpired(userIdFromFolder);
-            
-            setFolders(sortFolderItems(foldersWithState));
-          } else {
-            setFolders(sortFolderItems(rootFolders));
-          }
-        } else {
-          setFolders(sortFolderItems(rootFolders));
+        // Fetch grouped folders (personal + workspaces)
+        const grouped = await fetchGroupedFolders();
+        
+        // Set personal folders
+        const personalFolders = grouped.personal.folders;
+        setFolders(sortFolderItems(personalFolders));
+        
+        // Set personal uncategorised notes
+        setRootNotes(grouped.personal.uncategorisedNotes);
+        
+        // Set workspace sections
+        setWorkspaces(grouped.workspaces);
+        
+        // Expand all workspace sections by default if user has any
+        if (grouped.workspaces.length > 0) {
+          setExpandedSections(prev => {
+            const newSet = new Set(prev);
+            grouped.workspaces.forEach(ws => newSet.add(ws.id));
+            return newSet;
+          });
         }
       } catch (error) {
         console.error('Failed to load folders:', error);
@@ -203,68 +204,42 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
     loadFolders();
   }, []);
 
-  /**
-   * Load root-level notes (uncategorised) on component mount
-   */
-  useEffect(() => {
-    const loadRootNotes = async () => {
-      try {
-        const response = await fetch('/api/nabu/notes?folderId=null');
-        if (!response.ok) {
-          //throw new Error('Failed to fetch root notes');
-          
-        }
-        const data = await response.json();
-        if (data.success && data.data.notes) {
-          setRootNotes(data.data.notes.map((note: any) => ({
-            id: note.id,
-            title: note.title,
-            createdAt: note.createdAt,
-            updatedAt: note.updatedAt,
-          })));
-        }
-      } catch (error) {
-        console.error('Failed to load root notes:', error);
-      }
-    };
-
-    loadRootNotes();
-  }, []);
-
   // localStorage logic removed - now using database-backed thoughts from API
 
   /**
-   * Refresh folder tree and root notes
+   * Refresh folder tree and root notes (grouped by personal/workspaces)
    * Used after bulk operations like auto-move
    */
   const refreshFoldersAndNotes = async () => {
     try {
-      // Reload folders
-      const rootFolders = await fetchRootFolders();
+      const grouped = await fetchGroupedFolders();
       
       // Clear and refresh localStorage cache when data changes
       if (userId) {
         FolderStateStorage.clear(userId);
       }
       
-      setFolders(sortFolderItems(rootFolders));
-      
-      // Reload root notes
-      const notesResponse = await fetch('/api/nabu/notes?folderId=null');
-      if (notesResponse.ok) {
-        const data = await notesResponse.json();
-        if (data.success && data.data.notes) {
-          setRootNotes(data.data.notes.map((note: any) => ({
-            id: note.id,
-            title: note.title,
-            createdAt: note.createdAt,
-            updatedAt: note.updatedAt,
-          })));
-        }
-      }
+      setFolders(sortFolderItems(grouped.personal.folders));
+      setRootNotes(grouped.personal.uncategorisedNotes);
+      setWorkspaces(grouped.workspaces);
     } catch (error) {
       console.error('Failed to refresh folders and notes:', error);
     }
+  };
+
+  /**
+   * Toggle sidebar section expand/collapse
+   */
+  const handleSectionToggle = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
   };
 
   /**
@@ -377,6 +352,17 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
   }, [initialNoteId, initialThoughtId, isLoadingFolders, router, pathname]);
 
   /**
+   * Handle createNewNote prop - triggers quick note creation when ?new=true is in URL
+   */
+  useEffect(() => {
+    if (createNewNote && !isLoadingFolders) {
+      // Call handleQuickNote which creates the note and navigates to it
+      handleQuickNote();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createNewNote, isLoadingFolders]);
+
+  /**
    * Handle browser back/forward navigation
    * Detects URL changes from browser navigation and updates the view accordingly
    */
@@ -385,6 +371,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
     // The initialNoteId/initialThoughtId props will change, triggering the previous useEffect
     // This ensures the UI stays in sync with the URL
   }, [pathname]);
+
 
   /**
    * Handle search result selection
@@ -1224,6 +1211,7 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
         <NotesSidebar
           folders={folders}
           rootNotes={rootNotes}
+          workspaces={workspaces}
           view={view}
           selectedNote={selectedNote}
           editingNoteId={editingNote?.id || null}
@@ -1241,6 +1229,8 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
           onRefreshFolders={refreshFoldersAndNotes}
           isLoadingFolders={isLoadingFolders}
           folderLoadError={folderLoadError}
+          expandedSections={expandedSections}
+          onSectionToggle={handleSectionToggle}
         />
 
         {/* Main Content Area with top header integrated */}

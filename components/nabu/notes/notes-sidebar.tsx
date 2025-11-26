@@ -3,7 +3,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Home, AlertCircle, FileText, Trash2, Loader2 } from "lucide-react";
+import { Sparkles, Home, AlertCircle, FileText, Trash2, Loader2, ChevronDown, ChevronRight, Users, User } from "lucide-react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
@@ -19,28 +19,43 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 /**
+ * Workspace data structure for sidebar
+ */
+interface WorkspaceSection {
+  id: string;
+  name: string;
+  role: string;
+  folders: FolderItemType[];
+  uncategorisedNotes: NoteItem[];
+}
+
+/**
  * Props for the NotesSidebar component
  */
 interface NotesSidebarProps {
   folders: FolderItemType[];
   rootNotes: NoteItem[];
+  workspaces?: WorkspaceSection[]; // Workspace sections with their folders
   view: "feed" | "folders" | "editor";
   selectedNote: FolderItemType | null;
   editingNoteId?: string | null;
   onViewChange: (view: "feed" | "folders" | "editor") => void;
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
-  onAddFolder?: (parentId: string | null) => void;
-  onAddNote?: (folderId: string) => void;
+  onAddFolder?: (parentId: string | null, workspaceId?: string | null) => void;
+  onAddNote?: (folderId: string, workspaceId?: string | null) => void;
   onQuickNote?: () => void; // Callback to create a quick note
   onEditFolder?: (folderId: string) => void;
   onDeleteFolder?: (folderId: string) => void;
   onDeleteNote?: (noteId: string) => void;
-  onMoveFolder?: (folderId: string, newParentId: string | null) => void;
-  onMoveNote?: (noteId: string, newFolderId: string | null) => void;
+  onMoveFolder?: (folderId: string, newParentId: string | null, workspaceId?: string | null) => void;
+  onMoveNote?: (noteId: string, newFolderId: string | null, workspaceId?: string | null) => void;
   onRefreshFolders?: () => Promise<void>; // Callback to refresh folder tree and root notes
   isLoadingFolders?: boolean;
   folderLoadError?: string | null;
+  // Section expand/collapse state
+  expandedSections?: Set<string>; // 'personal' | workspace IDs
+  onSectionToggle?: (sectionId: string) => void;
 }
 
 /**
@@ -179,6 +194,7 @@ function UncategorisedNote({
 export function NotesSidebar({
   folders,
   rootNotes,
+  workspaces = [],
   view,
   selectedNote,
   editingNoteId,
@@ -196,6 +212,8 @@ export function NotesSidebar({
   onRefreshFolders,
   isLoadingFolders,
   folderLoadError,
+  expandedSections = new Set(['personal']),
+  onSectionToggle,
 }: NotesSidebarProps) {
   const router = useRouter();
   const [isRootDropTarget, setIsRootDropTarget] = useState(false);
@@ -447,29 +465,7 @@ export function NotesSidebar({
 
           <Separator className="my-3 bg-border/30" />
 
-          {/* Section label */}
-          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-            Folders
-          </div>
-
-          {/* Root-level new folder - also serves as drop zone for moving folders to root */}
-          {onAddFolder && !isLoadingFolders && (
-            <button
-              ref={rootDropZoneRef}
-              type="button"
-              onClick={() => onAddFolder(null)}
-              className={`flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs font-medium transition-all duration-200 ${
-                isRootDropTarget
-                  ? "border-primary bg-primary/20 text-primary shadow-sm"
-                  : "border-border/50 bg-background/50 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary backdrop-blur"
-              }`}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              New Folder
-            </button>
-          )}
-          
-          {/* Loading state - 5 skeleton folders */}
+          {/* Loading state */}
           {isLoadingFolders && (
             <div className="space-y-1.5 mt-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -489,115 +485,246 @@ export function NotesSidebar({
             </div>
           )}
 
-          {/* Folder hierarchy */}
+          {/* Personal Section */}
           {!isLoadingFolders && !folderLoadError && (
-            <div className="space-y-0.5 mt-2">
-              {folders.map((folder) => (
-                <FolderItem
-                  key={folder.id}
-                  item={folder}
-                  level={0}
-                  onToggle={onFolderToggle}
-                  onSelect={(item) => {
-                    onViewChange("folders");
-                    onNoteSelect(item);
-                  }}
-                    selectedId={selectedNote?.id || null}
-                    editingNoteId={editingNoteId}
-                    onAddFolder={onAddFolder}
-                    onAddNote={onAddNote}
-                    onEditFolder={onEditFolder}
-                    onDeleteFolder={onDeleteFolder}
-                    onDeleteNote={onDeleteNote}
-                  onMoveFolder={onMoveFolder}
-                  onMoveNote={onMoveNote}
-                  allFolders={folders}
-                  />
-              ))}
+            <div className="space-y-0.5">
+              {/* Personal section header - collapsible */}
+              <button
+                type="button"
+                onClick={() => onSectionToggle?.('personal')}
+                className="flex w-full items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-all duration-200 group"
+              >
+                {expandedSections.has('personal') ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-primary" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-primary" />
+                )}
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-primary flex-1 text-left">Personal</span>
+                <span className="text-xs text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded">
+                  {folders.length + rootNotes.length}
+                </span>
+              </button>
+
+              {/* Personal folders and notes - shown when expanded */}
+              {expandedSections.has('personal') && (
+                <div className="pl-2">
+                  {/* New folder button */}
+                  {onAddFolder && (
+                    <button
+                      ref={rootDropZoneRef}
+                      type="button"
+                      onClick={() => onAddFolder(null, null)}
+                      className={`flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 mb-1 ${
+                        isRootDropTarget
+                          ? "border-primary bg-primary/20 text-primary shadow-sm"
+                          : "border-primary/40 bg-primary/5 text-primary/80 hover:border-primary hover:bg-primary/15 hover:text-primary"
+                      }`}
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      New Folder
+                    </button>
+                  )}
+
+                  {/* Personal folder hierarchy */}
+                  <div className="space-y-0.5">
+                    {folders.map((folder) => (
+                      <FolderItem
+                        key={folder.id}
+                        item={folder}
+                        level={0}
+                        onToggle={onFolderToggle}
+                        onSelect={(item) => {
+                          onViewChange("folders");
+                          onNoteSelect(item);
+                        }}
+                        selectedId={selectedNote?.id || null}
+                        editingNoteId={editingNoteId}
+                        onAddFolder={onAddFolder ? (parentId) => onAddFolder(parentId, null) : undefined}
+                        onAddNote={onAddNote ? (folderId) => onAddNote(folderId, null) : undefined}
+                        onEditFolder={onEditFolder}
+                        onDeleteFolder={onDeleteFolder}
+                        onDeleteNote={onDeleteNote}
+                        onMoveFolder={onMoveFolder ? (folderId, newParentId) => onMoveFolder(folderId, newParentId, null) : undefined}
+                        onMoveNote={onMoveNote ? (noteId, newFolderId) => onMoveNote(noteId, newFolderId, null) : undefined}
+                        allFolders={folders}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Personal Uncategorised section */}
+                  <div className="space-y-0.5 mt-2">
+                    <div className="group">
+                      <UncategorisedHeader
+                        noteCount={rootNotes.length}
+                        selectedCount={selectedNoteIds.size}
+                        mode={uncategorisedMode}
+                        onModeChange={handleModeChange}
+                        isDragOver={isRootDropTarget}
+                      />
+                    </div>
+
+                    {/* Bulk move controls */}
+                    {uncategorisedMode === 'bulk' && rootNotes.length > 0 && (
+                      <BulkMoveControls
+                        totalNotes={rootNotes.length}
+                        selectedCount={selectedNoteIds.size}
+                        onSelectAll={handleSelectAll}
+                        onDeselectAll={handleDeselectAll}
+                      />
+                    )}
+
+                    {/* Auto-move controls */}
+                    {uncategorisedMode === 'auto' && rootNotes.length > 0 && (
+                      <div className="px-3 py-2 space-y-2">
+                        <BulkMoveControls
+                          totalNotes={rootNotes.length}
+                          selectedCount={selectedNoteIds.size}
+                          onSelectAll={handleSelectAll}
+                          onDeselectAll={handleDeselectAll}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleAnalyzeAutoMove}
+                          disabled={selectedNoteIds.size === 0 || isAnalyzing}
+                          className="w-full h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                              Analyze & Move
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Notes list with drag target */}
+                    <div ref={uncategorisedRef}>
+                      {rootNotes.length > 0 ? (
+                        rootNotes.map((note) => (
+                          <UncategorisedNote
+                            key={note.id}
+                            note={note}
+                            editingNoteId={editingNoteId}
+                            onNoteSelect={onNoteSelect}
+                            onDeleteNote={onDeleteNote}
+                            showCheckbox={uncategorisedMode !== 'normal'}
+                            isSelected={selectedNoteIds.has(note.id)}
+                            onToggleSelection={handleToggleSelection}
+                            selectedNoteIds={Array.from(selectedNoteIds)}
+                          />
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-center text-xs text-muted-foreground">
+                          No uncategorised notes
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Uncategorised section - always visible as drop target */}
-          {!isLoadingFolders && (
-            <>
-              <Separator className="my-3 bg-border/30" />
-              <div className="space-y-0.5">
-                {/* Header with mode switcher */}
-                <div className="group">
-                  <UncategorisedHeader
-                    noteCount={rootNotes.length}
-                    selectedCount={selectedNoteIds.size}
-                    mode={uncategorisedMode}
-                    onModeChange={handleModeChange}
-                    isDragOver={isRootDropTarget}
-                  />
-                </div>
-
-                {/* Bulk move controls */}
-                {uncategorisedMode === 'bulk' && rootNotes.length > 0 && (
-                  <BulkMoveControls
-                    totalNotes={rootNotes.length}
-                    selectedCount={selectedNoteIds.size}
-                    onSelectAll={handleSelectAll}
-                    onDeselectAll={handleDeselectAll}
-                  />
+          {/* Workspace Sections */}
+          {!isLoadingFolders && !folderLoadError && workspaces.map((workspace) => (
+            <div key={workspace.id} className="space-y-0.5 mt-2">
+              {/* Workspace section header - collapsible */}
+              <button
+                type="button"
+                onClick={() => onSectionToggle?.(workspace.id)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all duration-200 group"
+              >
+                {expandedSections.has(workspace.id) ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-amber-500" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-amber-500" />
                 )}
+                <Users className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-semibold text-amber-500 flex-1 text-left truncate">
+                  {workspace.name}
+                </span>
+                <span className="text-xs text-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  {workspace.folders.length + workspace.uncategorisedNotes.length}
+                </span>
+              </button>
 
-                {/* Auto-move controls */}
-                {uncategorisedMode === 'auto' && rootNotes.length > 0 && (
-                  <div className="px-3 py-2 space-y-2">
-                    <BulkMoveControls
-                      totalNotes={rootNotes.length}
-                      selectedCount={selectedNoteIds.size}
-                      onSelectAll={handleSelectAll}
-                      onDeselectAll={handleDeselectAll}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleAnalyzeAutoMove}
-                      disabled={selectedNoteIds.size === 0 || isAnalyzing}
-                      className="w-full h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+              {/* Workspace folders and notes - shown when expanded */}
+              {expandedSections.has(workspace.id) && (
+                <div className="pl-2">
+                  {/* New folder button for workspace */}
+                  {onAddFolder && (
+                    <button
+                      type="button"
+                      onClick={() => onAddFolder(null, workspace.id)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 mb-1 border-amber-500/40 bg-amber-500/5 text-amber-500/80 hover:border-amber-500 hover:bg-amber-500/15 hover:text-amber-500"
                     >
-                      {isAnalyzing ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                          Analyze & Move
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Notes list with drag target - always render drop zone */}
-                <div ref={uncategorisedRef}>
-                  {rootNotes.length > 0 ? (
-                    rootNotes.map((note) => (
-                      <UncategorisedNote
-                        key={note.id}
-                        note={note}
-                        editingNoteId={editingNoteId}
-                        onNoteSelect={onNoteSelect}
-                        onDeleteNote={onDeleteNote}
-                        showCheckbox={uncategorisedMode !== 'normal'}
-                        isSelected={selectedNoteIds.has(note.id)}
-                        onToggleSelection={handleToggleSelection}
-                        selectedNoteIds={Array.from(selectedNoteIds)}
-                      />
-                    ))
-                  ) : (
-                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                      No uncategorised notes
-                    </div>
+                      <Sparkles className="h-3 w-3" />
+                      New Folder
+                    </button>
                   )}
+
+                  {/* Workspace folder hierarchy */}
+                  <div className="space-y-0.5">
+                    {workspace.folders.map((folder) => (
+                      <FolderItem
+                        key={folder.id}
+                        item={folder}
+                        level={0}
+                        onToggle={onFolderToggle}
+                        onSelect={(item) => {
+                          onViewChange("folders");
+                          onNoteSelect(item);
+                        }}
+                        selectedId={selectedNote?.id || null}
+                        editingNoteId={editingNoteId}
+                        onAddFolder={onAddFolder ? (parentId) => onAddFolder(parentId, workspace.id) : undefined}
+                        onAddNote={onAddNote ? (folderId) => onAddNote(folderId, workspace.id) : undefined}
+                        onEditFolder={onEditFolder}
+                        onDeleteFolder={onDeleteFolder}
+                        onDeleteNote={onDeleteNote}
+                        onMoveFolder={onMoveFolder ? (folderId, newParentId) => onMoveFolder(folderId, newParentId, workspace.id) : undefined}
+                        onMoveNote={onMoveNote ? (noteId, newFolderId) => onMoveNote(noteId, newFolderId, workspace.id) : undefined}
+                        allFolders={workspace.folders}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Workspace Uncategorised section */}
+                  <div className="space-y-0.5 mt-2">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5" />
+                      Uncategorised
+                      <span className="ml-auto text-xs opacity-70">
+                        {workspace.uncategorisedNotes.length}
+                      </span>
+                    </div>
+                    {workspace.uncategorisedNotes.length > 0 ? (
+                      workspace.uncategorisedNotes.map((note) => (
+                        <UncategorisedNote
+                          key={note.id}
+                          note={note}
+                          editingNoteId={editingNoteId}
+                          onNoteSelect={onNoteSelect}
+                          onDeleteNote={onDeleteNote}
+                        />
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-center text-xs text-muted-foreground">
+                        No uncategorised notes
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              )}
+            </div>
+          ))}
         </div>
       </ScrollArea>
 

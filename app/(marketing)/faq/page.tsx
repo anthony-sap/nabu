@@ -366,7 +366,158 @@ export default function FAQPage() {
             </Accordion>
           </div>
 
-          {/* 7. COLLABORATION & SHARING */}
+          {/* 7. PLANS & UPGRADES */}
+          <div>
+            <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Plans & Upgrades</h2>
+            <Accordion type="single" collapsible className="space-y-4">
+              <AccordionItem value="available-plans" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  What plans are available?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Nabu offers three plans:
+                  </p>
+                  <ul className="space-y-2 ml-4">
+                    <li><strong className="text-white">Free:</strong> Capture & Find - Solo use with powerful search, 20 AI actions/month, 1GB storage</li>
+                    <li><strong className="text-white">Personal:</strong> Connected Brain - Power user tier with WhatsApp capture, webhooks, AI chat, 1000 AI actions/month, 10GB storage</li>
+                    <li><strong className="text-white">Teams:</strong> Shared Brain & Workflows - Team collaboration, real-time editing, advanced AI, 10000+ AI actions/month, unlimited storage</li>
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="how-to-upgrade" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How do I upgrade my plan?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Visit the <strong className="text-white">Upgrade</strong> page from the main navigation. You'll see a comparison of all plans with your current plan highlighted. Click "Upgrade" on the plan you want.
+                  </p>
+                  <p className="mb-3">
+                    For Personal plan: Your upgrade is instant—your entitlements update immediately.
+                  </p>
+                  <p>
+                    For Teams plan: You'll be prompted to create a workspace name. A new team workspace will be created with you as the owner, and you can then invite team members.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="upgrade-paths" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  What upgrade paths are available?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <ul className="space-y-2 ml-4">
+                    <li><strong className="text-white">Free → Personal:</strong> Unlocks integrations and AI features</li>
+                    <li><strong className="text-white">Free → Teams:</strong> Creates a workspace with full team features</li>
+                    <li><strong className="text-white">Personal → Teams:</strong> Creates a workspace while keeping personal features</li>
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="new-user-plan" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  What plan do new users start with?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  All new users start on the <strong className="text-white">Free</strong> plan automatically. This gives you full access to core note-taking features with a generous trial of AI capabilities. Upgrade when you need more power or team collaboration.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          {/* 8. TEAM WORKSPACES */}
+          <div>
+            <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Team Workspaces</h2>
+            <Accordion type="single" collapsible className="space-y-4">
+              <AccordionItem value="what-is-workspace" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  What is a workspace?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  A workspace is a shared environment where team members can collaborate on notes, folders, and tags. Each workspace has its own content, member list, and plan entitlements. You can be a member of multiple workspaces while maintaining your personal notes separately.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="workspace-roles" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  What roles exist in a workspace?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <ul className="space-y-2 ml-4">
+                    <li><strong className="text-white">Owner:</strong> Full control including billing, can delete workspace</li>
+                    <li><strong className="text-white">Admin:</strong> Can manage members, invites, and workspace settings</li>
+                    <li><strong className="text-white">Member:</strong> Can create, edit, and collaborate on all workspace content</li>
+                    <li><strong className="text-white">Guest:</strong> View-only access to shared content</li>
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="invite-members" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How do I invite team members?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Go to your workspace's <strong className="text-white">Members</strong> page and click "Invite Member". Enter their email address and choose a role (Admin, Member, or Guest).
+                  </p>
+                  <p className="mb-3">
+                    The invited person will receive an email with a link to accept the invitation. If they don't have a Nabu account, they'll create one during the acceptance process and automatically join your workspace.
+                  </p>
+                  <p>
+                    You can also copy the invite link directly to share through other channels.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="accept-invite" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How do I accept a workspace invite?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Click the invite link in your email or the link shared with you. You'll see the workspace name and your assigned role.
+                  </p>
+                  <p className="mb-3">
+                    If you're already logged in, simply click "Accept Invite" to join immediately.
+                  </p>
+                  <p>
+                    If you're not logged in, click "Sign in to Accept"—you'll be redirected back to accept the invite after authentication. New users can sign up directly from the invite page.
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="manage-members" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How do I manage workspace members?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  <p className="mb-3">
+                    Owners and Admins can manage members from the workspace Members page. You can:
+                  </p>
+                  <ul className="space-y-2 ml-4">
+                    <li>View all current members and their roles</li>
+                    <li>Change member roles (except for the owner)</li>
+                    <li>Remove members from the workspace</li>
+                    <li>View and manage pending invites</li>
+                    <li>Resend or cancel pending invitations</li>
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="invite-expiry" className="glass rounded-xl border-white/10 px-6">
+                <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
+                  How long are workspace invites valid?
+                </AccordionTrigger>
+                <AccordionContent className="text-white/80 pt-4">
+                  Workspace invites are valid for <strong className="text-white">7 days</strong> from when they're sent. After that, they expire and the recipient will need a new invitation. You can see expiration dates for pending invites on the Members page.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          {/* 9. COLLABORATION & SHARING */}
           <div>
             <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Collaboration & Sharing</h2>
             <Accordion type="single" collapsible className="space-y-4">
@@ -408,7 +559,7 @@ export default function FAQPage() {
             </Accordion>
           </div>
 
-          {/* 8. AI FEATURES */}
+          {/* 10. AI FEATURES */}
           <div>
             <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">AI Features</h2>
             <Accordion type="single" collapsible className="space-y-4">
@@ -480,7 +631,7 @@ export default function FAQPage() {
             </Accordion>
           </div>
 
-          {/* 9. DATA & STORAGE */}
+          {/* 11. DATA & STORAGE */}
           <div>
             <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Data & Storage</h2>
             <Accordion type="single" collapsible className="space-y-4">
@@ -541,7 +692,7 @@ export default function FAQPage() {
             </Accordion>
           </div>
 
-          {/* 10. AUTO-SAVE & SYNC */}
+          {/* 12. AUTO-SAVE & SYNC */}
           <div>
             <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Auto-Save & Sync</h2>
             <Accordion type="single" collapsible className="space-y-4">
@@ -593,7 +744,7 @@ export default function FAQPage() {
             </Accordion>
           </div>
 
-          {/* 11. TECHNICAL & SECURITY */}
+          {/* 13. TECHNICAL & SECURITY */}
           <div>
             <h2 className="text-3xl font-serif text-[var(--nabu-mint)] mb-6">Technical & Security</h2>
             <Accordion type="single" collapsible className="space-y-4">

@@ -70,6 +70,78 @@ function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
 }
 
 /**
+ * Workspace section with folders and uncategorised notes
+ */
+export interface WorkspaceSection {
+  id: string;
+  name: string;
+  role: string;
+  folders: FolderItem[];
+  uncategorisedNotes: NoteItem[];
+}
+
+/**
+ * Response structure for workspace-grouped folders
+ */
+export interface GroupedFoldersResponse {
+  personal: {
+    folders: FolderItem[];
+    uncategorisedNotes: NoteItem[];
+  };
+  workspaces: WorkspaceSection[];
+}
+
+/**
+ * Fetch folders grouped by personal and workspaces
+ * @returns Personal folders/notes and workspace sections
+ */
+export async function fetchGroupedFolders(): Promise<GroupedFoldersResponse> {
+  try {
+    const response = await fetch('/api/nabu/folders?includeWorkspaces=true');
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to fetch folders: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.success || !data.data) {
+      throw new Error("Invalid response format from server");
+    }
+
+    const result = data.data;
+    
+    return {
+      personal: {
+        folders: result.personal?.folders?.map(transformFolder) || [],
+        uncategorisedNotes: result.personal?.uncategorisedNotes?.map((note: ApiNoteResponse) => ({
+          id: note.id,
+          title: note.title,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        })) || [],
+      },
+      workspaces: result.workspaces?.map((ws: any) => ({
+        id: ws.id,
+        name: ws.name,
+        role: ws.role,
+        folders: ws.folders?.map(transformFolder) || [],
+        uncategorisedNotes: ws.uncategorisedNotes?.map((note: ApiNoteResponse) => ({
+          id: note.id,
+          title: note.title,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        })) || [],
+      })) || [],
+    };
+  } catch (error) {
+    console.error("Error fetching grouped folders:", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch root-level folders for the current user
  * @param includeNotes - Whether to include notes in the response
  * @param includeFullTree - Whether to fetch the entire folder hierarchy

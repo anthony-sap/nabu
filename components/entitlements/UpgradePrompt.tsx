@@ -90,7 +90,7 @@ export function UpgradePrompt({
           {message || `Upgrade to ${requiredPlan} to unlock this feature.`}
         </p>
         <Button asChild>
-          <Link href="/pricing">Upgrade to {requiredPlan}</Link>
+          <Link href="/upgrade">Upgrade to {requiredPlan}</Link>
         </Button>
       </div>
     );
@@ -119,7 +119,7 @@ export function UpgradePrompt({
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full">
-          <Link href="/pricing">Upgrade to {requiredPlan}</Link>
+          <Link href="/upgrade">Upgrade to {requiredPlan}</Link>
         </Button>
       </CardFooter>
     </Card>
