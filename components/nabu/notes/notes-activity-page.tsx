@@ -14,6 +14,7 @@ import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { FolderItem, NoteItem } from "./types";
 import { SearchResult } from "./types-search";
 import { fetchGroupedFolders, fetchFolderChildren, fetchFolderNotes, GroupedFoldersResponse } from "./api";
+import { transformFolder } from "./api";
 import { FolderStateStorage } from "./folder-state-storage";
 import {
   Dialog,
@@ -813,9 +814,40 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
    */
   const handleMoveFolder = async (folderId: string, newParentId: string | null, newWorkspaceId?: string | null) => {
     try {
-      // Optimistically update UI by removing folder from old location
-      const folderToMove = findFolderById(folders, folderId);
-      if (!folderToMove) return;
+      // Find the folder to move - check both personal and workspace folders
+      let folderToMove = findFolderById(folders, folderId);
+      let isSourceWorkspace = false;
+      let sourceWorkspaceIndex = -1;
+      let sourceParentId: string | null = null;
+      
+      // If not found in personal folders, search workspace folders
+      if (!folderToMove && groupedFolders) {
+        for (let i = 0; i < groupedFolders.workspaces.length; i++) {
+          folderToMove = findFolderById(groupedFolders.workspaces[i].folders, folderId);
+          if (folderToMove) {
+            isSourceWorkspace = true;
+            sourceWorkspaceIndex = i;
+            // Find parent ID
+            const flatFolders = flattenFolders(groupedFolders.workspaces[i].folders);
+            const parent = flatFolders.find(f => f.children?.some(c => c.id === folderId));
+            sourceParentId = parent?.id || null;
+            break;
+          }
+        }
+      } else if (folderToMove) {
+        // Find parent ID for personal folder
+        const flatFolders = flattenFolders(folders);
+        const parent = flatFolders.find(f => f.children?.some(c => c.id === folderId));
+        sourceParentId = parent?.id || null;
+      }
+      
+      if (!folderToMove) {
+        // Folder not found, fall back to full refresh
+        const groupedData = await fetchGroupedFolders();
+        setGroupedFolders(groupedData);
+        setFolders(groupedData.personal.folders);
+        return;
+      }
 
       // Call API to update parentId and workspaceId
       const response = await fetch(`/api/nabu/folders/${folderId}`, {
@@ -831,10 +863,86 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
         throw new Error("Failed to move folder");
       }
 
-      // Reload grouped folders to get updated structure
-      const groupedData = await fetchGroupedFolders();
-      setGroupedFolders(groupedData);
-      setFolders(groupedData.personal.folders);
+      const responseData = await response.json();
+      
+      // Use the existing folder object and update its parentId/workspaceId
+      // This preserves all children and notes that are already loaded
+      const updatedFolder: FolderItem = {
+        ...folderToMove,
+        // Note: parentId and workspaceId aren't part of FolderItem type, but we don't need them
+        // The folder structure will be updated by insertFolderSorted
+      };
+
+      // Determine if destination is personal (not workspace)
+      const isDestPersonal = newWorkspaceId === undefined;
+
+      // Update personal folders state
+      let updatedPersonalFolders = folders;
+      
+      // Remove from source if it's personal
+      if (!isSourceWorkspace) {
+        updatedPersonalFolders = removeFolderFromTree(folders, folderId);
+      }
+
+      // Add to destination if it's personal
+      if (isDestPersonal) {
+        updatedPersonalFolders = insertFolderSorted(updatedPersonalFolders, newParentId, updatedFolder);
+      }
+
+      setFolders(updatedPersonalFolders);
+
+      // Update groupedFolders state
+      if (groupedFolders) {
+        setGroupedFolders((current) => {
+          if (!current) return current;
+          
+          let updatedPersonal = { ...current.personal };
+          let updatedWorkspaces = [...current.workspaces];
+
+          // Update personal section - always update if source OR destination is personal
+          if (!isSourceWorkspace || isDestPersonal) {
+            updatedPersonal = {
+              ...updatedPersonal,
+              folders: updatedPersonalFolders,
+            };
+          }
+
+          // Update workspace sections - remove from source workspace
+          if (isSourceWorkspace && sourceWorkspaceIndex >= 0) {
+            const ws = updatedWorkspaces[sourceWorkspaceIndex];
+            updatedWorkspaces[sourceWorkspaceIndex] = {
+              ...ws,
+              folders: removeFolderFromTree(ws.folders, folderId),
+            };
+          }
+
+          // Add to destination workspace if moving to workspace
+          if (newWorkspaceId !== undefined) {
+            const destWsIndex = updatedWorkspaces.findIndex(ws => ws.id === newWorkspaceId);
+            if (destWsIndex >= 0) {
+              const destWs = updatedWorkspaces[destWsIndex];
+              updatedWorkspaces[destWsIndex] = {
+                ...destWs,
+                folders: insertFolderSorted(destWs.folders, newParentId, updatedFolder),
+              };
+            }
+          }
+          
+          // Always update personal section if destination is personal (regardless of source)
+          if (isDestPersonal) {
+            updatedPersonal = {
+              ...updatedPersonal,
+              folders: updatedPersonalFolders,
+            };
+          }
+
+          return {
+            ...current,
+            personal: updatedPersonal,
+            workspaces: updatedWorkspaces,
+          };
+        });
+      }
     } catch (error) {
       console.error("Failed to move folder:", error);
       // TODO: Show error toast
@@ -850,6 +958,77 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
    */
   const handleMoveNote = async (noteId: string, newFolderId: string | null, newWorkspaceId?: string | null) => {
     try {
+      // First, find the note in current state to get its current folder
+      let currentNote: NoteItem | undefined;
+      let sourceFolderId: string | null = null;
+      let isSourceWorkspace = false;
+      let sourceWorkspaceIndex = -1;
+      
+      // Search in personal folders
+      const findNoteInFolders = (items: FolderItem[]): { note: NoteItem; folderId: string } | null => {
+        for (const item of items) {
+          if (item.type === "folder" && item.notes) {
+            const note = item.notes.find(n => n.id === noteId);
+            if (note) {
+              return { note, folderId: item.id };
+            }
+            if (item.children) {
+              const found = findNoteInFolders(item.children);
+              if (found) return found;
+            }
+          }
+        }
+        return null;
+      };
+      
+      const foundInPersonal = findNoteInFolders(folders);
+      if (foundInPersonal) {
+        currentNote = foundInPersonal.note;
+        sourceFolderId = foundInPersonal.folderId;
+      } else if (groupedFolders) {
+        // Search in workspace folders
+        for (let i = 0; i < groupedFolders.workspaces.length; i++) {
+          const found = findNoteInFolders(groupedFolders.workspaces[i].folders);
+          if (found) {
+            currentNote = found.note;
+            sourceFolderId = found.folderId;
+            isSourceWorkspace = true;
+            sourceWorkspaceIndex = i;
+            break;
+          }
+        }
+      }
+      
+      // Also check uncategorised notes
+      if (!currentNote) {
+        const uncategorisedNote = rootNotes.find(n => n.id === noteId);
+        if (uncategorisedNote) {
+          currentNote = uncategorisedNote;
+          sourceFolderId = null; // null means uncategorised
+        } else if (groupedFolders) {
+          // Check workspace uncategorised notes
+          for (let i = 0; i < groupedFolders.workspaces.length; i++) {
+            const wsNote = groupedFolders.workspaces[i].uncategorisedNotes.find(n => n.id === noteId);
+            if (wsNote) {
+              currentNote = wsNote;
+              sourceFolderId = null;
+              isSourceWorkspace = true;
+              sourceWorkspaceIndex = i;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!currentNote) {
+        // Note not found in current state, fall back to full refresh
+        const groupedData = await fetchGroupedFolders();
+        setGroupedFolders(groupedData);
+        setFolders(groupedData.personal.folders);
+        setRootNotes(groupedData.personal.uncategorisedNotes);
+        return;
+      }
+
       // Call API to update folderId and workspaceId
       const response = await fetch(`/api/nabu/notes/${noteId}`, {
         method: "PATCH",
@@ -864,11 +1043,175 @@ export default function NotesActivityPage({ initialNoteId, initialThoughtId, ini
         throw new Error("Failed to move note");
       }
 
-      // Reload grouped folders to get updated structure
-      const groupedData = await fetchGroupedFolders();
-      setGroupedFolders(groupedData);
-      setFolders(groupedData.personal.folders);
-      setRootNotes(groupedData.personal.uncategorisedNotes);
+      const responseData = await response.json();
+      const updatedNote: NoteItem = {
+        id: responseData.data.id,
+        title: responseData.data.title,
+        createdAt: responseData.data.createdAt,
+        updatedAt: responseData.data.updatedAt,
+      };
+
+      // Helper to remove note from folder's notes array
+      const removeNoteFromFolder = (items: FolderItem[]): FolderItem[] => {
+        return items.map(item => {
+          if (item.type === "folder") {
+            const updatedItem = {
+              ...item,
+              notes: item.notes?.filter(note => note.id !== noteId),
+              noteCount: item.notes?.some(n => n.id === noteId) 
+                ? (item.noteCount ?? 0) - 1 
+                : item.noteCount,
+            };
+            if (item.children) {
+              return { ...updatedItem, children: removeNoteFromFolder(item.children) };
+            }
+            return updatedItem;
+          }
+          return item;
+        });
+      };
+
+      // Helper to add note to folder's notes array
+      const addNoteToFolder = (items: FolderItem[], targetFolderId: string | null): FolderItem[] => {
+        return items.map(item => {
+          if (item.type === "folder" && item.id === targetFolderId) {
+            const noteExists = item.notes?.some(n => n.id === noteId);
+            return {
+              ...item,
+              notes: noteExists 
+                ? item.notes 
+                : [...(item.notes || []), updatedNote],
+              noteCount: noteExists 
+                ? item.noteCount 
+                : (item.noteCount ?? 0) + 1,
+            };
+          }
+          if (item.children) {
+            return { ...item, children: addNoteToFolder(item.children, targetFolderId) };
+          }
+          return item;
+        });
+      };
+
+      // Determine if destination is personal (not workspace)
+      const isDestPersonal = newWorkspaceId === undefined;
+      
+      // Update personal folders state
+      let updatedPersonalFolders = folders;
+      let updatedPersonalRootNotes = rootNotes;
+
+      // Remove from source if it's personal
+      if (!isSourceWorkspace) {
+        if (sourceFolderId === null) {
+          // Removing from personal uncategorised
+          updatedPersonalRootNotes = rootNotes.filter(n => n.id !== noteId);
+        } else {
+          // Removing from personal folder
+          updatedPersonalFolders = removeNoteFromFolder(folders);
+        }
+      }
+
+      // Add to destination if it's personal
+      if (isDestPersonal) {
+        if (newFolderId === null) {
+          // Adding to personal uncategorised
+          if (!updatedPersonalRootNotes.some(n => n.id === noteId)) {
+            updatedPersonalRootNotes = [...updatedPersonalRootNotes, updatedNote];
+          }
+        } else {
+          // Adding to personal folder
+          updatedPersonalFolders = addNoteToFolder(updatedPersonalFolders, newFolderId);
+        }
+      }
+
+      setFolders(updatedPersonalFolders);
+      setRootNotes(updatedPersonalRootNotes);
+
+      // Update groupedFolders state
+      if (groupedFolders) {
+        setGroupedFolders((current) => {
+          if (!current) return current;
+          
+          let updatedPersonal = { ...current.personal };
+          let updatedWorkspaces = [...current.workspaces];
+
+          // Update personal section
+          if (sourceFolderId === null && !isSourceWorkspace) {
+            updatedPersonal = {
+              ...updatedPersonal,
+              uncategorisedNotes: updatedPersonal.uncategorisedNotes.filter(n => n.id !== noteId),
+              folders: updatedPersonalFolders,
+            };
+          } else if (!isSourceWorkspace) {
+            updatedPersonal = {
+              ...updatedPersonal,
+              folders: updatedPersonalFolders,
+            };
+          }
+
+          if (newFolderId === null && newWorkspaceId === undefined) {
+            if (!updatedPersonal.uncategorisedNotes.some(n => n.id === noteId)) {
+              updatedPersonal = {
+                ...updatedPersonal,
+                uncategorisedNotes: [...updatedPersonal.uncategorisedNotes, updatedNote],
+              };
+            }
+          }
+
+          // Update workspace sections
+          if (isSourceWorkspace && sourceWorkspaceIndex >= 0) {
+            const ws = updatedWorkspaces[sourceWorkspaceIndex];
+            if (sourceFolderId === null) {
+              updatedWorkspaces[sourceWorkspaceIndex] = {
+                ...ws,
+                uncategorisedNotes: ws.uncategorisedNotes.filter(n => n.id !== noteId),
+                folders: removeNoteFromFolder(ws.folders),
+              };
+            } else {
+              updatedWorkspaces[sourceWorkspaceIndex] = {
+                ...ws,
+                folders: removeNoteFromFolder(ws.folders),
+              };
+            }
+          }
+
+          // Add to destination workspace if moving to workspace
+          if (newWorkspaceId !== undefined) {
+            const destWsIndex = updatedWorkspaces.findIndex(ws => ws.id === newWorkspaceId);
+            if (destWsIndex >= 0) {
+              const destWs = updatedWorkspaces[destWsIndex];
+              if (newFolderId === null) {
+                updatedWorkspaces[destWsIndex] = {
+                  ...destWs,
+                  uncategorisedNotes: destWs.uncategorisedNotes.some(n => n.id === noteId)
+                    ? destWs.uncategorisedNotes
+                    : [...destWs.uncategorisedNotes, updatedNote],
+                };
+              } else {
+                updatedWorkspaces[destWsIndex] = {
+                  ...destWs,
+                  folders: addNoteToFolder(destWs.folders, newFolderId),
+                };
+              }
+            }
+          }
+          
+          // Always update personal section if destination is personal (regardless of source)
+          if (isDestPersonal) {
+            updatedPersonal = {
+              ...updatedPersonal,
+              folders: updatedPersonalFolders,
+              uncategorisedNotes: updatedPersonalRootNotes,
+            };
+          }
+
+          return {
+            ...current,
+            personal: updatedPersonal,
+            workspaces: updatedWorkspaces,
+          };
+        });
+      }
     } catch (error) {
       console.error("Failed to move note:", error);
       // TODO: Show error toast

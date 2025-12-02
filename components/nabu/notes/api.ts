@@ -37,7 +37,7 @@ interface ApiFolderResponse {
 /**
  * Transform API folder response to FolderItem format
  */
-function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
+export function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
   // Fallback: if _count is empty/missing, calculate from actual data
   const childCount = apiFolder._count?.children ?? apiFolder.children?.length ?? 0;
   const notesCount = apiFolder._count?.notes ?? apiFolder.notes?.length ?? 0;
