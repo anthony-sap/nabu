@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { QuickThoughtProvider } from "@/components/nabu/quick-thought-context";
 import { QuickThoughtManager } from "@/components/nabu/quick-thought-manager";
-import { QueryProvider } from "@/components/providers/query-provider";
 
 interface NabuLayoutProps {
   children: React.ReactNode;
@@ -19,10 +18,9 @@ export default async function NabuLayout({ children }: NabuLayoutProps) {
   if (!user) redirect("/login");
 
   return (
-    <QueryProvider>
-      <QuickThoughtProvider>
-        {/* Multi-layer gradient background for premium feel */}
-        <div className="relative flex min-h-screen w-full bg-background">
+    <QuickThoughtProvider>
+      {/* Multi-layer gradient background for premium feel */}
+      <div className="relative flex min-h-screen w-full bg-background">
         {/* Radial gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
         <div className="absolute top-0 left-0 right-0 h-[600px] bg-gradient-radial from-primary/10 via-transparent to-transparent pointer-events-none" />
@@ -40,9 +38,8 @@ export default async function NabuLayout({ children }: NabuLayoutProps) {
 
         {/* Quick Thought Manager - handles all modals and minimized thoughts */}
         <QuickThoughtManager />
-        </div>
-      </QuickThoughtProvider>
-    </QueryProvider>
+      </div>
+    </QuickThoughtProvider>
   );
 }
 

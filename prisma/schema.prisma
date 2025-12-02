@@ -6,9 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("MIGRATE_DATABASE_URL")  // Direct connection (port 5432) for migrations
 }
 
 enum UserRole {
@@ -870,8 +870,12 @@ model WorkspaceMembership {
   invitedAt   DateTime  @default(now())
   acceptedAt  DateTime?
   
+  // Audit fields
   createdAt   DateTime  @default(now())
+  createdBy   String?
   updatedAt   DateTime  @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
   
   @@unique([workspaceId, userId])
   @@index([workspaceId])
@@ -890,6 +894,11 @@ model WorkspaceInvite {
   createdById String
   createdAt   DateTime  @default(now())
   acceptedAt  DateTime?
+  
+  // Audit fields
+  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
   
   @@index([workspaceId])
   @@index([email])

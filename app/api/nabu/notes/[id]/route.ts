@@ -24,11 +24,10 @@ export async function GET(
     const { userId, tenantId } = await getUserContext();
     const { id } = await params;
 
+    // Middleware automatically handles workspace filtering and tenant isolation
     const note = await prisma.note.findFirst({
       where: {
         id,
-        userId,
-        tenantId,
         deletedAt: null,
       },
       select: {
@@ -173,12 +172,10 @@ export async function PATCH(
     const { userId, tenantId } = await getUserContext();
     const { id } = await params;
 
-    // Verify ownership and get existing note
+    // Verify ownership and get existing note (middleware handles filtering)
     const existingNote = await prisma.note.findFirst({
       where: {
         id,
-        userId,
-        tenantId,
         deletedAt: null,
       },
     });
@@ -201,13 +198,11 @@ export async function PATCH(
 
     const { tagIds, ...noteData } = validationResult.data;
 
-    // If folderId is being changed, verify it exists
+    // If folderId is being changed, verify it exists and user has access (middleware handles filtering)
     if (noteData.folderId !== undefined && noteData.folderId) {
       const folder = await prisma.folder.findFirst({
         where: {
           id: noteData.folderId,
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
@@ -215,21 +210,36 @@ export async function PATCH(
       if (!folder) {
         return errorResponse("Folder not found", 404);
       }
+      
+      // Ensure folder belongs to same workspace as note (if workspace note)
+      if (existingNote.workspaceId && folder.workspaceId !== existingNote.workspaceId) {
+        return errorResponse("Folder belongs to a different workspace", 400);
+      }
+      // If note is workspace note but folder is personal, that's invalid
+      if (existingNote.workspaceId && !folder.workspaceId) {
+        return errorResponse("Cannot move workspace note to personal folder", 400);
+      }
     }
 
-    // If tagIds provided, verify they exist
+    // If tagIds provided, verify they exist and user has access (middleware handles filtering)
     if (tagIds && tagIds.length > 0) {
       const tags = await prisma.tag.findMany({
         where: {
           id: { in: tagIds },
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
 
       if (tags.length !== tagIds.length) {
         return errorResponse("One or more tags not found", 404);
+      }
+      
+      // Ensure tags belong to same workspace as note (if workspace note)
+      if (existingNote.workspaceId) {
+        const invalidTags = tags.filter(tag => tag.workspaceId !== existingNote.workspaceId);
+        if (invalidTags.length > 0) {
+          return errorResponse("Tags must belong to the same workspace as the note", 400);
+        }
       }
     }
 

@@ -35,10 +35,8 @@ export async function GET(req: NextRequest) {
 
     const { folderId, tagId, search, visibility, page = 1, limit = 20 } = queryResult.data;
 
-    // Build query
+    // Build query - middleware automatically handles workspace filtering and tenant isolation
     const where: any = {
-      userId,
-      tenantId,
       deletedAt: null,
     };
 
@@ -154,13 +152,11 @@ export async function POST(req: NextRequest) {
 
     const { tagIds, ...noteData } = validationResult.data;
 
-    // If folderId is provided, verify it exists and belongs to user
+    // If folderId is provided, verify it exists and user has access (middleware handles filtering)
     if (noteData.folderId) {
       const folder = await prisma.folder.findFirst({
         where: {
           id: noteData.folderId,
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
@@ -168,15 +164,22 @@ export async function POST(req: NextRequest) {
       if (!folder) {
         return errorResponse("Folder not found", 404);
       }
+      
+      // If folder belongs to a workspace, ensure note's workspaceId matches (if provided)
+      if (folder.workspaceId && noteData.workspaceId && folder.workspaceId !== noteData.workspaceId) {
+        return errorResponse("Folder belongs to a different workspace", 400);
+      }
+      // If folder is workspace folder but note doesn't have workspaceId, inherit it
+      if (folder.workspaceId && !noteData.workspaceId) {
+        noteData.workspaceId = folder.workspaceId;
+      }
     }
 
-    // If tagIds provided, verify they exist and belong to user
+    // If tagIds provided, verify they exist and user has access (middleware handles filtering)
     if (tagIds && tagIds.length > 0) {
       const tags = await prisma.tag.findMany({
         where: {
           id: { in: tagIds },
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
@@ -184,16 +187,25 @@ export async function POST(req: NextRequest) {
       if (tags.length !== tagIds.length) {
         return errorResponse("One or more tags not found", 404);
       }
+      
+      // Ensure tags belong to same workspace as note (if workspace note)
+      if (noteData.workspaceId) {
+        const invalidTags = tags.filter(tag => tag.workspaceId !== noteData.workspaceId);
+        if (invalidTags.length > 0) {
+          return errorResponse("Tags must belong to the same workspace as the note", 400);
+        }
+      }
     }
 
     // Create note with tags in a transaction
+    // Middleware will automatically set tenantId: null if workspaceId is provided
     const note = await prisma.$transaction(async (tx) => {
-      // Create note
+      // Create note - middleware handles workspaceId verification and tenantId setting
       const createdNote = await tx.note.create({
         data: {
           ...noteData,
           userId,
-          tenantId,
+          // tenantId will be set by middleware (null for workspace, session tenantId for personal)
           createdBy: userId,
           updatedBy: userId,
         },

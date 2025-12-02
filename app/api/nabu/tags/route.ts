@@ -29,10 +29,8 @@ export async function GET(req: NextRequest) {
 
     const { type } = queryResult.data;
 
-    // Build query
+    // Build query - middleware automatically handles workspace filtering and tenant isolation
     const where: any = {
-      userId,
-      tenantId,
       deletedAt: null,
     };
 
@@ -84,12 +82,12 @@ export async function POST(req: NextRequest) {
 
     const data = validationResult.data;
 
-    // Check if tag with same name already exists for this user/tenant
+    // Check if tag with same name already exists in same workspace/personal scope
+    // Middleware handles filtering, but we need to check within the same workspaceId
     const existingTag = await prisma.tag.findFirst({
       where: {
         name: data.name,
-        userId,
-        tenantId,
+        workspaceId: data.workspaceId || null, // Check within same workspace or personal
         deletedAt: null,
       },
     });
@@ -98,12 +96,12 @@ export async function POST(req: NextRequest) {
       return errorResponse("Tag with this name already exists", 409);
     }
 
-    // Create tag
+    // Create tag - middleware handles workspaceId verification and tenantId setting
     const tag = await prisma.tag.create({
       data: {
         ...data,
         userId,
-        tenantId,
+        // tenantId will be set by middleware (null for workspace, session tenantId for personal)
         createdBy: userId,
         updatedBy: userId,
       },

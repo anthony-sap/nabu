@@ -3,7 +3,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Home, AlertCircle, FileText, Trash2, Loader2, ChevronDown, ChevronRight, Users, User } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sparkles, Home, AlertCircle, FileText, Trash2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
@@ -19,23 +20,20 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 /**
- * Workspace data structure for sidebar
- */
-interface WorkspaceSection {
-  id: string;
-  name: string;
-  role: string;
-  folders: FolderItemType[];
-  uncategorisedNotes: NoteItem[];
-}
-
-/**
  * Props for the NotesSidebar component
  */
 interface NotesSidebarProps {
-  folders: FolderItemType[];
-  rootNotes: NoteItem[];
-  workspaces?: WorkspaceSection[]; // Workspace sections with their folders
+  personalFolders: FolderItemType[];
+  personalUncategorisedNotes: NoteItem[];
+  workspaces: Array<{
+    id: string;
+    name: string;
+    role: string;
+    folders: FolderItemType[];
+    uncategorisedNotes: NoteItem[];
+  }>;
+  expandedSections: Record<string, boolean>; // 'personal', 'workspace-{id}'
+  onSectionToggle: (sectionId: string, expanded: boolean) => void;
   view: "feed" | "folders" | "editor";
   selectedNote: FolderItemType | null;
   editingNoteId?: string | null;
@@ -43,19 +41,16 @@ interface NotesSidebarProps {
   onFolderToggle: (id: string) => void;
   onNoteSelect: (item: FolderItemType) => void;
   onAddFolder?: (parentId: string | null, workspaceId?: string | null) => void;
-  onAddNote?: (folderId: string, workspaceId?: string | null) => void;
+  onAddNote?: (folderId: string) => void;
   onQuickNote?: () => void; // Callback to create a quick note
   onEditFolder?: (folderId: string) => void;
   onDeleteFolder?: (folderId: string) => void;
   onDeleteNote?: (noteId: string) => void;
-  onMoveFolder?: (folderId: string, newParentId: string | null, workspaceId?: string | null) => void;
-  onMoveNote?: (noteId: string, newFolderId: string | null, workspaceId?: string | null) => void;
+  onMoveFolder?: (folderId: string, newParentId: string | null, newWorkspaceId?: string | null) => void;
+  onMoveNote?: (noteId: string, newFolderId: string | null, newWorkspaceId?: string | null) => void;
   onRefreshFolders?: () => Promise<void>; // Callback to refresh folder tree and root notes
   isLoadingFolders?: boolean;
   folderLoadError?: string | null;
-  // Section expand/collapse state
-  expandedSections?: Set<string>; // 'personal' | workspace IDs
-  onSectionToggle?: (sectionId: string) => void;
 }
 
 /**
@@ -192,9 +187,11 @@ function UncategorisedNote({
  * Displays feed/folder navigation and hierarchical folder structure
  */
 export function NotesSidebar({
-  folders,
-  rootNotes,
-  workspaces = [],
+  personalFolders,
+  personalUncategorisedNotes,
+  workspaces,
+  expandedSections,
+  onSectionToggle,
   view,
   selectedNote,
   editingNoteId,
@@ -212,8 +209,6 @@ export function NotesSidebar({
   onRefreshFolders,
   isLoadingFolders,
   folderLoadError,
-  expandedSections = new Set(['personal']),
-  onSectionToggle,
 }: NotesSidebarProps) {
   const router = useRouter();
   const [isRootDropTarget, setIsRootDropTarget] = useState(false);
@@ -290,7 +285,7 @@ export function NotesSidebar({
       setShowAutoMovePreview(false);
     } else if (newMode === 'auto') {
       // Entering auto mode - select all notes initially
-      setSelectedNoteIds(new Set(rootNotes.map(n => n.id)));
+      setSelectedNoteIds(new Set(personalUncategorisedNotes.map(n => n.id)));
     }
     setUncategorisedMode(newMode);
   };
@@ -312,7 +307,7 @@ export function NotesSidebar({
    * Select all uncategorised notes
    */
   const handleSelectAll = () => {
-    setSelectedNoteIds(new Set(rootNotes.map(n => n.id)));
+    setSelectedNoteIds(new Set(personalUncategorisedNotes.map(n => n.id)));
   };
 
   /**
@@ -465,7 +460,7 @@ export function NotesSidebar({
 
           <Separator className="my-3 bg-border/30" />
 
-          {/* Loading state */}
+          {/* Loading state - 5 skeleton folders */}
           {isLoadingFolders && (
             <div className="space-y-1.5 mt-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -485,50 +480,39 @@ export function NotesSidebar({
             </div>
           )}
 
-          {/* Personal Section */}
+          {/* Personal section - collapsible */}
           {!isLoadingFolders && !folderLoadError && (
-            <div className="space-y-0.5">
-              {/* Personal section header - collapsible */}
-              <button
-                type="button"
-                onClick={() => onSectionToggle?.('personal')}
-                className="flex w-full items-center gap-2 px-3 py-2.5 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-all duration-200 group"
-              >
-                {expandedSections.has('personal') ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-primary" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-primary" />
-                )}
-                <User className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary flex-1 text-left">Personal</span>
-                <span className="text-xs text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded">
-                  {folders.length + rootNotes.length}
-                </span>
-              </button>
-
-              {/* Personal folders and notes - shown when expanded */}
-              {expandedSections.has('personal') && (
-                <div className="pl-2">
-                  {/* New folder button */}
+            <Collapsible
+              open={expandedSections.personal ?? true}
+              onOpenChange={(open) => onSectionToggle('personal', open)}
+            >
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                  {expandedSections.personal ?? true ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-semibold text-foreground">Personal</span>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pl-1 pr-3 py-2 space-y-2">
+                  {/* New Folder button for Personal */}
                   {onAddFolder && (
                     <button
-                      ref={rootDropZoneRef}
                       type="button"
                       onClick={() => onAddFolder(null, null)}
-                      className={`flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 mb-1 ${
-                        isRootDropTarget
-                          ? "border-primary bg-primary/20 text-primary shadow-sm"
-                          : "border-primary/40 bg-primary/5 text-primary/80 hover:border-primary hover:bg-primary/15 hover:text-primary"
-                      }`}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-background/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all duration-200"
                     >
-                      <Sparkles className="h-3 w-3" />
+                      <Sparkles className="h-3.5 w-3.5" />
                       New Folder
                     </button>
                   )}
 
-                  {/* Personal folder hierarchy */}
+                  {/* Personal folders */}
                   <div className="space-y-0.5">
-                    {folders.map((folder) => (
+                    {personalFolders.map((folder) => (
                       <FolderItem
                         key={folder.id}
                         item={folder}
@@ -540,191 +524,169 @@ export function NotesSidebar({
                         }}
                         selectedId={selectedNote?.id || null}
                         editingNoteId={editingNoteId}
-                        onAddFolder={onAddFolder ? (parentId) => onAddFolder(parentId, null) : undefined}
-                        onAddNote={onAddNote ? (folderId) => onAddNote(folderId, null) : undefined}
+                        onAddFolder={onAddFolder}
+                        onAddNote={onAddNote}
                         onEditFolder={onEditFolder}
                         onDeleteFolder={onDeleteFolder}
                         onDeleteNote={onDeleteNote}
-                        onMoveFolder={onMoveFolder ? (folderId, newParentId) => onMoveFolder(folderId, newParentId, null) : undefined}
-                        onMoveNote={onMoveNote ? (noteId, newFolderId) => onMoveNote(noteId, newFolderId, null) : undefined}
-                        allFolders={folders}
+                        onMoveFolder={onMoveFolder}
+                        onMoveNote={onMoveNote}
+                        allFolders={personalFolders}
                       />
                     ))}
                   </div>
-
-                  {/* Personal Uncategorised section */}
-                  <div className="space-y-0.5 mt-2">
-                    <div className="group">
-                      <UncategorisedHeader
-                        noteCount={rootNotes.length}
-                        selectedCount={selectedNoteIds.size}
-                        mode={uncategorisedMode}
-                        onModeChange={handleModeChange}
-                        isDragOver={isRootDropTarget}
-                      />
-                    </div>
-
-                    {/* Bulk move controls */}
-                    {uncategorisedMode === 'bulk' && rootNotes.length > 0 && (
-                      <BulkMoveControls
-                        totalNotes={rootNotes.length}
-                        selectedCount={selectedNoteIds.size}
-                        onSelectAll={handleSelectAll}
-                        onDeselectAll={handleDeselectAll}
-                      />
-                    )}
-
-                    {/* Auto-move controls */}
-                    {uncategorisedMode === 'auto' && rootNotes.length > 0 && (
-                      <div className="px-3 py-2 space-y-2">
-                        <BulkMoveControls
-                          totalNotes={rootNotes.length}
-                          selectedCount={selectedNoteIds.size}
-                          onSelectAll={handleSelectAll}
-                          onDeselectAll={handleDeselectAll}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={handleAnalyzeAutoMove}
-                          disabled={selectedNoteIds.size === 0 || isAnalyzing}
-                          className="w-full h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                              Analyzing...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                              Analyze & Move
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Notes list with drag target */}
-                    <div ref={uncategorisedRef}>
-                      {rootNotes.length > 0 ? (
-                        rootNotes.map((note) => (
-                          <UncategorisedNote
-                            key={note.id}
-                            note={note}
-                            editingNoteId={editingNoteId}
-                            onNoteSelect={onNoteSelect}
-                            onDeleteNote={onDeleteNote}
-                            showCheckbox={uncategorisedMode !== 'normal'}
-                            isSelected={selectedNoteIds.has(note.id)}
-                            onToggleSelection={handleToggleSelection}
-                            selectedNoteIds={Array.from(selectedNoteIds)}
-                          />
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-center text-xs text-muted-foreground">
-                          No uncategorised notes
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
-          {/* Workspace Sections */}
-          {!isLoadingFolders && !folderLoadError && workspaces.map((workspace) => (
-            <div key={workspace.id} className="space-y-0.5 mt-2">
-              {/* Workspace section header - collapsible */}
-              <button
-                type="button"
-                onClick={() => onSectionToggle?.(workspace.id)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all duration-200 group"
+          {/* Workspace sections - collapsible */}
+          {!isLoadingFolders && !folderLoadError && workspaces.map((workspace) => {
+            const sectionId = `workspace-${workspace.id}`;
+            const isExpanded = expandedSections[sectionId] ?? true;
+            
+            return (
+              <Collapsible
+                key={workspace.id}
+                open={isExpanded}
+                onOpenChange={(open) => onSectionToggle(sectionId, open)}
               >
-                {expandedSections.has(workspace.id) ? (
-                  <ChevronDown className="h-3.5 w-3.5 text-amber-500" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 text-amber-500" />
-                )}
-                <Users className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-semibold text-amber-500 flex-1 text-left truncate">
-                  {workspace.name}
-                </span>
-                <span className="text-xs text-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                  {workspace.folders.length + workspace.uncategorisedNotes.length}
-                </span>
-              </button>
-
-              {/* Workspace folders and notes - shown when expanded */}
-              {expandedSections.has(workspace.id) && (
-                <div className="pl-2">
-                  {/* New folder button for workspace */}
-                  {onAddFolder && (
-                    <button
-                      type="button"
-                      onClick={() => onAddFolder(null, workspace.id)}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 mb-1 border-amber-500/40 bg-amber-500/5 text-amber-500/80 hover:border-amber-500 hover:bg-amber-500/15 hover:text-amber-500"
-                    >
-                      <Sparkles className="h-3 w-3" />
-                      New Folder
-                    </button>
-                  )}
-
-                  {/* Workspace folder hierarchy */}
-                  <div className="space-y-0.5">
-                    {workspace.folders.map((folder) => (
-                      <FolderItem
-                        key={folder.id}
-                        item={folder}
-                        level={0}
-                        onToggle={onFolderToggle}
-                        onSelect={(item) => {
-                          onViewChange("folders");
-                          onNoteSelect(item);
-                        }}
-                        selectedId={selectedNote?.id || null}
-                        editingNoteId={editingNoteId}
-                        onAddFolder={onAddFolder ? (parentId) => onAddFolder(parentId, workspace.id) : undefined}
-                        onAddNote={onAddNote ? (folderId) => onAddNote(folderId, workspace.id) : undefined}
-                        onEditFolder={onEditFolder}
-                        onDeleteFolder={onDeleteFolder}
-                        onDeleteNote={onDeleteNote}
-                        onMoveFolder={onMoveFolder ? (folderId, newParentId) => onMoveFolder(folderId, newParentId, workspace.id) : undefined}
-                        onMoveNote={onMoveNote ? (noteId, newFolderId) => onMoveNote(noteId, newFolderId, workspace.id) : undefined}
-                        allFolders={workspace.folders}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Workspace Uncategorised section */}
-                  <div className="space-y-0.5 mt-2">
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5" />
-                      Uncategorised
-                      <span className="ml-auto text-xs opacity-70">
-                        {workspace.uncategorisedNotes.length}
-                      </span>
-                    </div>
-                    {workspace.uncategorisedNotes.length > 0 ? (
-                      workspace.uncategorisedNotes.map((note) => (
-                        <UncategorisedNote
-                          key={note.id}
-                          note={note}
-                          editingNoteId={editingNoteId}
-                          onNoteSelect={onNoteSelect}
-                          onDeleteNote={onDeleteNote}
-                        />
-                      ))
+                <CollapsibleTrigger className="w-full mt-2">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <div className="px-3 py-2 text-center text-xs text-muted-foreground">
-                        No uncategorised notes
-                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
+                    <span className="text-sm font-semibold text-foreground">{workspace.name}</span>
                   </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="pl-1 pr-3 py-2 space-y-2">
+                    {/* New Folder button for Workspace */}
+                    {onAddFolder && (
+                      <button
+                        type="button"
+                        onClick={() => onAddFolder(null, workspace.id)}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-background/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        New Folder
+                      </button>
+                    )}
+
+                    {/* Workspace folders */}
+                    <div className="space-y-0.5">
+                      {workspace.folders.map((folder) => (
+                        <FolderItem
+                          key={folder.id}
+                          item={folder}
+                          level={0}
+                          onToggle={onFolderToggle}
+                          onSelect={(item) => {
+                            onViewChange("folders");
+                            onNoteSelect(item);
+                          }}
+                          selectedId={selectedNote?.id || null}
+                          editingNoteId={editingNoteId}
+                          onAddFolder={onAddFolder}
+                          onAddNote={onAddNote}
+                          onEditFolder={onEditFolder}
+                          onDeleteFolder={onDeleteFolder}
+                          onDeleteNote={onDeleteNote}
+                          onMoveFolder={onMoveFolder}
+                          onMoveNote={onMoveNote}
+                          allFolders={workspace.folders}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+
+          {/* Uncategorised section - moved to bottom */}
+          {!isLoadingFolders && (
+            <>
+              <Separator className="my-3 bg-border/30" />
+              <div className="space-y-0.5">
+                {/* Header with mode switcher */}
+                <div className="group">
+                  <UncategorisedHeader
+                    noteCount={personalUncategorisedNotes.length}
+                    selectedCount={selectedNoteIds.size}
+                    mode={uncategorisedMode}
+                    onModeChange={handleModeChange}
+                    isDragOver={isRootDropTarget}
+                  />
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Bulk move controls */}
+                {uncategorisedMode === 'bulk' && personalUncategorisedNotes.length > 0 && (
+                  <BulkMoveControls
+                    totalNotes={personalUncategorisedNotes.length}
+                    selectedCount={selectedNoteIds.size}
+                    onSelectAll={handleSelectAll}
+                    onDeselectAll={handleDeselectAll}
+                  />
+                )}
+
+                {/* Auto-move controls */}
+                {uncategorisedMode === 'auto' && personalUncategorisedNotes.length > 0 && (
+                  <div className="px-3 py-2 space-y-2">
+                    <BulkMoveControls
+                      totalNotes={personalUncategorisedNotes.length}
+                      selectedCount={selectedNoteIds.size}
+                      onSelectAll={handleSelectAll}
+                      onDeselectAll={handleDeselectAll}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleAnalyzeAutoMove}
+                      disabled={selectedNoteIds.size === 0 || isAnalyzing}
+                      className="w-full h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                          Analyze & Move
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Notes list with drag target - always render drop zone */}
+                <div ref={uncategorisedRef}>
+                  {personalUncategorisedNotes.length > 0 ? (
+                    personalUncategorisedNotes.map((note) => (
+                      <UncategorisedNote
+                        key={note.id}
+                        note={note}
+                        editingNoteId={editingNoteId}
+                        onNoteSelect={onNoteSelect}
+                        onDeleteNote={onDeleteNote}
+                        showCheckbox={uncategorisedMode !== 'normal'}
+                        isSelected={selectedNoteIds.has(note.id)}
+                        onToggleSelection={handleToggleSelection}
+                        selectedNoteIds={Array.from(selectedNoteIds)}
+                      />
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                      No uncategorised notes
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </ScrollArea>
 
@@ -733,7 +695,7 @@ export function NotesSidebar({
         open={showAutoMovePreview}
         onOpenChange={setShowAutoMovePreview}
         suggestions={autoMoveSuggestions}
-        noteDetails={new Map(rootNotes.map(n => [n.id, { id: n.id, title: n.title }]))}
+        noteDetails={new Map(personalUncategorisedNotes.map(n => [n.id, { id: n.id, title: n.title }]))}
         onExecute={handleExecuteAutoMove}
       />
     </div>

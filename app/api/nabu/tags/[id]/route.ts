@@ -23,11 +23,10 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const includeNotes = searchParams.get("includeNotes") === "true";
 
+    // Middleware automatically handles workspace filtering and tenant isolation
     const tag = await prisma.tag.findFirst({
       where: {
         id: params.id,
-        userId,
-        tenantId,
         deletedAt: null,
       },
       include: {
@@ -109,13 +108,18 @@ export async function PATCH(
 
     const data = validationResult.data;
 
-    // If name is being changed, check for conflicts
+    // If name is being changed, check for conflicts within same workspace
     if (data.name) {
+      // Get existing tag to check its workspaceId
+      const currentTag = await prisma.tag.findFirst({
+        where: { id: params.id },
+        select: { workspaceId: true },
+      });
+      
       const existingTag = await prisma.tag.findFirst({
         where: {
           name: data.name,
-          userId,
-          tenantId,
+          workspaceId: currentTag?.workspaceId || null,
           deletedAt: null,
           id: { not: params.id },
         },

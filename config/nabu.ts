@@ -17,5 +17,9 @@ export const nabuNavLinks: NavItem[] = [
     title: "Trash",
     href: "/trash",
   },
+  {
+    title: "Upgrade",
+    href: "/upgrade",
+  },
 ];
 

@@ -14,11 +14,9 @@ export async function GET(req: NextRequest) {
   try {
     const { userId, tenantId } = await getUserContext();
 
-    // Fetch notes (limit to 50 most recent)
+    // Fetch notes (limit to 50 most recent) - middleware handles workspace filtering
     const notes = await prisma.note.findMany({
       where: {
-        userId,
-        tenantId,
         deletedAt: null,
       },
       select: {
@@ -32,11 +30,9 @@ export async function GET(req: NextRequest) {
       take: 50,
     });
 
-    // Fetch folders (limit to 50 most recent)
+    // Fetch folders (limit to 50 most recent) - middleware handles workspace filtering
     const folders = await prisma.folder.findMany({
       where: {
-        userId,
-        tenantId,
         deletedAt: null,
       },
       select: {
@@ -50,11 +46,9 @@ export async function GET(req: NextRequest) {
       take: 50,
     });
 
-    // Fetch thoughts (limit to 50 most recent)
+    // Fetch thoughts (limit to 50 most recent) - middleware handles workspace filtering
     const thoughts = await prisma.thought.findMany({
       where: {
-        userId,
-        tenantId,
         deletedAt: null,
       },
       select: {
@@ -68,11 +62,9 @@ export async function GET(req: NextRequest) {
       take: 50,
     });
 
-    // Fetch tags (all active tags)
+    // Fetch tags (all active tags) - middleware handles workspace filtering
     const tags = await prisma.tag.findMany({
       where: {
-        userId,
-        tenantId,
         deletedAt: null,
       },
       select: {

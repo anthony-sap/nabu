@@ -83,20 +83,6 @@ async function handleWebhookRequest(
       );
     }
 
-    // Check entitlements - user must have webhook access
-    const { getEntitlementsForUser } = await import("@/lib/entitlements/service");
-    const entitlements = await getEntitlementsForUser(webhookEndpoint.userId);
-    
-    if (!entitlements.canUseWebhooks) {
-      return NextResponse.json(
-        { 
-          error: "Webhooks not available",
-          message: "Upgrade to Personal plan to use webhooks",
-        },
-        { status: 403 }
-      );
-    }
-
     // Extract headers (convert Headers to plain object)
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => {

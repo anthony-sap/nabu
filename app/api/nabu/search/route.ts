@@ -86,6 +86,8 @@ function formatVectorForPostgres(embedding: number[]): string {
 export async function GET(req: NextRequest) {
   try {
     const { userId, tenantId } = await getUserContext();
+    const { getUserWorkspaceIds } = await import("@/lib/workspace-helpers");
+    const workspaceIds = await getUserWorkspaceIds(userId);
     const { searchParams } = new URL(req.url);
 
     // Parse and validate query parameters
@@ -172,7 +174,10 @@ export async function GET(req: NextRequest) {
         FROM "Note" n
         LEFT JOIN note_tags nt ON nt."noteId" = n.id
         WHERE n."userId" = ${userId}
-          AND n."tenantId" = ${tenantId}
+          AND (
+            (n."tenantId" = ${tenantId} AND n."workspaceId" IS NULL)
+            ${workspaceIds.length > 0 ? Prisma.sql`OR n."workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})` : Prisma.empty}
+          )
           AND n."deletedAt" IS NULL
           ${noteFolderFilter}
           AND (
@@ -206,7 +211,10 @@ export async function GET(req: NextRequest) {
           FROM "NoteChunk" nc
           JOIN "Note" n ON nc."noteId" = n.id
           WHERE n."userId" = ${userId}
-            AND n."tenantId" = ${tenantId}
+            AND (
+              (n."tenantId" = ${tenantId} AND n."workspaceId" IS NULL)
+              ${workspaceIds.length > 0 ? Prisma.sql`OR n."workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})` : Prisma.empty}
+            )
             AND n."deletedAt" IS NULL
             AND nc."deletedAt" IS NULL
           ${noteFolderFilter}
@@ -293,7 +301,10 @@ export async function GET(req: NextRequest) {
           END as "keywordScore"
         FROM "Thought" t
         WHERE t."userId" = ${userId}
-          AND t."tenantId" = ${tenantId}
+          AND (
+            (t."tenantId" = ${tenantId} AND t."workspaceId" IS NULL)
+            ${workspaceIds.length > 0 ? Prisma.sql`OR t."workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})` : Prisma.empty}
+          )
           AND t."deletedAt" IS NULL
           AND (
             to_tsvector('english', 
@@ -323,7 +334,10 @@ export async function GET(req: NextRequest) {
           FROM "ThoughtChunk" tc
           JOIN "Thought" t ON tc."thoughtId" = t.id
           WHERE t."userId" = ${userId}
-            AND t."tenantId" = ${tenantId}
+            AND (
+              (t."tenantId" = ${tenantId} AND t."workspaceId" IS NULL)
+              ${workspaceIds.length > 0 ? Prisma.sql`OR t."workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})` : Prisma.empty}
+            )
             AND t."deletedAt" IS NULL
             AND tc.embedding IS NOT NULL
           ORDER BY "vectorScore" DESC

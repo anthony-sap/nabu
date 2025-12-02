@@ -25,12 +25,10 @@ export async function POST(
       return errorResponse("noteIds array is required", 400);
     }
 
-    // Verify note ownership
+    // Verify note ownership (middleware handles filtering)
     const note = await prisma.note.findFirst({
       where: {
         id: noteId,
-        userId,
-        tenantId,
         deletedAt: null,
       },
     });
@@ -42,12 +40,10 @@ export async function POST(
     // Process each link
     await Promise.all(
       noteIds.map(async (toNoteId) => {
-        // Verify target note exists and user has access
+        // Verify target note exists and user has access (middleware handles filtering)
         const targetNote = await prisma.note.findFirst({
           where: {
             id: toNoteId,
-            userId,
-            tenantId,
             deletedAt: null,
           },
         });
@@ -88,11 +84,13 @@ export async function POST(
           });
         } else {
           // Create new link with default relation "RELATED"
+          // NoteLink doesn't have workspaceId, but links notes which may be workspace notes
+          // tenantId should match the note's tenantId (null for workspace notes)
           await prisma.noteLink.create({
             data: {
               fromNoteId: noteId,
               toNoteId,
-              tenantId,
+              tenantId: note.tenantId, // Use note's tenantId (null for workspace notes)
               relation: "RELATED",
               createdBy: userId,
               updatedBy: userId,
@@ -159,12 +157,10 @@ export async function DELETE(
       return errorResponse("noteIds array is required", 400);
     }
 
-    // Verify note ownership
+    // Verify note ownership (middleware handles filtering)
     const note = await prisma.note.findFirst({
       where: {
         id: noteId,
-        userId,
-        tenantId,
         deletedAt: null,
       },
     });

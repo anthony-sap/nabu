@@ -17,74 +17,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getDbUser } from "@/lib/user-sync";
 import { successResponse, errorResponse, handleApiError } from "@/lib/nabu-helpers";
 import { PlanCode } from "@/lib/entitlements/types";
-
-/**
- * Default folder structure for new team workspaces
- */
-interface FolderTemplate {
-  name: string;
-  color: string;
-  children?: FolderTemplate[];
-}
-
-const DEFAULT_TEAM_FOLDERS: FolderTemplate[] = [
-  { name: "Inbox", color: "#00B3A6", children: [] },
-  { name: "Ideas and Experiments", color: "#8B5CF6", children: [] },
-  { name: "Projects", color: "#F59E0B", children: [] },
-  { name: "SOPs and Processes", color: "#10B981", children: [] },
-  {
-    name: "Marketing",
-    color: "#EC4899",
-    children: [
-      { name: "Video Content", color: "#EC4899" },
-      { name: "Articles and Writing", color: "#EC4899" },
-      { name: "Ads and Funnels", color: "#EC4899" },
-    ],
-  },
-  { name: "Other", color: "#6B7280", children: [] },
-];
-
-/**
- * Creates default folder structure for a new team workspace
- */
-async function createDefaultTeamFolders(
-  tx: any,
-  workspaceId: string,
-  userId: string,
-  tenantId: string | null
-) {
-  for (const folder of DEFAULT_TEAM_FOLDERS) {
-    const parent = await tx.folder.create({
-      data: {
-        name: folder.name,
-        color: folder.color,
-        workspaceId,
-        userId,
-        tenantId,
-        createdBy: userId,
-        updatedBy: userId,
-      },
-    });
-
-    // Create children if any
-    if (folder.children && folder.children.length > 0) {
-      for (const child of folder.children) {
-        await tx.folder.create({
-          data: {
-            name: child.name,
-            color: child.color,
-            parentId: parent.id,
-            workspaceId,
-            userId,
-            tenantId,
-            createdBy: userId,
-            updatedBy: userId,
-          },
-        });
-      }
-    }
-  }
-}
+import { createDefaultWorkspaceFolders } from "@/lib/workspace-helpers";
 
 // Valid upgrade paths
 const VALID_UPGRADES: Record<PlanCode, PlanCode[]> = {
@@ -162,8 +95,9 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Create default folder structure for the workspace
-        await createDefaultTeamFolders(tx, workspace.id, kindeUser.id, dbUser.tenantId);
+        // Create default folders for the workspace
+        await createDefaultWorkspaceFolders(tx, workspace.id, kindeUser.id);
+        console.log(`[Upgrade] Created default folders for workspace: ${workspace.id}`);
 
         // Update user plan
         const updatedUser = await tx.user.update({

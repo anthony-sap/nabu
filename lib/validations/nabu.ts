@@ -10,6 +10,7 @@ export const folderCreateSchema = z.object({
   description: z.string().max(1000).optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid hex color").optional(),
   parentId: z.string().cuid().optional(),
+  workspaceId: z.string().cuid().optional().nullable(),
   order: z.number().int().min(0).optional(),
 });
 
@@ -18,6 +19,7 @@ export const folderUpdateSchema = z.object({
   description: z.string().max(1000).optional().nullable(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid hex color").optional().nullable(),
   parentId: z.string().cuid().optional().nullable(),
+  workspaceId: z.string().cuid().optional().nullable(),
   order: z.number().int().min(0).optional(),
 });
 
@@ -88,6 +90,7 @@ export const noteCreateSchema = z.object({
   content: z.string().optional().default(""), // Content is optional, defaults to empty string
   contentState: z.string().optional(), // Lexical JSON state
   folderId: z.string().cuid().optional(),
+  workspaceId: z.string().cuid().optional().nullable(), // Workspace note (tenantId will be null)
   summary: z.string().max(2000).optional(),
   visibility: z.nativeEnum(NoteVisibility).optional(),
   sourceThoughts: z.array(z.string().cuid()).default([]),
@@ -99,6 +102,7 @@ export const noteUpdateSchema = z.object({
   content: z.string().optional(),
   contentState: z.string().optional().nullable(),
   folderId: z.string().cuid().optional().nullable(),
+  workspaceId: z.string().cuid().optional().nullable(), // Workspace note (tenantId will be null)
   summary: z.string().max(2000).optional().nullable(),
   visibility: z.nativeEnum(NoteVisibility).optional(),
   sourceThoughts: z.array(z.string().cuid()).optional(),
@@ -175,7 +179,13 @@ export const thoughtResponseSchema = z.object({
 // ============================================================================
 
 export const folderQuerySchema = z.object({
-  parentId: z.string().cuid().optional(),
+  parentId: z.string().refine(val => {
+    // Accept any non-empty string - backend will validate existence and format
+    // This is more lenient because Prisma CUIDs may not always pass Zod's strict validation
+    return typeof val === 'string' && val.length > 0 && val.length <= 100;
+  }, {
+    message: "parentId must be a non-empty string"
+  }).optional(),
   includeChildren: z.string().transform(val => val === "true").optional(),
   includeNotes: z.string().transform(val => val === "true").optional(),
   includeFullTree: z.string().transform(val => val === "true").optional(),
@@ -186,8 +196,14 @@ export const tagQuerySchema = z.object({
 });
 
 export const noteQuerySchema = z.object({
-  folderId: z.string().refine(val => val === 'null' || z.string().cuid().safeParse(val).success, {
-    message: "folderId must be a valid CUID or 'null'"
+  folderId: z.string().refine(val => {
+    // Accept 'null' for uncategorised notes
+    if (val === 'null') return true;
+    // Accept any non-empty string - backend will validate existence and format
+    // This is more lenient because Prisma CUIDs may not always pass Zod's strict validation
+    return typeof val === 'string' && val.length > 0 && val.length <= 100;
+  }, {
+    message: "folderId must be a non-empty string or 'null'"
   }).optional(),
   tagId: z.string().cuid().optional(),
   search: z.string().max(500).optional(),
