@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, prismaClient } from "@/lib/db";
 import {
   getUserContext,
   successResponse,
@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
     const { moves } = validationResult.data;
 
     // Execute all moves in a transaction for atomicity
-    const result = await prisma.$transaction(async (tx) => {
+    // Use prismaClient (base client) for transactions - middleware extensions don't work with transactions
+    const result = await prismaClient.$transaction(async (tx) => {
       // Track created folders to avoid duplicates
       const createdFolders = new Map<string, string>(); // folderName -> folderId
       const results: Array<{

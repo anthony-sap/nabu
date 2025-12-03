@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, prismaClient } from "@/lib/db";
 import { noteUpdateSchema } from "@/lib/validations/nabu";
 import {
   getUserContext,
@@ -260,8 +260,9 @@ export async function PATCH(
     );
 
     // Update note with tags in a transaction
-    const note = await prisma.$transaction(async (tx) => {
-      // Update note
+    // Use prismaClient (base client) for transactions - middleware extensions don't work with transactions
+    const note = await prismaClient.$transaction(async (tx) => {
+      // Update note - preserve existing tenantId/workspaceId unless explicitly changed
       const updatedNote = await tx.note.update({
         where: { id },
         data: {
@@ -277,12 +278,13 @@ export async function PATCH(
           where: { noteId: id },
         });
 
-        // Add new tags
+        // Add new tags - preserve tenantId from existing note
         if (tagIds.length > 0) {
           await tx.noteTag.createMany({
             data: tagIds.map((tagId) => ({
               noteId: id,
               tagId,
+              tenantId: existingNote.tenantId, // Preserve tenantId from existing note
               createdBy: userId,
             })),
           });

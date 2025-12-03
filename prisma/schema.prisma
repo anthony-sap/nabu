@@ -891,11 +891,11 @@ model WorkspaceInvite {
   role        String    // 'admin' | 'member' | 'guest'
   token       String    @unique
   expiresAt   DateTime
-  createdById String
   createdAt   DateTime  @default(now())
   acceptedAt  DateTime?
   
   // Audit fields
+  createdBy   String?
   updatedAt   DateTime  @default(now()) @updatedAt
   updatedBy   String?
   deletedAt   DateTime?

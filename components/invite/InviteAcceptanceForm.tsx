@@ -6,11 +6,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LoginLink } from "@kinde-oss/kinde-auth-nextjs";
 import { toast } from "sonner";
+import { setCookie, deleteCookie } from "@/lib/cookies";
 import {
   Users,
   Mail,
@@ -97,6 +98,9 @@ export function InviteAcceptanceForm({
         return;
       }
 
+      // Clear the pending invite cookie if it exists
+      deleteCookie('pendingInviteToken');
+      
       toast.success(`You've joined ${workspaceName}!`);
       router.push("/notes");
     } catch (err) {
@@ -193,6 +197,11 @@ export function InviteAcceptanceForm({
             <LoginLink
               postLoginRedirectURL={`/invite/${token}`}
               className="w-full"
+              onClick={() => {
+                // Store invite token in cookie before redirecting to login
+                // This ensures we can redirect back even if postLoginRedirectURL doesn't work
+                setCookie('pendingInviteToken', token, { maxAge: 60 * 10 }); // 10 minutes
+              }}
             >
               <Button className="w-full" size="lg">
                 Sign in to Accept

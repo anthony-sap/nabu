@@ -111,17 +111,56 @@ export const createUserInKinde = async (
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      
+      // Try to parse error message from response
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If parsing fails, use the text as-is
+        if (errorText) {
+          errorMessage = errorText;
+        }
+      }
+
+      // Handle specific error cases
+      if (response.status === 409 || errorMessage.includes("already exists") || errorMessage.includes("duplicate")) {
+        // User already exists - this is okay, we can return the existing user ID
+        // Try to find the user by email
+        const existingUser = await findUsersInKinde({ email: user.email, page_size: 1 });
+        if (existingUser && typeof existingUser === 'object' && 'users' in existingUser) {
+          const users = (existingUser as any).users;
+          if (Array.isArray(users) && users.length > 0 && users[0].id) {
+            console.log(`[Kinde] User ${user.email} already exists, returning existing ID: ${users[0].id}`);
+            return users[0].id;
+          }
+        }
+        throw new Error(`User with email ${user.email} already exists in Kinde`);
+      }
+
+      throw new Error(errorMessage);
     }
 
     const responseData: ResponseData = await response.json();
     const userSub = responseData.id;
 
-    await updateUserRolesInKinde(userSub, (user.roles as string[]) ?? [], []);
+    // Update roles if provided (don't fail if this fails)
+    try {
+      await updateUserRolesInKinde(userSub, (user.roles as string[]) ?? [], []);
+    } catch (roleError) {
+      console.error(`[Kinde] Failed to update roles for user ${userSub}:`, roleError);
+      // Don't throw - user creation succeeded, role update is secondary
+    }
 
     return userSub;
-  } catch (error) {
-    console.error(JSON.stringify(error));
+  } catch (error: any) {
+    console.error(`[Kinde] Error creating user ${user.email}:`, error?.message || error);
     throw error;
   }
 };
@@ -352,6 +391,34 @@ export const findUsersInKinde = async (
   } catch (error) {
     console.error(JSON.stringify(error));
     throw error;
+  }
+};
+
+/**
+ * Check if a user exists in Kinde by email
+ * 
+ * @param email - Email address to search for
+ * @returns true if user exists, false otherwise
+ */
+export const userExistsInKinde = async (email: string): Promise<boolean> => {
+  try {
+    const result = await findUsersInKinde({ 
+      email: email.toLowerCase().trim(),
+      page_size: 1 
+    });
+    
+    // Check if users array exists and has at least one user
+    if (result && typeof result === 'object' && 'users' in result) {
+      const users = (result as any).users;
+      return Array.isArray(users) && users.length > 0;
+    }
+    
+    return false;
+  } catch (error) {
+    // If API returns 404 or user not found, return false
+    // Log other errors but don't throw - we'll handle gracefully
+    console.error(`[Kinde] Error checking if user exists: ${email}`, error);
+    return false;
   }
 };
 

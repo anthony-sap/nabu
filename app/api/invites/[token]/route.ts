@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { successResponse, errorResponse, handleApiError } from "@/lib/nabu-helpers";
+import { syncUser } from "@/lib/user-sync";
 
 /**
  * GET /api/invites/[token]
@@ -66,8 +67,8 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !user.email) {
+    const kindeUser = await getCurrentUser();
+    if (!kindeUser || !kindeUser.email) {
       return errorResponse("You must be logged in to accept an invite", 401);
     }
 
@@ -93,10 +94,37 @@ export async function POST(
     }
 
     // Verify email matches
-    if (invite.email.toLowerCase() !== user.email.toLowerCase()) {
+    if (invite.email.toLowerCase() !== kindeUser.email.toLowerCase()) {
       return errorResponse(
-        `This invite was sent to ${invite.email}, but you're logged in as ${user.email}`,
+        `This invite was sent to ${invite.email}, but you're logged in as ${kindeUser.email}`,
         403
+      );
+    }
+
+    // Ensure user exists in database (sync if needed)
+    // This handles the case where user exists in Kinde but not in our database
+    try {
+      await syncUser(kindeUser);
+      console.log(`[InviteAccept] User synced to database: ${kindeUser.email}`);
+    } catch (syncError: any) {
+      console.error(`[InviteAccept] Failed to sync user: ${kindeUser.email}`, syncError);
+      // If sync fails, we can't proceed - return error with helpful message
+      return errorResponse(
+        `Failed to sync user account: ${syncError?.message || 'Unknown error'}. Please try logging out and logging back in, or contact support.`,
+        500
+      );
+    }
+
+    // Verify user exists in database before creating membership
+    const dbUser = await prisma.user.findUnique({
+      where: { id: kindeUser.id },
+      select: { id: true },
+    });
+
+    if (!dbUser) {
+      return errorResponse(
+        "User account not found in database. Please try logging out and logging back in.",
+        500
       );
     }
 
@@ -105,7 +133,7 @@ export async function POST(
       where: {
         workspaceId_userId: {
           workspaceId: invite.workspaceId,
-          userId: user.id,
+          userId: kindeUser.id,
         },
       },
     });
@@ -124,7 +152,7 @@ export async function POST(
     await prisma.workspaceMembership.create({
       data: {
         workspaceId: invite.workspaceId,
-        userId: user.id,
+        userId: kindeUser.id,
         role: invite.role as 'owner' | 'admin' | 'member' | 'guest',
         status: 'active',
         acceptedAt: new Date(),

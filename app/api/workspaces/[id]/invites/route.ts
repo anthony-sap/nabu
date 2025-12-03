@@ -10,6 +10,8 @@ import { getUserContext, successResponse, errorResponse, handleApiError } from "
 import { getEntitlementsForWorkspace } from "@/lib/entitlements/service";
 import { canManageMembers } from "@/lib/workspace/permissions";
 import { sendInviteEmail } from "@/lib/email/send-invite";
+import { userExistsInKinde, createUserInKinde } from "@/lib/kinde";
+import { env } from "@/env";
 import crypto from "crypto";
 
 /**
@@ -83,6 +85,7 @@ export async function POST(
       : inviter?.email || "A team member";
 
     // Create invite
+    // Note: createdBy is automatically set by middleware
     const invite = await prisma.workspaceInvite.create({
       data: {
         workspaceId,
@@ -90,9 +93,36 @@ export async function POST(
         role: role as 'admin' | 'member' | 'guest',
         token,
         expiresAt,
-        createdById: userId,
       },
     });
+
+    // Create user in Kinde if they don't exist (async, don't block response)
+    // This allows users to accept invites even if they don't have accounts yet
+    (async () => {
+      try {
+        const normalizedEmail = email.toLowerCase().trim();
+        const exists = await userExistsInKinde(normalizedEmail);
+        
+        if (!exists) {
+          console.log(`[Invite] Creating Kinde user for ${normalizedEmail}`);
+          await createUserInKinde(
+            {
+              email: normalizedEmail,
+              firstName: null,
+              lastName: null,
+            },
+            env.KINDE_DEFAULT_ORG_CODE
+          );
+          console.log(`[Invite] Successfully created Kinde user for ${normalizedEmail}`);
+        } else {
+          console.log(`[Invite] User ${normalizedEmail} already exists in Kinde`);
+        }
+      } catch (error: any) {
+        // Log but don't fail - invite is still created and user can sign up manually
+        console.error(`[Invite] Failed to create Kinde user for ${email}:`, error?.message || error);
+        // Don't throw - invite creation should succeed even if Kinde user creation fails
+      }
+    })();
 
     // Send invite email (async, don't block response)
     sendInviteEmail({

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, prismaClient } from "@/lib/db";
 import { noteCreateSchema, noteQuerySchema } from "@/lib/validations/nabu";
 import {
   getUserContext,
@@ -9,6 +9,7 @@ import {
   errorResponse,
 } from "@/lib/nabu-helpers";
 import { syncContentHashtagsToNote } from "@/lib/tag-sync-helper";
+import { verifyWorkspaceMembership } from "@/lib/workspace-helpers";
 
 /**
  * GET /api/nabu/notes
@@ -198,14 +199,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Create note with tags in a transaction
-    // Middleware will automatically set tenantId: null if workspaceId is provided
-    const note = await prisma.$transaction(async (tx) => {
-      // Create note - middleware handles workspaceId verification and tenantId setting
+    // Use prismaClient (base client) for transactions - middleware extensions don't work with transactions
+    // We need to manually set tenantId and verify workspace membership
+    const note = await prismaClient.$transaction(async (tx) => {
+      // Determine tenantId based on workspaceId
+      // If workspaceId is set, tenantId should be null (workspace items)
+      // Otherwise, use session tenantId (personal items)
+      const finalTenantId = noteData.workspaceId ? null : tenantId;
+      
+      // Verify workspace membership if workspaceId is provided
+      if (noteData.workspaceId) {
+        await verifyWorkspaceMembership(userId, noteData.workspaceId);
+      }
+      
+      // Create note - manually set fields that middleware would set
       const createdNote = await tx.note.create({
         data: {
           ...noteData,
           userId,
-          // tenantId will be set by middleware (null for workspace, session tenantId for personal)
+          tenantId: finalTenantId, // Set manually (null for workspace, tenantId for personal)
           createdBy: userId,
           updatedBy: userId,
         },
@@ -217,6 +229,7 @@ export async function POST(req: NextRequest) {
           data: tagIds.map((tagId) => ({
             noteId: createdNote.id,
             tagId,
+            tenantId: finalTenantId, // Set manually for consistency
             createdBy: userId,
           })),
         });
