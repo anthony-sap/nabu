@@ -235,6 +235,46 @@ export type KindePropertyValueObject = {
 };
 
 /**
+ * Refresh user claims in Kinde
+ * This invalidates the cache for a user, ensuring the next token includes updated claims
+ * 
+ * @param userSub - The Kinde user ID
+ * @returns Promise that resolves when claims are refreshed
+ */
+export const refreshUserClaimsInKinde = async (
+  userSub: string,
+): Promise<any> => {
+  try {
+    const accessToken: string = await getKindeAccessToken();
+    // Kinde Management API endpoint to refresh user claims
+    // This invalidates the cache so the next token will include updated properties
+    const url = `${env.KINDE_M2M_DOMAIN}/api/v1/users/${userSub}/refresh_claims`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    };
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const responseData: ResponseData = await response.json();
+    console.log(`[Kinde] Refreshed user claims for user: ${userSub}`);
+    return responseData;
+  } catch (error) {
+    console.error(`[Kinde] Error refreshing user claims for ${userSub}:`, error);
+    throw error;
+  }
+};
+
+/**
  * Updates a user properties in Kinde.
  */
 export const updateUserPropertiesInKinde = async (

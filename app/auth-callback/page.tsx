@@ -13,7 +13,7 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
 import { headers, cookies } from "next/headers";
 import { prismaClient, MAIN_TENANT_ID } from "@/lib/db";
-import { updateUserPropertiesInKinde } from "@/lib/kinde";
+import { updateUserPropertiesInKinde, refreshUserClaimsInKinde } from "@/lib/kinde";
 
 interface AuthCallbackPageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -109,6 +109,20 @@ export default async function AuthCallbackPage(props: AuthCallbackPageProps = {}
         tenant_id: dbUser.tenantId || MAIN_TENANT_ID,
       });
       console.log(`[AuthCallback] Updated Kinde properties for user: ${dbUser.id}`);
+      
+      // Refresh user claims to ensure next token includes updated properties
+      try {
+        await refreshUserClaimsInKinde(kindeUser.id);
+        console.log(`[AuthCallback] Refreshed user claims for user: ${dbUser.id}`);
+        
+        // Force re-authentication to get fresh token with updated claims
+        // Redirect to logout then login to get new token
+        console.log(`[AuthCallback] Redirecting to logout to refresh token...`);
+        redirect("/api/auth/logout?post_logout_redirect_uri=/api/auth/login");
+      } catch (refreshError) {
+        console.error("[AuthCallback] Failed to refresh user claims:", refreshError);
+        // Continue anyway - user can refresh token on next login
+      }
     } catch (kindeError) {
       // Log but don't fail - Kinde properties are nice-to-have
       console.error("[AuthCallback] Failed to update Kinde properties:", kindeError);
