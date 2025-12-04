@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LogoutLink, useKindeAuth } from "@kinde-oss/kinde-auth-nextjs";
-import { LayoutDashboard, Lock, LogOut, Settings, Webhook } from "lucide-react";
+import { LayoutDashboard, Lock, LogOut, Settings, Webhook, Sparkles } from "lucide-react";
 import { Drawer } from "vaul";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -105,6 +105,17 @@ export function UserAccountNav() {
 
               <li className="text-foreground hover:bg-muted rounded-lg">
                 <Link
+                  href="/upgrade"
+                  onClick={closeDrawer}
+                  className="flex w-full items-center gap-3 px-2.5 py-2"
+                >
+                  <Sparkles className="size-4" />
+                  <p className="text-sm">Upgrade Plan</p>
+                </Link>
+              </li>
+
+              <li className="text-foreground hover:bg-muted rounded-lg">
+                <Link
                   href="/webhooks"
                   onClick={closeDrawer}
                   className="flex w-full items-center gap-3 px-2.5 py-2"
@@ -180,6 +191,16 @@ export function UserAccountNav() {
           >
             <Settings className="size-4" />
             <p className="text-sm">Settings</p>
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem asChild>
+          <Link
+            href="/upgrade"
+            className="flex items-center space-x-2.5"
+          >
+            <Sparkles className="size-4" />
+            <p className="text-sm">Upgrade Plan</p>
           </Link>
         </DropdownMenuItem>
 

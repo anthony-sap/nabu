@@ -24,11 +24,10 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const includeChildren = searchParams.get("includeChildren") === "true";
 
+    // Middleware automatically handles workspace filtering and tenant isolation
     const folder = await prisma.folder.findFirst({
       where: {
         id,
-        userId,
-        tenantId,
         deletedAt: null,
       },
       include: {
@@ -106,12 +105,10 @@ export async function PATCH(
     // If parentId is being changed, verify it exists and prevent circular references
     if (data.parentId !== undefined) {
       if (data.parentId) {
-        // Check if new parent exists and belongs to user
+        // Check if new parent exists and user has access (middleware handles filtering)
         const parentFolder = await prisma.folder.findFirst({
           where: {
             id: data.parentId,
-            userId,
-            tenantId,
             deletedAt: null,
           },
         });

@@ -33,7 +33,9 @@ export async function getUserContext(): Promise<{
 }
 
 /**
- * Validate that the current user owns a resource
+ * Validate that the current user has access to a resource
+ * Works for both personal items (tenantId + userId) and workspace items (workspaceId + membership)
+ * Middleware ensures user can only access items they have permission for, so this is mainly for business logic
  */
 export async function validateOwnership(
   resourceType: "folder" | "tag" | "note" | "thought",
@@ -43,28 +45,30 @@ export async function validateOwnership(
 ): Promise<boolean> {
   let resource: any;
 
+  // Middleware will automatically filter by workspace membership and tenantId
+  // So we can query without explicit workspaceId/tenantId filters
   switch (resourceType) {
     case "folder":
       resource = await prisma.folder.findFirst({
-        where: { id: resourceId, userId, tenantId, deletedAt: null },
+        where: { id: resourceId, deletedAt: null },
         select: { id: true },
       });
       break;
     case "tag":
       resource = await prisma.tag.findFirst({
-        where: { id: resourceId, userId, tenantId, deletedAt: null },
+        where: { id: resourceId, deletedAt: null },
         select: { id: true },
       });
       break;
     case "note":
       resource = await prisma.note.findFirst({
-        where: { id: resourceId, userId, tenantId, deletedAt: null },
+        where: { id: resourceId, deletedAt: null },
         select: { id: true },
       });
       break;
     case "thought":
       resource = await prisma.thought.findFirst({
-        where: { id: resourceId, userId, tenantId, deletedAt: null },
+        where: { id: resourceId, deletedAt: null },
         select: { id: true },
       });
       break;

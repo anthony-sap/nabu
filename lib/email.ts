@@ -4,9 +4,23 @@ import { Attachment, Message, ServerClient } from "postmark";
 
 import { env } from "@/env";
 
-const emailClient = new ServerClient(env.POSTMARK_API_KEY);
+// Lazy initialization to avoid errors when API key is missing or invalid
+let emailClient: ServerClient | null = null;
 
-export { emailClient };
+function getEmailClient(): ServerClient | null {
+  // Only initialize if we have a valid API key (not "test" or empty)
+  if (!emailClient && env.POSTMARK_API_KEY && env.POSTMARK_API_KEY !== "test" && env.POSTMARK_API_KEY !== "local") {
+    try {
+      emailClient = new ServerClient(env.POSTMARK_API_KEY);
+    } catch (error) {
+      console.error("[Email] Failed to initialize Postmark client:", error);
+      return null;
+    }
+  }
+  return emailClient;
+}
+
+export { getEmailClient };
 
 export enum EMAIL_TEMPLATES {
   NEW_USER = "user-invitation",
@@ -32,17 +46,11 @@ export const sendEmail = async (props: SendEmailProps) => {
     attachments,
   } = props;
 
-  if (!env.POSTMARK_API_KEY || !env.EMAIL_FROM) {
-    console.error("Missing postmark credentials");
-    console.log("sendEmail->props->", props);
-    return;
-  }
-
-  // If API key is "test", log instead of sending
-  if (env.POSTMARK_API_KEY === "test") {
+  // Test mode or missing credentials - log instead of sending
+  if (!env.POSTMARK_API_KEY || env.POSTMARK_API_KEY === "test" || env.POSTMARK_API_KEY === "local" || !env.EMAIL_FROM) {
     console.log("=== EMAIL LOG (TEST MODE) ===");
     console.log("To:", recipient);
-    console.log("From:", env.EMAIL_FROM);
+    console.log("From:", env.EMAIL_FROM || "noreply@localhost");
     console.log("Subject:", subject);
     if (templateAlias) {
       console.log("Template Alias:", templateAlias);
@@ -54,12 +62,21 @@ export const sendEmail = async (props: SendEmailProps) => {
     return { MessageID: "test-message-id" };
   }
 
+  // Get email client (lazy initialization)
+  const client = getEmailClient();
+  if (!client) {
+    console.error("[Email] Postmark client not initialized. Check POSTMARK_API_KEY.");
+    console.log("[Email] Email would have been sent to:", recipient);
+    console.log("[Email] Subject:", subject);
+    return;
+  }
+
   try {
     let result;
 
     if (templateAlias) {
       // Use Postmark template
-      result = await emailClient.sendEmailWithTemplate({
+      result = await client.sendEmailWithTemplate({
         From: env.EMAIL_FROM,
         To: recipient,
         TemplateAlias: templateAlias,
@@ -75,11 +92,12 @@ export const sendEmail = async (props: SendEmailProps) => {
         HtmlBody: htmlBody || "",
         Attachments: attachments,
       };
-      result = await emailClient.sendEmail(payload);
+      result = await client.sendEmail(payload);
     }
 
     return result;
   } catch (e) {
-    console.error(e);
+    console.error("[Email] Error sending email:", e);
+    throw e;
   }
 };

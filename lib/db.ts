@@ -7,6 +7,7 @@ import {
   softDeleteAware,
   storingAuditLog,
   tenantAware,
+  workspaceAware,
 } from "./dbMiddleware";
 
 export const MAIN_TENANT_ID = "4365be3f-1d9c-4408-83d1-c250d1a3a251";
@@ -29,5 +30,6 @@ if (process.env.NODE_ENV === "production") {
 export let prisma = prismaClient
   .$extends(softDeleteAware)
   .$extends(tenantAware)
+  .$extends(workspaceAware)
   .$extends(createdByUpdatedBy)
   .$extends(storingAuditLog);

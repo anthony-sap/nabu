@@ -25,12 +25,10 @@ export async function POST(
       return errorResponse("tagNames array is required", 400);
     }
 
-    // Verify note ownership
+    // Verify note ownership (middleware handles filtering)
     const note = await prisma.note.findFirst({
       where: {
         id: noteId,
-        userId,
-        tenantId,
         deletedAt: null,
       },
     });
@@ -42,23 +40,22 @@ export async function POST(
     // Process each tag
     const results = await Promise.all(
       tagNames.map(async (tagName) => {
-        // Find or create tag
+        // Find or create tag in same workspace as note (or personal if note is personal)
         let tag = await prisma.tag.findFirst({
           where: {
             name: tagName,
-            userId,
-            tenantId,
+            workspaceId: note.workspaceId || null,
             deletedAt: null,
           },
         });
 
         if (!tag) {
           // Create new tag with USER_ADDED source
+          // Middleware will set tenantId: null if workspaceId is set
           tag = await prisma.tag.create({
             data: {
               name: tagName,
-              userId,
-              tenantId,
+              workspaceId: note.workspaceId || null,
               status: "ENABLE",
               createdBy: userId,
               updatedBy: userId,
@@ -184,12 +181,10 @@ export async function DELETE(
       return errorResponse("tagNames array is required", 400);
     }
 
-    // Verify note ownership
+    // Verify note ownership (middleware handles filtering)
     const note = await prisma.note.findFirst({
       where: {
         id: noteId,
-        userId,
-        tenantId,
         deletedAt: null,
       },
     });
@@ -198,12 +193,11 @@ export async function DELETE(
       return errorResponse("Note not found", 404);
     }
     
-    // Find tags by names
+    // Find tags by names in same workspace as note (or personal if note is personal)
     const tags = await prisma.tag.findMany({
       where: {
         name: { in: tagNames },
-        userId,
-        tenantId,
+        workspaceId: note.workspaceId || null,
         deletedAt: null,
       },
     });

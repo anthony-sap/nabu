@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   getUserContext,
@@ -6,6 +7,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
+import { getUserWorkspaceIds, getUserTenantId } from "@/lib/workspace-helpers";
 
 /**
  * GET /api/nabu/trash
@@ -29,17 +31,13 @@ export async function GET(req: NextRequest) {
     // Search
     const search = searchParams.get("search");
 
-    // Build where clause for notes
+    // Build where clause for notes - middleware handles workspace filtering
     const noteWhere: any = {
-      userId,
-      tenantId,
       deletedAt: { not: null },
     };
 
-    // Build where clause for thoughts
+    // Build where clause for thoughts - middleware handles workspace filtering
     const thoughtWhere: any = {
-      userId,
-      tenantId,
       deletedAt: { not: null },
     };
     
@@ -113,22 +111,51 @@ export async function GET(req: NextRequest) {
     ]);
 
    
-    // Debug: Try a raw count query to see total deleted items in DB
-    const rawNoteCount = await prisma.$queryRaw`
-      SELECT COUNT(*) as count 
-      FROM "Note" 
-      WHERE "userId" = ${userId} 
-        AND "tenantId" = ${tenantId}
-        AND "deletedAt" IS NOT NULL
-    `;
+    // Get user's workspace IDs for raw query (raw queries bypass middleware)
+    const workspaceIds = await getUserWorkspaceIds(userId);
+    const tenantId = await getUserTenantId(userId);
     
-    const rawThoughtCount = await prisma.$queryRaw`
-      SELECT COUNT(*) as count 
-      FROM "Thought" 
-      WHERE "userId" = ${userId} 
-        AND "tenantId" = ${tenantId}
-        AND "deletedAt" IS NOT NULL
-    `;
+    // Debug: Try a raw count query to see total deleted items in DB
+    // Include both personal (tenantId) and workspace (workspaceIds) items
+    const rawNoteCount = workspaceIds.length > 0
+      ? await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*) as count 
+          FROM "Note" 
+          WHERE "userId" = ${userId} 
+            AND (
+              ("tenantId" = ${tenantId} AND "workspaceId" IS NULL)
+              OR "workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})
+            )
+            AND "deletedAt" IS NOT NULL
+        `
+      : await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*) as count 
+          FROM "Note" 
+          WHERE "userId" = ${userId} 
+            AND "tenantId" = ${tenantId}
+            AND "workspaceId" IS NULL
+            AND "deletedAt" IS NOT NULL
+        `;
+    
+    const rawThoughtCount = workspaceIds.length > 0
+      ? await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*) as count 
+          FROM "Thought" 
+          WHERE "userId" = ${userId} 
+            AND (
+              ("tenantId" = ${tenantId} AND "workspaceId" IS NULL)
+              OR "workspaceId" IN (${Prisma.join(workspaceIds.map(id => Prisma.sql`${id}`), ', ')})
+            )
+            AND "deletedAt" IS NOT NULL
+        `
+      : await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*) as count 
+          FROM "Thought" 
+          WHERE "userId" = ${userId} 
+            AND "tenantId" = ${tenantId}
+            AND "workspaceId" IS NULL
+            AND "deletedAt" IS NOT NULL
+        `;
 
     // Helper function to calculate days left and create snippet
     const processItem = (item: any, type: "note" | "thought") => {

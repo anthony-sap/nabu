@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, prismaClient } from "@/lib/db";
 import { noteCreateSchema, noteQuerySchema } from "@/lib/validations/nabu";
 import {
   getUserContext,
@@ -9,6 +9,7 @@ import {
   errorResponse,
 } from "@/lib/nabu-helpers";
 import { syncContentHashtagsToNote } from "@/lib/tag-sync-helper";
+import { verifyWorkspaceMembership } from "@/lib/workspace-helpers";
 
 /**
  * GET /api/nabu/notes
@@ -35,10 +36,8 @@ export async function GET(req: NextRequest) {
 
     const { folderId, tagId, search, visibility, page = 1, limit = 20 } = queryResult.data;
 
-    // Build query
+    // Build query - middleware automatically handles workspace filtering and tenant isolation
     const where: any = {
-      userId,
-      tenantId,
       deletedAt: null,
     };
 
@@ -154,13 +153,11 @@ export async function POST(req: NextRequest) {
 
     const { tagIds, ...noteData } = validationResult.data;
 
-    // If folderId is provided, verify it exists and belongs to user
+    // If folderId is provided, verify it exists and user has access (middleware handles filtering)
     if (noteData.folderId) {
       const folder = await prisma.folder.findFirst({
         where: {
           id: noteData.folderId,
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
@@ -168,15 +165,22 @@ export async function POST(req: NextRequest) {
       if (!folder) {
         return errorResponse("Folder not found", 404);
       }
+      
+      // If folder belongs to a workspace, ensure note's workspaceId matches (if provided)
+      if (folder.workspaceId && noteData.workspaceId && folder.workspaceId !== noteData.workspaceId) {
+        return errorResponse("Folder belongs to a different workspace", 400);
+      }
+      // If folder is workspace folder but note doesn't have workspaceId, inherit it
+      if (folder.workspaceId && !noteData.workspaceId) {
+        noteData.workspaceId = folder.workspaceId;
+      }
     }
 
-    // If tagIds provided, verify they exist and belong to user
+    // If tagIds provided, verify they exist and user has access (middleware handles filtering)
     if (tagIds && tagIds.length > 0) {
       const tags = await prisma.tag.findMany({
         where: {
           id: { in: tagIds },
-          userId,
-          tenantId,
           deletedAt: null,
         },
       });
@@ -184,16 +188,36 @@ export async function POST(req: NextRequest) {
       if (tags.length !== tagIds.length) {
         return errorResponse("One or more tags not found", 404);
       }
+      
+      // Ensure tags belong to same workspace as note (if workspace note)
+      if (noteData.workspaceId) {
+        const invalidTags = tags.filter(tag => tag.workspaceId !== noteData.workspaceId);
+        if (invalidTags.length > 0) {
+          return errorResponse("Tags must belong to the same workspace as the note", 400);
+        }
+      }
     }
 
     // Create note with tags in a transaction
-    const note = await prisma.$transaction(async (tx) => {
-      // Create note
+    // Use prismaClient (base client) for transactions - middleware extensions don't work with transactions
+    // We need to manually set tenantId and verify workspace membership
+    const note = await prismaClient.$transaction(async (tx) => {
+      // Determine tenantId based on workspaceId
+      // If workspaceId is set, tenantId should be null (workspace items)
+      // Otherwise, use session tenantId (personal items)
+      const finalTenantId = noteData.workspaceId ? null : tenantId;
+      
+      // Verify workspace membership if workspaceId is provided
+      if (noteData.workspaceId) {
+        await verifyWorkspaceMembership(userId, noteData.workspaceId);
+      }
+      
+      // Create note - manually set fields that middleware would set
       const createdNote = await tx.note.create({
         data: {
           ...noteData,
           userId,
-          tenantId,
+          tenantId: finalTenantId, // Set manually (null for workspace, tenantId for personal)
           createdBy: userId,
           updatedBy: userId,
         },
@@ -205,6 +229,7 @@ export async function POST(req: NextRequest) {
           data: tagIds.map((tagId) => ({
             noteId: createdNote.id,
             tagId,
+            tenantId: finalTenantId, // Set manually for consistency
             createdBy: userId,
           })),
         });

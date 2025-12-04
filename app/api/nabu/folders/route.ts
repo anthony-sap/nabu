@@ -21,6 +21,144 @@ export async function GET(req: NextRequest) {
     const { userId, tenantId } = await getUserContext();
     const { searchParams } = new URL(req.url);
 
+    // Check if we need to return grouped folders (personal + workspaces)
+    const includeWorkspaces = searchParams.get("includeWorkspaces") === "true";
+
+    // If includeWorkspaces is true, return grouped folders
+    if (includeWorkspaces) {
+      // Get user's workspace memberships
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          workspaceMemberships: {
+            where: { status: "active" },
+            include: {
+              workspace: true,
+            },
+          },
+        },
+      });
+
+      // Fetch personal folders (workspaceId IS NULL)
+      const personalFolders = await prisma.folder.findMany({
+        where: {
+          userId,
+          tenantId,
+          workspaceId: null,
+          deletedAt: null,
+          parentId: null,
+        },
+        include: {
+          _count: {
+            select: { notes: true, children: true },
+          },
+          children: {
+            where: { 
+              deletedAt: null,
+              workspaceId: null, // Only personal folder children
+            },
+            include: {
+              _count: {
+                select: { notes: true, children: true },
+              },
+            },
+            orderBy: [{ order: "asc" }, { name: "asc" }],
+          },
+        },
+        orderBy: [{ order: "asc" }, { name: "asc" }],
+      });
+
+      // Fetch personal uncategorised notes
+      const personalUncategorisedNotes = await prisma.note.findMany({
+        where: {
+          userId,
+          tenantId,
+          workspaceId: null,
+          folderId: null,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+
+      // Fetch workspace folders for each workspace
+      const workspaceGroups = await Promise.all(
+        (user?.workspaceMemberships || []).map(async (membership) => {
+          const workspaceFolders = await prisma.folder.findMany({
+            where: {
+              workspaceId: membership.workspaceId,
+              deletedAt: null,
+              parentId: null,
+            },
+            include: {
+              _count: {
+                select: { notes: true, children: true },
+              },
+              children: {
+                where: { deletedAt: null },
+                include: {
+                  _count: {
+                    select: { notes: true, children: true },
+                  },
+                },
+                orderBy: [{ order: "asc" }, { name: "asc" }],
+              },
+            },
+            orderBy: [{ order: "asc" }, { name: "asc" }],
+          });
+
+          // Fetch workspace uncategorised notes
+          const workspaceUncategorisedNotes = await prisma.note.findMany({
+            where: {
+              workspaceId: membership.workspaceId,
+              folderId: null,
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              title: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          });
+
+          return {
+            id: membership.workspaceId,
+            name: membership.workspace.name,
+            role: membership.role,
+            folders: workspaceFolders.map((folder) =>
+              formatFolderResponse(folder, true, false)
+            ),
+            uncategorisedNotes: workspaceUncategorisedNotes,
+          };
+        })
+      );
+
+      return new Response(
+        JSON.stringify(
+          successResponse({
+            personal: {
+              folders: personalFolders.map((folder) =>
+                formatFolderResponse(folder, true, false)
+              ),
+              uncategorisedNotes: personalUncategorisedNotes,
+            },
+            workspaces: workspaceGroups,
+          })
+        ),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Validate query params
     const queryResult = folderQuerySchema.safeParse({
       parentId: searchParams.get("parentId") || undefined,
@@ -50,7 +188,7 @@ export async function GET(req: NextRequest) {
         child_count: bigint;
       }>>`
         WITH RECURSIVE folder_tree AS (
-          -- Base: root folders
+          -- Base: root folders (personal only)
           SELECT 
             id, name, color, "parentId", "userId", "tenantId", "order",
             0 as level,
@@ -58,12 +196,13 @@ export async function GET(req: NextRequest) {
           FROM "Folder"
           WHERE "userId" = ${userId}
             AND ("tenantId" = ${tenantId} OR ("tenantId" IS NULL AND ${tenantId}::text IS NULL))
+            AND "workspaceId" IS NULL
             AND "deletedAt" IS NULL 
             AND "parentId" IS NULL
           
           UNION ALL
           
-          -- Recursive: child folders
+          -- Recursive: child folders (personal only)
           SELECT 
             f.id, f.name, f.color, f."parentId", f."userId", f."tenantId", f."order",
             ft.level + 1,
@@ -71,6 +210,7 @@ export async function GET(req: NextRequest) {
           FROM "Folder" f
           INNER JOIN folder_tree ft ON f."parentId" = ft.id
           WHERE f."deletedAt" IS NULL
+            AND f."workspaceId" IS NULL
         )
         SELECT 
           ft.id,
@@ -133,10 +273,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Build query for non-full-tree requests
+    // For regular queries (not includeWorkspaces), only return personal folders
+    // Explicitly filter workspaceId: null so middleware only returns personal folders
     const where: any = {
-      userId,
-      tenantId,
       deletedAt: null,
+      workspaceId: null, // Explicitly filter for personal folders only
     };
 
     // If parentId is not specified, get only root folders (parentId is null)
@@ -221,13 +362,15 @@ export async function POST(req: NextRequest) {
 
     const data = validationResult.data;
 
-    // If parentId is provided, verify it exists and belongs to user
+    // If parentId is provided, verify it exists and belongs to user/workspace
     if (data.parentId) {
       const parentFolder = await prisma.folder.findFirst({
         where: {
           id: data.parentId,
-          userId,
-          tenantId,
+          ...(data.workspaceId 
+            ? { workspaceId: data.workspaceId }
+            : { userId, tenantId, workspaceId: null }
+          ),
           deletedAt: null,
         },
       });
@@ -237,10 +380,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // If workspaceId is provided, verify user has access to the workspace
+    if (data.workspaceId) {
+      const membership = await prisma.workspaceMembership.findFirst({
+        where: {
+          workspaceId: data.workspaceId,
+          userId,
+          status: "active",
+        },
+      });
+
+      if (!membership) {
+        return errorResponse("You don't have access to this workspace", 403);
+      }
+    }
+
     // Create folder
     const folder = await prisma.folder.create({
       data: {
-        ...data,
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        parentId: data.parentId,
+        workspaceId: data.workspaceId || null,
+        order: data.order,
         userId,
         tenantId,
         createdBy: userId,

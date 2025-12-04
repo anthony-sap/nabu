@@ -37,7 +37,7 @@ interface ApiFolderResponse {
 /**
  * Transform API folder response to FolderItem format
  */
-function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
+export function transformFolder(apiFolder: ApiFolderResponse): FolderItem {
   // Fallback: if _count is empty/missing, calculate from actual data
   const childCount = apiFolder._count?.children ?? apiFolder.children?.length ?? 0;
   const notesCount = apiFolder._count?.notes ?? apiFolder.notes?.length ?? 0;
@@ -142,6 +142,71 @@ export async function fetchFolderChildren(parentId: string, includeNotes = true)
 }
 
 /**
+ * Grouped folders response structure
+ */
+export interface GroupedFoldersResponse {
+  personal: {
+    folders: FolderItem[];
+    uncategorisedNotes: NoteItem[];
+  };
+  workspaces: Array<{
+    id: string;
+    name: string;
+    role: string;
+    folders: FolderItem[];
+    uncategorisedNotes: NoteItem[];
+  }>;
+}
+
+/**
+ * Fetch grouped folders (personal + workspaces)
+ * @returns Grouped folders with personal and workspace sections
+ */
+export async function fetchGroupedFolders(): Promise<GroupedFoldersResponse> {
+  try {
+    const response = await fetch("/api/nabu/folders?includeWorkspaces=true");
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to fetch grouped folders: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.success || !data.data) {
+      throw new Error("Invalid response format from server");
+    }
+
+    return {
+      personal: {
+        folders: data.data.personal.folders.map(transformFolder),
+        uncategorisedNotes: data.data.personal.uncategorisedNotes.map((note: any) => ({
+          id: note.id,
+          title: note.title,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        })),
+      },
+      workspaces: data.data.workspaces.map((ws: any) => ({
+        id: ws.id,
+        name: ws.name,
+        role: ws.role,
+        folders: ws.folders.map(transformFolder),
+        uncategorisedNotes: ws.uncategorisedNotes.map((note: any) => ({
+          id: note.id,
+          title: note.title,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        })),
+      })),
+    };
+  } catch (error) {
+    console.error("Error fetching grouped folders:", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch notes for a specific folder
  * @param folderId - ID of the folder, or null/undefined for uncategorized notes
  * @returns Array of notes in the folder
@@ -151,15 +216,16 @@ export async function fetchFolderNotes(folderId: string | null | undefined): Pro
     // Normalize null/undefined to 'null' string for uncategorized notes
     const normalizedFolderId = folderId === null || folderId === undefined ? 'null' : folderId;
     
-    // Validate folderId format - should be 'null' or a valid CUID
+    // Validate folderId format - should be 'null' or a non-empty string
+    // Backend will validate CUID format, so we just check it's a valid string here
     if (normalizedFolderId !== 'null') {
-      if (!normalizedFolderId || typeof normalizedFolderId !== 'string') {
+      if (!normalizedFolderId || typeof normalizedFolderId !== 'string' || normalizedFolderId.trim().length === 0) {
         throw new Error(`Invalid folderId: ${folderId}. Expected a valid folder ID or null for uncategorized notes.`);
       }
-      // Validate CUID format using zod (matches backend validation)
-      const cuidValidation = z.string().cuid().safeParse(normalizedFolderId);
-      if (!cuidValidation.success) {
-        throw new Error(`Invalid folderId format: ${folderId}. Expected a valid CUID or null for uncategorized notes.`);
+      // Basic validation: ensure it's a reasonable length (CUIDs are typically 25 chars)
+      // But accept any non-empty string since backend will validate the actual format
+      if (normalizedFolderId.length < 1 || normalizedFolderId.length > 100) {
+        throw new Error(`Invalid folderId format: ${folderId}. Folder ID length is invalid.`);
       }
     }
     

@@ -5,6 +5,12 @@ import { Prisma } from "@prisma/client";
 import { prismaClient } from "./db";
 import { getSchemaModelMap } from "./dbSchemaMap";
 import { getCurrentUser } from "./session";
+import {
+  hasWorkspaceIdField,
+  getUserWorkspaceIds,
+  verifyWorkspaceMembership,
+  getUserTenantId,
+} from "./workspace-helpers";
 
 // extension for making models soft delete aware
 export const softDeleteAware = Prisma.defineExtension({
@@ -83,10 +89,16 @@ export const tenantAware = Prisma.defineExtension({
         if (model == "WhatsAppLinkToken") {
           return query(args);
         }
+        // Skip tenant filtering for workspace-related models (handled by workspaceAware)
+        if (model == "Workspace" || model == "WorkspaceMembership" || model == "WorkspaceInvite") {
+          return query(args);
+        }
 
         const user = await getCurrentUser();
-
         const sessionTenantId = user?.tenantId;
+        
+        // Check if this model has workspaceId field
+        const isWorkspaceAware = hasWorkspaceIdField(model);
         
         if (
           ["findUnique", "findFirst", "findMany", "count"].includes(operation)
@@ -94,7 +106,21 @@ export const tenantAware = Prisma.defineExtension({
           if (!args["where"]) {
             args["where"] = {};
           }
-          args["where"]["tenantId"] = sessionTenantId;
+          
+          // For workspace-aware models, skip tenantId filter if workspaceId is present
+          // (workspace items have tenantId: null, personal items will be filtered by tenantId)
+          if (isWorkspaceAware) {
+            const hasWorkspaceId = args["where"]["workspaceId"] !== undefined;
+            if (!hasWorkspaceId) {
+              // No workspaceId specified - tenantAware will filter by tenantId for personal items
+              // workspaceAware will add workspace items separately
+              args["where"]["tenantId"] = sessionTenantId;
+            }
+            // If workspaceId is present, skip tenantId filter (workspaceAware will handle it)
+          } else {
+            // Non-workspace-aware models: always filter by tenantId
+            args["where"]["tenantId"] = sessionTenantId;
+          }
         } else if (
           operation === "create" ||
           operation === "createMany" ||
@@ -107,9 +133,18 @@ export const tenantAware = Prisma.defineExtension({
           const explicitTenantId = Array.isArray(dataObject) 
             ? dataObject[0]?.tenantId 
             : dataObject?.tenantId;
+          const explicitWorkspaceId = Array.isArray(dataObject)
+            ? dataObject[0]?.workspaceId
+            : dataObject?.workspaceId;
           
-          // Use explicit tenantId if provided (e.g., from webhooks), otherwise use session tenantId
-          const tenantId = explicitTenantId !== undefined ? explicitTenantId : sessionTenantId;
+          // For workspace-aware models: if workspaceId is set, tenantId should be null
+          // Otherwise use explicit tenantId or session tenantId
+          let tenantId: string | null;
+          if (isWorkspaceAware && explicitWorkspaceId !== undefined && explicitWorkspaceId !== null) {
+            tenantId = null; // Workspace items have tenantId: null
+          } else {
+            tenantId = explicitTenantId !== undefined ? explicitTenantId : sessionTenantId;
+          }
           
           args["data"] = updateArgsDataWithSchema({
             modelName: model,
@@ -119,24 +154,161 @@ export const tenantAware = Prisma.defineExtension({
               tenantId,
             },
             updateDataRelational: {
-              Tenant: {
+              Tenant: tenantId ? {
                 connect: {
                   id: tenantId,
                 },
-              },
+              } : undefined,
             },
             createData: {
               tenantId,
             },
             createDataRelational: {
-              Tenant: {
+              Tenant: tenantId ? {
                 connect: {
                   id: tenantId,
                 },
-              },
+              } : undefined,
             },
           });
         }
+        return query(args);
+      },
+    },
+  },
+});
+
+// extension for making models workspace aware
+export const workspaceAware = Prisma.defineExtension({
+  name: "workspaceAware",
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        // Only apply to models with workspaceId field
+        if (!hasWorkspaceIdField(model)) {
+          return query(args);
+        }
+
+        const user = await getCurrentUser();
+        if (!user?.id) {
+          return query(args);
+        }
+
+        const userId = user.id;
+        
+        if (
+          ["findUnique", "findFirst", "findMany", "count"].includes(operation)
+        ) {
+          if (!args["where"]) {
+            args["where"] = {};
+          }
+
+          const where = args["where"];
+          const explicitWorkspaceId = where["workspaceId"];
+          const hasExplicitWorkspaceId = "workspaceId" in where;
+
+          // If workspaceId is explicitly set to null, only return personal items
+          if (hasExplicitWorkspaceId && explicitWorkspaceId === null) {
+            // Explicitly filtering for personal items only - don't add workspace items
+            // The where clause already has workspaceId: null, which is what we want
+            // No need to modify where clause further
+          } else if (hasExplicitWorkspaceId && explicitWorkspaceId !== null) {
+            // Verify user has access to this workspace
+            await verifyWorkspaceMembership(userId, explicitWorkspaceId);
+            // Filter by this specific workspace (tenantId is already null for workspace items)
+            // No need to modify where clause further
+          } else {
+            // No explicit workspaceId - need to include both personal and workspace items
+            const workspaceIds = await getUserWorkspaceIds(userId);
+            const tenantId = await getUserTenantId(userId);
+
+            // tenantAware has already set tenantId in where clause
+            // We need to modify it to allow both personal (tenantId match) and workspace items (tenantId: null)
+            
+            // Get the tenantId that tenantAware set
+            const tenantIdFromWhere = where["tenantId"];
+            
+            // Remove tenantId and workspaceId from where (we'll handle them in OR)
+            const existingConditions = { ...where };
+            delete existingConditions["workspaceId"];
+            delete existingConditions["tenantId"];
+
+            // Build OR condition: personal items OR workspace items
+            const workspaceOrConditions: any[] = [];
+
+            // Personal items: workspaceId is null AND tenantId matches
+            workspaceOrConditions.push({
+              workspaceId: null,
+              tenantId: tenantIdFromWhere !== undefined ? tenantIdFromWhere : tenantId,
+            });
+
+            // Workspace items: workspaceId in user's accessible workspaces (tenantId is null)
+            if (workspaceIds.length > 0) {
+              workspaceOrConditions.push({
+                workspaceId: { in: workspaceIds },
+              });
+            }
+
+            // If there are existing OR conditions, combine them with workspace OR using AND
+            if (where["OR"]) {
+              // Wrap existing OR and workspace OR in AND
+              args["where"] = {
+                ...existingConditions,
+                AND: [
+                  { OR: where["OR"] },
+                  { OR: workspaceOrConditions },
+                ],
+              };
+            } else {
+              // No existing OR - just add workspace OR
+              args["where"] = {
+                ...existingConditions,
+                OR: workspaceOrConditions,
+              };
+            }
+          }
+        } else if (
+          operation === "create" ||
+          operation === "createMany" ||
+          operation === "createManyAndReturn" ||
+          operation === "update" ||
+          operation === "updateMany"
+        ) {
+          const dataObject = args?.data ?? {};
+          const explicitWorkspaceId = Array.isArray(dataObject)
+            ? dataObject[0]?.workspaceId
+            : dataObject?.workspaceId;
+
+          // If workspaceId is set, verify membership and ensure tenantId is null
+          if (explicitWorkspaceId !== undefined && explicitWorkspaceId !== null) {
+            await verifyWorkspaceMembership(userId, explicitWorkspaceId);
+            
+            // Ensure tenantId is null for workspace items
+            if (Array.isArray(dataObject)) {
+              dataObject.forEach((item: any) => {
+                if (item) {
+                  item.tenantId = null;
+                  item.userId = userId; // Ensure userId matches authenticated user
+                }
+              });
+            } else {
+              dataObject.tenantId = null;
+              dataObject.userId = userId; // Ensure userId matches authenticated user
+            }
+          } else {
+            // Personal item - ensure userId matches
+            if (Array.isArray(dataObject)) {
+              dataObject.forEach((item: any) => {
+                if (item) {
+                  item.userId = userId;
+                }
+              });
+            } else {
+              dataObject.userId = userId;
+            }
+          }
+        }
+
         return query(args);
       },
     },

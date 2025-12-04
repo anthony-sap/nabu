@@ -163,3 +163,8 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Fix Radix ScrollArea display:table issue */
+.scroll-area-viewport > div[style*="display:table"] {
+  display: block !important;
+}
