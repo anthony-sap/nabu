@@ -59,11 +59,11 @@ const config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
+        sans: ["var(--font-sans)", ...fontFamily.sans],  // Inter - UI/Body
         urban: ["var(--font-urban)", ...fontFamily.sans],
         heading: ["var(--font-heading)", ...fontFamily.sans],
         geist: ["var(--font-geist)", ...fontFamily.sans],
-        serif: ["Georgia", "Cambria", "Times New Roman", "Times", "serif"],
+        serif: ["var(--font-serif)", "Georgia", "Cambria", "Times New Roman", "Times", "serif"],  // Playfair Display - Headings
       },
       boxShadow: {
         "nabu": "0 10px 30px -10px hsl(var(--ring) / 0.25)",

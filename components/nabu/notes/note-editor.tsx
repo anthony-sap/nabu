@@ -1091,9 +1091,9 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       </div>
 
       {/* Scrollable content area with sidebar */}
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden ">
         {/* Main Content - Scrollable */}
-        <ScrollArea className="flex-1 overflow-y-auto">
+        <ScrollArea className="flex-1 overflow-y-auto bg-white items-center justify-between">
           <div className="relative max-w-6xl mx-auto px-6 py-8 space-y-6">
             {/* Title input - larger and more prominent */}
             <input
@@ -1115,7 +1115,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
 
             {/* Suggested tags display (for reference after review) */}
             {!showSuggestionNotification && suggestedTags.length > 0 && (
-              <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/30">
+              <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted border border-dashed border-muted-foreground/30">
                 <span className="text-xs text-muted-foreground font-medium w-full mb-1">
                   AI Suggested (for reference):
                 </span>
