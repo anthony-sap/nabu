@@ -557,7 +557,7 @@ export function LexicalEditor({
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className={`relative border border-input rounded-lg bg-muted/30 focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-colors ${className}`}>
+      <div className={`relative rounded-lg   transition-colors ${className}`}>
         {showToolbar && <LexicalToolbar noteId={noteId} />}
         <div className="relative">
           <RichTextPlugin

@@ -128,5 +128,108 @@
   .border-nabu-mint {
     border-color: rgb(var(--nabu-mint));
   }
+
+  .shadow-nabu-mint {
+    --tw-shadow-color: rgb(var(--nabu-mint));
+  }
+}
+
+/* Nabu Button Styles */
+@layer components {
+  /* Primary Button - Prominent Actions */
+  .btn-nabu-primary {
+    @apply bg-nabu-mint text-white font-bold text-sm
+           rounded-xl py-2.5 px-5
+           shadow-lg shadow-nabu-mint/20
+           hover:bg-nabu-mint/90 hover:scale-105 
+           transition-all;
+  }
+  
+  /* Secondary Primary Button - Slightly smaller scale on hover */
+  .btn-nabu-primary-sm {
+    @apply bg-nabu-mint text-white font-bold text-sm
+           rounded-xl py-2.5 px-5
+           shadow-lg shadow-nabu-mint/20
+           hover:bg-nabu-mint/90 hover:scale-[1.02] 
+           transition-all;
+  }
+
+  /* Secondary / Ghost Button - Navigation & Utilities */
+  .btn-nabu-ghost {
+    @apply text-[rgb(var(--nabu-deep))]/60 dark:text-white/60
+           bg-transparent rounded-lg p-2
+           hover:bg-[rgb(var(--nabu-deep))]/5 dark:hover:bg-white/10
+           hover:text-[rgb(var(--nabu-deep))] dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Icon Button - Square ghost button for icons */
+  .btn-nabu-icon {
+    @apply w-10 h-10 flex items-center justify-center
+           text-[rgb(var(--nabu-deep))]/60 dark:text-white/60
+           bg-transparent rounded-xl
+           hover:bg-[rgb(var(--nabu-deep))]/5 dark:hover:bg-white/10
+           hover:text-[rgb(var(--nabu-deep))] dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Tab Button - For switchers */
+  .btn-nabu-tab {
+    @apply text-[rgb(var(--nabu-deep))]/40 dark:text-white/40
+           border-b-2 border-transparent
+           hover:text-[rgb(var(--nabu-deep))]/70 dark:hover:text-white/70
+           transition-all duration-200;
+  }
+
+  .btn-nabu-tab-active {
+    @apply text-[rgb(var(--nabu-deep))] dark:text-white
+           border-b-2 border-[rgb(var(--nabu-mint))];
+  }
+
+  /* Quick Action Chip */
+  .btn-nabu-chip {
+    @apply bg-white dark:bg-[rgb(var(--nabu-deep))]/60
+           border border-[rgb(var(--nabu-deep))]/5 dark:border-white/5
+           shadow-[0_4px_20px_rgba(7,22,51,0.04)]
+           rounded-xl px-3 py-2
+           hover:scale-[1.02] hover:shadow-xl
+           transition-all duration-200;
+  }
+
+  .btn-nabu-chip-active {
+    @apply border-[rgb(var(--nabu-mint))];
+  }
+
+  /* Modal Cancel/Ghost Button */
+  .btn-nabu-cancel {
+    @apply bg-transparent text-nabu-deep/60 dark:text-white/60
+           font-medium text-sm rounded-xl py-2.5 px-5
+           hover:bg-nabu-deep/5 dark:hover:bg-white/10
+           hover:text-nabu-deep dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Color Swatch Button - Tactile candy buttons */
+  .color-swatch {
+    @apply w-8 h-8 rounded-full shadow-sm
+           hover:scale-110 hover:ring-2 hover:ring-offset-2
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .color-swatch-selected {
+    @apply ring-2 ring-offset-2 ring-nabu-deep/20 dark:ring-white/20;
+  }
+
+  /* Nabu Modal Input - Etched Slot style */
+  .input-nabu {
+    @apply w-full h-12 px-4 py-3 rounded-xl
+           bg-[#F8FAFC] dark:bg-white/5
+           border border-nabu-deep/5 dark:border-white/10
+           text-base font-medium text-nabu-deep dark:text-white
+           placeholder:text-nabu-deep/30 dark:placeholder:text-white/30
+           focus:border-nabu-mint focus:ring-1 focus:ring-nabu-mint focus:outline-none
+           transition-all duration-200;
+  }
 }
 

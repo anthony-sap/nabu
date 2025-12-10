@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/session";
 import { QuickThoughtProvider } from "@/components/nabu/quick-thought-context";
 import { QuickThoughtManager } from "@/components/nabu/quick-thought-manager";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { AppShell } from "@/components/nabu/app-shell";
 
 interface NabuLayoutProps {
   children: React.ReactNode;
@@ -10,7 +11,11 @@ interface NabuLayoutProps {
 
 /**
  * Layout for the Nabu application section
- * Minimalist layout with integrated sidebar navigation
+ * 
+ * Three-Layer Visual Physics:
+ * 1. Canvas: Solid base (Slate 50 light / Nabu Deep dark)
+ * 2. Atmosphere: Blurred Mint & Lapis orbs for ambient light
+ * 3. Lens: Glass sidebar catches and diffuses the atmosphere
  */
 export default async function NabuLayout({ children }: NabuLayoutProps) {
   const user = await getCurrentUser();
@@ -21,22 +26,24 @@ export default async function NabuLayout({ children }: NabuLayoutProps) {
   return (
     <QueryProvider>
       <QuickThoughtProvider>
-        {/* Multi-layer gradient background for premium feel */}
-        <div className="relative flex min-h-screen w-full bg-background">
-          {/* Radial gradient overlays */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
-          <div className="absolute top-0 left-0 right-0 h-[600px] bg-gradient-radial from-primary/10 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-gradient-radial from-secondary/8 via-transparent to-transparent pointer-events-none" />
+        {/* Background Container - Matching Prototype */}
+        <div className="w-full h-screen overflow-hidden relative font-sans text-nabu-deep dark:text-white selection:bg-nabu-mint/30 transition-colors duration-300 bg-[#F8FAFC] dark:bg-[#071633]">
           
-          {/* Subtle noise texture overlay */}
-          <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
-          }} />
+          {/* Atmosphere Orb 1: Mint - Top Left */}
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-nabu-mint/10 dark:bg-nabu-mint/5 rounded-full blur-[120px] pointer-events-none mix-blend-multiply dark:mix-blend-screen transition-opacity duration-500" />
           
-          {/* Main content - full width, children handle their own layout */}
-          <main className="relative flex-1 w-full">
-            {children}
-          </main>
+          {/* Atmosphere Orb 2: Lapis - Bottom Left */}
+          <div className="absolute bottom-[-10%] left-[10%] w-[40%] h-[40%] bg-nabu-lapis/5 dark:bg-nabu-lapis/10 rounded-full blur-[100px] pointer-events-none mix-blend-multiply dark:mix-blend-screen transition-opacity duration-500" />
+          
+          {/* Atmosphere Orb 3: Mint - Top Right */}
+          <div className="absolute top-[20%] right-[20%] w-[30%] h-[30%] bg-nabu-mint/5 dark:bg-nabu-mint/5 rounded-full blur-[80px] pointer-events-none transition-opacity duration-500" />
+
+          {/* App Content - Relative z-10 */}
+          <div className="flex w-full h-full relative z-10">
+            <AppShell>
+              {children}
+            </AppShell>
+          </div>
 
           {/* Quick Thought Manager - handles all modals and minimized thoughts */}
           <QuickThoughtManager />

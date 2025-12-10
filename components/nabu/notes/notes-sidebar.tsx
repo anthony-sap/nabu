@@ -10,9 +10,8 @@ import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { FolderItem } from "./folder-item";
 import { FolderItem as FolderItemType, NoteItem } from "./types";
 import { DragData } from "./drag-drop-utils";
-import { ModeToggle } from "@/components/layout/mode-toggle";
-import { UserAccountNav } from "@/components/layout/user-account-nav";
 import { QuickThoughtTrigger } from "@/components/nabu/quick-thought-trigger";
+import { Search } from "lucide-react";
 import { UncategorisedHeader, UncategorisedMode } from "./uncategorised-header";
 import { BulkMoveControls } from "./bulk-move-controls";
 import { AutoMovePreview, AutoMoveSuggestions } from "./auto-move-preview";
@@ -398,39 +397,38 @@ export function NotesSidebar({
   };
 
   return (
-    <div className="w-80 flex-shrink-0 h-full border-r border-border/30 backdrop-blur-xl bg-background/40 flex flex-col">
-      {/* Top branding and controls with glassy effect */}
-      <div className="flex-shrink-0 px-4 py-4 border-b border-border/30">
-        {/* Logo and controls row - inline */}
+    // Layer 3: The Lens - Glass sidebar catches atmosphere colors
+    <div className="w-80 flex-shrink-0 h-full flex flex-col
+                     dark:bg-[#071633]/30 
+                    
+                    ">
+      {/* Top branding and controls */}
+      <div className="flex-shrink-0 px-4 py-4 ">
+        {/* Logo and search row */}
         <div className="flex items-center justify-between mb-4">
           {/* Logo and brand */}
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-primary/10 relative flex items-center justify-center ring-1 ring-primary/20">
-              <img src="/nabu_logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)] w-5"/>
-            </div>
-            <span className="font-serif font-bold text-xl text-foreground">Nabu</span>
-          </div>
           
-          {/* Controls on the right */}
-          <div className="flex items-center gap-1">
-            <ModeToggle />
-            <UserAccountNav />
-          </div>
+          
+        
         </div>
         
-        {/* Quick Thought Trigger - full width button */}
+        {/* Quick Thought Trigger */}
         <QuickThoughtTrigger />
         
-        {/* Quick Note Button */}
+        {/* Quick Note Button - Primary Action */}
         {onQuickNote && (
-          <Button
+          <button
             onClick={onQuickNote}
-            className="w-full mt-2 justify-start gap-2 bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200"
-            size="sm"
+            className="w-full mt-3 flex items-center justify-center gap-2 
+                       bg-nabu-mint text-white font-bold text-sm
+                       rounded-xl py-2.5 px-5
+                       shadow-lg shadow-nabu-mint/20
+                       hover:bg-nabu-mint/90 hover:scale-[1.02]
+                       transition-all"
           >
             <FileText className="h-4 w-4" />
-            <span className="flex-1 text-left">Quick Note</span>
-          </Button>
+            <span>Quick Note</span>
+          </button>
         )}
       </div>
       
@@ -442,7 +440,7 @@ export function NotesSidebar({
             className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
               view === "feed"
                 ? "bg-primary/15 text-primary font-medium shadow-sm ring-1 ring-primary/20"
-                : "hover:bg-muted/30 text-muted-foreground hover:text-foreground"
+                : "hover:bg-white/30 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => {
               onViewChange("feed");
@@ -458,7 +456,7 @@ export function NotesSidebar({
             )}
           </div>
 
-          <Separator className="my-3 bg-border/30" />
+          <Separator className="my-3 bg-white/20 dark:bg-white/10" />
 
           {/* Loading state - 5 skeleton folders */}
           {isLoadingFolders && (
@@ -486,14 +484,14 @@ export function NotesSidebar({
               open={expandedSections.personal ?? true}
               onOpenChange={(open) => onSectionToggle('personal', open)}
             >
-              <CollapsibleTrigger className="w-full">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+              <CollapsibleTrigger className="w-full group">
+                <div className="flex items-center gap-1.5 px-2 py-2 cursor-pointer transition-colors">
                   {expandedSections.personal ?? true ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="h-3 w-3 text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-3 w-3 text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors" />
                   )}
-                  <span className="text-sm font-semibold text-foreground">Personal</span>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors">Personal</span>
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -503,7 +501,13 @@ export function NotesSidebar({
                     <button
                       type="button"
                       onClick={() => onAddFolder(null, null)}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-background/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium
+                                 border border-dashed border-nabu-deep/30 dark:border-white/20
+                                 text-nabu-deep/40 dark:text-white/40
+                                 hover:border-nabu-mint dark:hover:border-nabu-mint
+                                 hover:text-nabu-mint dark:hover:text-nabu-mint
+                                 hover:bg-transparent
+                                 transition-all duration-200"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       New Folder
@@ -551,14 +555,14 @@ export function NotesSidebar({
                 open={isExpanded}
                 onOpenChange={(open) => onSectionToggle(sectionId, open)}
               >
-                <CollapsibleTrigger className="w-full mt-2">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+                <CollapsibleTrigger className="w-full group mt-3">
+                  <div className="flex items-center gap-1.5 px-2 py-2 cursor-pointer transition-colors">
                     {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      <ChevronDown className="h-3 w-3 text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <ChevronRight className="h-3 w-3 text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors" />
                     )}
-                    <span className="text-sm font-semibold text-foreground">{workspace.name}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-nabu-deep/40 dark:text-white/40 group-hover:text-nabu-deep dark:group-hover:text-white transition-colors">{workspace.name}</span>
                   </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -568,7 +572,13 @@ export function NotesSidebar({
                       <button
                         type="button"
                         onClick={() => onAddFolder(null, workspace.id)}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-background/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium
+                                   border border-dashed border-nabu-deep/30 dark:border-white/20
+                                   text-nabu-deep/40 dark:text-white/40
+                                   hover:border-nabu-mint dark:hover:border-nabu-mint
+                                   hover:text-nabu-mint dark:hover:text-nabu-mint
+                                   hover:bg-transparent
+                                   transition-all duration-200"
                       >
                         <Sparkles className="h-3.5 w-3.5" />
                         New Folder
@@ -609,7 +619,7 @@ export function NotesSidebar({
           {/* Uncategorised section - moved to bottom */}
           {!isLoadingFolders && (
             <>
-              <Separator className="my-3 bg-border/30" />
+              <Separator className="my-3 bg-white/20 dark:bg-white/10" />
               <div className="space-y-0.5">
                 {/* Header with mode switcher */}
                 <div className="group">
