@@ -1000,7 +1000,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
       
       {/* Header with breadcrumb, actions, and save status - glassy and modern */}
-      <div className="relative flex items-center justify-between px-6 py-4 border-b border-border/30 flex-shrink-0 backdrop-blur-sm bg-background/60">
+      <div className="relative flex items-center justify-between px-6 py-4 border-b border-border/30 flex-shrink-0 backdrop-blur-sm bg-white dark:bg-background">
         <div className="flex items-center gap-4">
           {/* Breadcrumb navigation */}
           <BreadcrumbNav 

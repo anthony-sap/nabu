@@ -199,5 +199,37 @@
   .btn-nabu-chip-active {
     @apply border-[rgb(var(--nabu-mint))];
   }
+
+  /* Modal Cancel/Ghost Button */
+  .btn-nabu-cancel {
+    @apply bg-transparent text-nabu-deep/60 dark:text-white/60
+           font-medium text-sm rounded-xl py-2.5 px-5
+           hover:bg-nabu-deep/5 dark:hover:bg-white/10
+           hover:text-nabu-deep dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Color Swatch Button - Tactile candy buttons */
+  .color-swatch {
+    @apply w-8 h-8 rounded-full shadow-sm
+           hover:scale-110 hover:ring-2 hover:ring-offset-2
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .color-swatch-selected {
+    @apply ring-2 ring-offset-2 ring-nabu-deep/20 dark:ring-white/20;
+  }
+
+  /* Nabu Modal Input - Etched Slot style */
+  .input-nabu {
+    @apply w-full h-12 px-4 py-3 rounded-xl
+           bg-[#F8FAFC] dark:bg-white/5
+           border border-nabu-deep/5 dark:border-white/10
+           text-base font-medium text-nabu-deep dark:text-white
+           placeholder:text-nabu-deep/30 dark:placeholder:text-white/30
+           focus:border-nabu-mint focus:ring-1 focus:ring-nabu-mint focus:outline-none
+           transition-all duration-200;
+  }
 }
 
