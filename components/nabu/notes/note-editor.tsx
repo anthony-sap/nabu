@@ -1093,7 +1093,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       {/* Scrollable content area with sidebar */}
       <div className="relative flex flex-1 overflow-hidden ">
         {/* Main Content - Scrollable */}
-        <ScrollArea className="flex-1 overflow-y-auto bg-white items-center justify-between">
+        <ScrollArea className="flex-1 overflow-y-auto bg-white dark:bg-background items-center justify-between">
           <div className="relative max-w-6xl mx-auto px-6 py-8 space-y-6">
             {/* Title input - larger and more prominent */}
             <input
