@@ -49,14 +49,14 @@ export function UncategorisedHeader({
   if (mode === 'normal') {
     // Normal mode: Show title, count, and menu
     return (
-      <div className={`group flex items-center justify-between px-3 py-1.5 rounded-lg transition-all duration-200 ${
+      <div className={`flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-nabu-deep/40 dark:text-white/40 mb-2 px-2 w-full hover:text-nabu-deep dark:hover:text-white transition-colors transition-all duration-200 ${
         isDragOver ? "bg-primary/20 text-primary" : ""
       }`}>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
             Uncategorised
           </span>
-          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-muted/50">
+          <Badge variant="secondary" className="bg-nabu-deep/10 dark:bg-white/10 px-1.5 rounded text-[9px] text-nabu-deep dark:text-white">
             {noteCount}
           </Badge>
         </div>

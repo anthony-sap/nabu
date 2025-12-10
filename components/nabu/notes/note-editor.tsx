@@ -995,7 +995,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
   }
 
   return (
-    <div className="relative h-full flex flex-col bg-background overflow-hidden">
+    <div className="relative h-full flex flex-col  overflow-hidden">
       {/* Glassy shine effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
       
@@ -1014,7 +1014,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+              className="h-full cursor-pointer text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
               onClick={onDelete}
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -1025,28 +1025,28 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
 
         {/* Save status indicator and action buttons */}
         <div className="flex items-center gap-3">
-          {/* Version control buttons */}
-          <Button
-            variant="ghost"
-            size="sm"
+          {/* Version control buttons - Tertiary/Ghost style */}
+          <button
             onClick={() => setShowVersionHistoryPanel(!showVersionHistoryPanel)}
-            className="hover:bg-muted/50 transition-all duration-200"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                       text-nabu-deep/60 dark:text-white/60
+                       hover:bg-nabu-deep/5 dark:hover:bg-white/10 h-full  cursor-pointer"
             title="View version history"
           >
-            <History className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">History</span>
-          </Button>
+            <History className="h-4 w-4" />
+            <span className="hidden lg:inline">History</span>
+          </button>
           
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={() => setShowManualVersionDialog(true)}
-            className="hover:bg-muted/50 transition-all duration-200"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                       text-nabu-deep/60 dark:text-white/60
+                       hover:bg-nabu-deep/5 dark:hover:bg-white/10 h-full  cursor-pointer"
             title="Save a manual version snapshot"
           >
-            <Save className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Save Version</span>
-          </Button>
+            <Save className="h-4 w-4" />
+            <span className="hidden lg:inline">Save Version</span>
+          </button>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {saveStatus === "saved-locally" && lastSaved && (
@@ -1082,7 +1082,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
               variant="ghost" 
               size="sm"
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-all duration-200"
+              className="text-muted-foreground hover:text-foreground transition-all duration-200 h-full  cursor-pointer"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1094,7 +1094,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
       <div className="relative flex flex-1 overflow-hidden">
         {/* Main Content - Scrollable */}
         <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="relative max-w-4xl mx-auto px-6 py-8 space-y-6">
+          <div className="relative max-w-6xl mx-auto px-6 py-8 space-y-6">
             {/* Title input - larger and more prominent */}
             <input
               type="text"

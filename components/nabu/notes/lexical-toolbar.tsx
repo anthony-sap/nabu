@@ -228,7 +228,7 @@ export function LexicalToolbar({ noteId }: { noteId?: string }) {
   }, [editor, updateToolbar]);
 
   return (
-    <div className="flex flex-wrap items-center gap-1 p-2 border-b border-border bg-muted/20">
+    <div className="flex flex-wrap items-center gap-1 p-2 rounded-lg border border-input bg-muted/30  border-border ">
       {/* History */}
       <Button
         size="sm"

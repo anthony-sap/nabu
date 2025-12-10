@@ -271,25 +271,41 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
   return (
     <div className="h-full flex flex-col">
       {/* Quick capture form - fixed at top */}
-      <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pt-6">
+      <div className="flex-shrink-0 max-w-6xl mx-auto w-full px-8 pt-6">
         <QuickCaptureForm onSaved={refreshThoughts} />
       </div>
 
-      {/* Tabs - below quick capture */}
-      <div className="flex-shrink-0 max-w-4xl mx-auto w-full px-8 pb-4">
+      {/* Tab Switcher - Nabu Modern Scribe Style */}
+      <div className="flex-shrink-0 max-w-6xl mx-auto w-full px-8 pt-6 pb-4">
         <Tabs value="thoughts" className="w-full">
-          <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent gap-0">
+          <TabsList className="w-full justify-start border-b border-[rgb(var(--nabu-deep))]/10 dark:border-white/10 rounded-none h-auto p-0 bg-transparent gap-6">
+            {/* Thoughts Tab - Active */}
             <TabsTrigger 
               value="thoughts" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              className="rounded-none border-b-2 px-0 pb-3 text-sm font-bold transition-all duration-200
+                         border-[rgb(var(--nabu-mint))] 
+                         text-[rgb(var(--nabu-deep))] dark:text-white
+                         data-[state=inactive]:border-transparent 
+                         data-[state=inactive]:text-[rgb(var(--nabu-deep))]/40 data-[state=inactive]:font-normal
+                         dark:data-[state=inactive]:text-white/40
+                         data-[state=inactive]:hover:text-[rgb(var(--nabu-deep))]/70 dark:data-[state=inactive]:hover:text-white/70
+                         bg-transparent"
               onClick={() => onTabChange?.("thoughts")}
             >
               <Lightbulb className="h-4 w-4 mr-2" />
               Thoughts
             </TabsTrigger>
+            {/* Notes Tab - Inactive */}
             <TabsTrigger 
               value="notes"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground px-4 py-2"
+              className="rounded-none border-b-2 px-0 pb-3 text-sm transition-all duration-200
+                         data-[state=active]:border-[rgb(var(--nabu-mint))] 
+                         data-[state=active]:text-[rgb(var(--nabu-deep))] data-[state=active]:font-bold
+                         dark:data-[state=active]:text-white
+                         border-transparent 
+                         text-[rgb(var(--nabu-deep))]/40 dark:text-white/40
+                         hover:text-[rgb(var(--nabu-deep))]/70 dark:hover:text-white/70
+                         bg-transparent"
               onClick={() => onTabChange?.("notes")}
             >
               <FileText className="h-4 w-4 mr-2" />
@@ -301,21 +317,24 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
 
       {/* Scrollable content */}
       <ScrollArea className="flex-1">
-        <div className="space-y-6 max-w-4xl mx-auto px-8 py-6">
-          {/* Header */}
+        <div className="space-y-6 max-w-6xl mx-auto px-8 py-6">
+          {/* Header Area - Nabu Modern Scribe Style */}
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-serif font-semibold text-foreground">Thoughts</h2>
+            <div className="flex items-center gap-3">
+              {/* Title: Serif font, text-4xl, font-bold */}
+              <h2 className="text-4xl font-serif font-bold text-[rgb(var(--nabu-deep))] dark:text-white">Thoughts</h2>
               {!bulkMode && (
-                <Badge variant="secondary" className="text-xs bg-secondary/15 text-secondary border-secondary/20">
+                <span className="bg-[rgb(var(--nabu-lapis))]/10 dark:bg-white/10 
+                               text-[rgb(var(--nabu-lapis))] dark:text-white 
+                               rounded-full text-xs font-bold px-3 py-1">
                   {thoughts.length} {thoughts.length === 1 ? "thought" : "thoughts"}
-                </Badge>
+                </span>
               )}
               {bulkMode && (
-                <Badge variant="default" className="text-xs bg-primary text-primary-foreground">
+                <span className="bg-[rgb(var(--nabu-mint))] text-white 
+                               rounded-full text-xs font-bold px-3 py-1">
                   {selectedThoughtIds.size} selected
-                </Badge>
+                </span>
               )}
             </div>
 

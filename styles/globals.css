@@ -57,6 +57,13 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
+  /* Nabu Brand Colors - Supports opacity modifiers like bg-nabu-mint/10 */
+  --color-nabu-mint: rgb(0 179 166);
+  --color-nabu-deep: rgb(7 22 51);
+  --color-nabu-lapis: rgb(30 64 175);
+  --color-nabu-gold: rgb(197 155 47);
+  --color-nabu-clay: rgb(231 220 199);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
