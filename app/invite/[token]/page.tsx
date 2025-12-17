@@ -94,3 +94,7 @@ export default async function InviteAcceptancePage({ params }: PageProps) {
   );
 }
 
+
+
+
+

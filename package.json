@@ -157,6 +157,7 @@
     "rehype-slug": "^6.0.0",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",
+    "supabase": "^2.67.0",
     "tailwindcss": "^4.1.10",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",

@@ -8,3 +8,7 @@ ALTER TABLE "WorkspaceInvite" ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL D
 ADD COLUMN     "updatedBy" TEXT,
 ADD COLUMN     "deletedAt" TIMESTAMP(3);
 
+
+
+
+
