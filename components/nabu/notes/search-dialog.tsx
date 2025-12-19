@@ -111,7 +111,7 @@ export function SearchDialog({ open, onOpenChange, onSelectResult }: SearchDialo
 
         {/* Empty state */}
         {!isLoading && !error && query && results.length === 0 && (
-          <CommandEmpty>No results found for "{query}"</CommandEmpty>
+          <CommandEmpty>No results found for &quot;{query}&quot;</CommandEmpty>
         )}
 
         {/* Results */}

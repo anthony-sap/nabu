@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
       // Verify all existing folders exist and belong to user
       if (movesToExisting.length > 0) {
-        const folderIds = [...new Set(movesToExisting.map(m => m.folderId))];
+        const folderIds = Array.from(new Set(movesToExisting.map(m => m.folderId)));
         const folders = await tx.folder.findMany({
           where: {
             id: { in: folderIds },
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Create folders and move notes
-        for (const [folderName, data] of groupedByFolder.entries()) {
+        for (const [folderName, data] of Array.from(groupedByFolder.entries())) {
           try {
             // Check if folder with this name already exists
             let folder = await tx.folder.findFirst({

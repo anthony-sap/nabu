@@ -7,7 +7,7 @@ import {
   handleApiError,
   errorResponse,
 } from "@/lib/nabu-helpers";
-import { getUserWorkspaceIds, getUserTenantId } from "@/lib/workspace-helpers";
+import { getUserWorkspaceIds } from "@/lib/workspace-helpers";
 
 /**
  * GET /api/nabu/trash
@@ -113,7 +113,6 @@ export async function GET(req: NextRequest) {
    
     // Get user's workspace IDs for raw query (raw queries bypass middleware)
     const workspaceIds = await getUserWorkspaceIds(userId);
-    const tenantId = await getUserTenantId(userId);
     
     // Debug: Try a raw count query to see total deleted items in DB
     // Include both personal (tenantId) and workspace (workspaceIds) items

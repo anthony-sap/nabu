@@ -71,13 +71,10 @@ export async function suggestFolders(
       },
       include: {
         chunks: {
-          where: {
-            embedding: { not: null },
-          },
           orderBy: {
             chunkIndex: 'asc',
           },
-          take: 1, // Just need one chunk with embedding for search
+          take: 10, // Get multiple chunks, filter for embedding in JS
         },
         folder: {
           select: {
@@ -106,7 +103,9 @@ export async function suggestFolders(
     }
 
     // Check if note has embeddings for semantic search
-    if (!note.chunks || note.chunks.length === 0 || !note.chunks[0].embedding) {
+    // Find first chunk with embedding (filter in JS since embedding is Unsupported type)
+    const chunkWithEmbedding = note.chunks?.find(chunk => (chunk as any).embedding !== null);
+    if (!chunkWithEmbedding || !(chunkWithEmbedding as any).embedding) {
       // Fallback: suggest based on folders only
       return await suggestFoldersWithoutEmbeddings(userId, tenantId, note.title);
     }
@@ -125,7 +124,7 @@ export async function suggestFolders(
         n.title as note_title,
         f.id as folder_id,
         f.name as folder_name,
-        1 - (nc.embedding <=> ${note.chunks[0].embedding}::vector) as similarity
+        1 - (nc.embedding <=> ${(chunkWithEmbedding as any).embedding}::vector) as similarity
       FROM "NoteChunk" nc
       INNER JOIN "Note" n ON n.id = nc."noteId"
       LEFT JOIN "Folder" f ON f.id = n."folderId"
@@ -134,7 +133,7 @@ export async function suggestFolders(
         AND nc.embedding IS NOT NULL
         AND n."deletedAt" IS NULL
         AND n."folderId" IS NOT NULL
-      ORDER BY nc.embedding <=> ${note.chunks[0].embedding}::vector
+      ORDER BY nc.embedding <=> ${(chunkWithEmbedding as any).embedding}::vector
       LIMIT ${MAX_SIMILAR_NOTES}
     `;
 

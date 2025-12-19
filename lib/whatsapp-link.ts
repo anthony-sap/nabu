@@ -128,6 +128,10 @@ export async function linkPhoneToUser(
   userId: string,
   tenantId: string | null
 ): Promise<void> {
+  if (!tenantId) {
+    throw new Error("Tenant ID is required for phone linking");
+  }
+
   const token = await prisma.whatsAppLinkToken.findUnique({
     where: { id: tokenId },
   });
@@ -150,7 +154,7 @@ export async function linkPhoneToUser(
     where: {
       phoneNumber_tenantId: {
         phoneNumber: token.phoneNumber,
-        tenantId: tenantId,
+        tenantId,
       },
     },
     create: {
@@ -213,6 +217,13 @@ export async function verifyCodeAndLink(
   error?: string;
   userId?: string;
 }> {
+  if (!tenantId) {
+    return {
+      success: false,
+      error: "Tenant ID is required for phone linking",
+    };
+  }
+
   try {
     // Find token by phone number and verification code
     const linkToken = await prisma.whatsAppLinkToken.findFirst({

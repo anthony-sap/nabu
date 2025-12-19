@@ -62,6 +62,7 @@ export function PromoteThoughtDialog({
     if (open) {
       loadFolders();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   /**

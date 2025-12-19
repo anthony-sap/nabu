@@ -654,7 +654,7 @@ export function extractTextFromBody(body: any): string {
 
     // Try to extract all string values
     const strings: string[] = [];
-    function extractStrings(obj: any): void {
+    const extractStrings = (obj: any): void => {
       if (typeof obj === "string") {
         strings.push(obj);
       } else if (Array.isArray(obj)) {
@@ -662,7 +662,7 @@ export function extractTextFromBody(body: any): string {
       } else if (obj && typeof obj === "object") {
         Object.values(obj).forEach(extractStrings);
       }
-    }
+    };
     extractStrings(body);
     return strings.join("\n");
   }

@@ -24,7 +24,7 @@ export async function DELETE(
     const imageAttachment = await prisma.imageAttachment.findFirst({
       where: {
         id: imageId,
-        tenantId,
+        tenantId: tenantId ?? undefined,
         deletedAt: null,
       },
       include: {

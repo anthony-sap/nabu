@@ -99,6 +99,7 @@ export function QuickThoughtModal({ draft }: QuickThoughtModalProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.state, draft.content, draft.id, minimizeDraft]);
 
   /**

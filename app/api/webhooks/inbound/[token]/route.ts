@@ -71,6 +71,7 @@ async function handleWebhookRequest(
       },
       select: {
         id: true,
+        name: true,
         userId: true,
         tenantId: true,
       },

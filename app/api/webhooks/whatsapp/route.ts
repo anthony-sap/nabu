@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
     const body = await req.text();
     const signature = req.headers.get("x-hub-signature-256");
 
+    if (!env.WHATSAPP_WEBHOOK_SECRET) {
+      console.error("WHATSAPP_WEBHOOK_SECRET not configured");
+      return new NextResponse("Server configuration error", { status: 500 });
+    }
+
     if (!signature || !verifyWhatsAppSignature(body, signature, env.WHATSAPP_WEBHOOK_SECRET)) {
       console.error("Invalid WhatsApp webhook signature");
       return new NextResponse("Unauthorized", { status: 401 });

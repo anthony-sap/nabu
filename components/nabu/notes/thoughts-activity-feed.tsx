@@ -472,7 +472,7 @@ export function ThoughtsActivityFeed({ activeTab, onTabChange }: ThoughtsActivit
                 <div className="space-y-2">
                   <h3 className="font-serif font-bold text-xl text-foreground">No thoughts yet</h3>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                    Use the Quick Thought feature (⌘+K) to capture your ideas. They'll appear here.
+                    Use the Quick Thought feature (⌘+K) to capture your ideas. They&apos;ll appear here.
                   </p>
                 </div>
               </CardContent>

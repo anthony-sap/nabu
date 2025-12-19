@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Sparkles, Check, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -195,7 +196,7 @@ export default function UpgradePage() {
             <div className="flex items-center gap-6 flex-1">
               <Link href="/notes" className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-xl bg-primary/10 relative flex items-center justify-center ring-1 ring-primary/20">
-                  <img src="/nabu_logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)] w-5" />
+                  <Image src="/nabu_logo.png" alt="Nabu" width={20} height={20} className="absolute inset-0 m-2 fill-[var(--nabu-mint)] w-5" />
                 </div>
                 <span className="font-serif font-bold text-lg hidden sm:inline">Nabu</span>
               </Link>
@@ -280,9 +281,9 @@ export default function UpgradePage() {
       {availablePlans.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>You're on the highest plan!</CardTitle>
+            <CardTitle>You&apos;re on the highest plan!</CardTitle>
             <CardDescription>
-              You're already on the Teams plan with all features unlocked.
+              You&apos;re already on the Teams plan with all features unlocked.
             </CardDescription>
           </CardHeader>
         </Card>

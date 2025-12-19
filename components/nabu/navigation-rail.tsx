@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { MessageCircle, FolderOpen, LayoutGrid, Bookmark, Settings } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -56,9 +57,11 @@ export function NavigationRail() {
         {/* App Logo - Top */}
         <div className="mb-6">
           <div className="h-10 w-10 rounded-xl bg-[rgb(var(--nabu-mint))]/10 relative flex items-center justify-center ring-1 ring-[rgb(var(--nabu-mint))]/20">
-            <img 
+            <Image 
               src="/nabu_logo.png" 
               alt="Nabu" 
+              width={24}
+              height={24}
               className="w-6 h-6"
             />
           </div>

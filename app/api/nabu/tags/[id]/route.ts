@@ -16,9 +16,10 @@ import {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { userId, tenantId } = await getUserContext();
     const { searchParams } = new URL(req.url);
     const includeNotes = searchParams.get("includeNotes") === "true";
@@ -26,7 +27,7 @@ export async function GET(
     // Middleware automatically handles workspace filtering and tenant isolation
     const tag = await prisma.tag.findFirst({
       where: {
-        id: params.id,
+        id,
         deletedAt: null,
       },
       include: {
@@ -83,13 +84,14 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { userId, tenantId } = await getUserContext();
 
     // Verify ownership
-    const isOwner = await validateOwnership("tag", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("tag", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Tag not found or access denied", 404);
     }
@@ -112,7 +114,7 @@ export async function PATCH(
     if (data.name) {
       // Get existing tag to check its workspaceId
       const currentTag = await prisma.tag.findFirst({
-        where: { id: params.id },
+        where: { id },
         select: { workspaceId: true },
       });
       
@@ -121,7 +123,7 @@ export async function PATCH(
           name: data.name,
           workspaceId: currentTag?.workspaceId || null,
           deletedAt: null,
-          id: { not: params.id },
+          id: { not: id },
         },
       });
 
@@ -132,7 +134,7 @@ export async function PATCH(
 
     // Update tag
     const tag = await prisma.tag.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...data,
         updatedBy: userId,
@@ -164,20 +166,21 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { userId, tenantId } = await getUserContext();
 
     // Verify ownership
-    const isOwner = await validateOwnership("tag", params.id, userId, tenantId);
+    const isOwner = await validateOwnership("tag", id, userId, tenantId);
     if (!isOwner) {
       return errorResponse("Tag not found or access denied", 404);
     }
 
     // Delete tag (this will cascade delete noteTags due to schema relations)
     await prisma.tag.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         deletedAt: new Date(),
         updatedBy: userId,

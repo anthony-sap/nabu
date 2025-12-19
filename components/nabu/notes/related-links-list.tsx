@@ -113,7 +113,7 @@ export function RelatedLinksList({ links, onDeleteLink, onAddLink, className }: 
           {/* Link items */}
           {links.length === 0 ? (
             <div className="text-xs text-muted-foreground text-center py-2">
-              No linked notes yet. Use @mention in the editor or click "Add Link" above.
+              No linked notes yet. Use @mention in the editor or click &quot;Add Link&quot; above.
             </div>
           ) : (
             links.map((link) => (

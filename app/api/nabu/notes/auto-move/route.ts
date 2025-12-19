@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
     const { userId, tenantId } = await getUserContext();
     const body = await req.json();
 
+    if (!tenantId) {
+      return errorResponse("Tenant context required", 400);
+    }
+
     // Validate request
     const validationResult = autoMoveRequestSchema.safeParse(body);
 

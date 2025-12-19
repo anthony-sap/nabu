@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Trash2, FileImage, HardDrive } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { formatFileSize } from "@/lib/image-compression";
 
 /**
@@ -224,11 +225,13 @@ export default function StoragePage() {
                   {/* Thumbnail or placeholder */}
                   <div className="flex-shrink-0">
                     {file.url ? (
-                      <img
+                      <Image
                         src={file.url}
                         alt={file.originalFilename}
+                        width={80}
+                        height={80}
                         className="w-20 h-20 object-cover rounded border"
-                        loading="lazy"
+                        unoptimized
                       />
                     ) : (
                       <div className="w-20 h-20 bg-muted rounded border flex items-center justify-center">

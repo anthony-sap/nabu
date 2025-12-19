@@ -153,7 +153,7 @@ export function NoteDetailView({ selectedNote }: NoteDetailViewProps) {
                 ) : (
                   <div className="text-muted-foreground space-y-6">
                     <p className="text-base leading-relaxed">
-                      This note is empty. Click "Edit Note" to start writing.
+                      This note is empty. Click &quot;Edit Note&quot; to start writing.
                     </p>
                     <div className="p-6 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 backdrop-blur-sm">
                       <h3 className="font-serif font-semibold text-foreground mb-3 text-lg">

@@ -230,6 +230,7 @@ export function FolderItem({
       cleanup1();
       cleanup2();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id, item.name, isFolder, onMoveFolder, onMoveNote, allFolders]);
 
   /**

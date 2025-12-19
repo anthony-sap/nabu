@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -263,7 +264,7 @@ export default function NabuLanding() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-[var(--nabu-deep)] relative">
-            <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+            <Image src="/logo.png" alt="Nabu" width={16} height={16} className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
 
             </div>
             <span>Nabu</span>

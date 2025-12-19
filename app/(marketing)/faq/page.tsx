@@ -36,7 +36,7 @@ export default function FAQPage() {
             Frequently Asked Questions
           </h1>
           <p className="mt-6 text-lg text-white/80 max-w-2xl mx-auto">
-            Everything you need to know about Nabu's features, capabilities, and how to make the most of your note-taking experience.
+            Everything you need to know about Nabu&apos;s features, capabilities, and how to make the most of your note-taking experience.
           </p>
         </div>
       </section>
@@ -67,7 +67,7 @@ export default function FAQPage() {
                     <strong className="text-white">Thoughts</strong> are quick captures—short ideas, reminders, or snippets you want to save without overthinking. They appear in your Feed and are perfect for capturing information on the go.
                   </p>
                   <p className="mb-3">
-                    <strong className="text-white">Notes</strong> are more structured, long-form content with rich formatting, images, and links. You can promote one or more Thoughts into a Note when you're ready to develop an idea further.
+                    <strong className="text-white">Notes</strong> are more structured, long-form content with rich formatting, images, and links. You can promote one or more Thoughts into a Note when you&apos;re ready to develop an idea further.
                   </p>
                   <p>
                     Nabu intelligently detects your intent: short, single-line text becomes a Thought; longer, structured content becomes a Note. You always have control to change this classification.
@@ -86,7 +86,7 @@ export default function FAQPage() {
 
               <AccordionItem value="tags-vs-folders" className="glass rounded-xl border-white/10 px-6">
                 <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
-                  What's the difference between Tags and Folders?
+                  What&apos;s the difference between Tags and Folders?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
@@ -152,7 +152,7 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    When you create or edit content, Nabu's AI analyzes the text and suggests relevant tags based on context, entities (people, companies, projects), and topics. The system is intelligent about timing—it waits for a 2-minute cooldown after you stop editing to avoid generating redundant suggestions while you're actively working.
+                    When you create or edit content, Nabu&apos;s AI analyzes the text and suggests relevant tags based on context, entities (people, companies, projects), and topics. The system is intelligent about timing—it waits for a 2-minute cooldown after you stop editing to avoid generating redundant suggestions while you&apos;re actively working.
                   </p>
                   <p className="mb-3">
                     Tag suggestions appear as a notification with a confidence score. You can accept all, select specific tags, or dismiss them entirely. The system learns from your choices to improve future suggestions.
@@ -186,7 +186,7 @@ export default function FAQPage() {
                   How does folder suggestion work?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  When you create a new note or promote a Thought to a Note, Nabu's AI analyzes the content and suggests the most appropriate folder based on your existing folder structure and the note's topic. You can accept the suggestion or choose a different folder—it's completely optional and designed to save you time organizing.
+                  When you create a new note or promote a Thought to a Note, Nabu&apos;s AI analyzes the content and suggests the most appropriate folder based on your existing folder structure and the note&apos;s topic. You can accept the suggestion or choose a different folder—it&apos;s completely optional and designed to save you time organizing.
                 </AccordionContent>
               </AccordionItem>
 
@@ -228,7 +228,7 @@ export default function FAQPage() {
                   What image formats are supported?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Nabu supports all common image formats: JPEG, PNG, GIF, WebP, and SVG. SVG files receive special treatment—they're stored without compression to preserve their infinite scaling capability and crisp rendering at any size. Other formats are automatically optimized for web delivery.
+                  Nabu supports all common image formats: JPEG, PNG, GIF, WebP, and SVG. SVG files receive special treatment—they&apos;re stored without compression to preserve their infinite scaling capability and crisp rendering at any size. Other formats are automatically optimized for web delivery.
                 </AccordionContent>
               </AccordionItem>
 
@@ -251,7 +251,7 @@ export default function FAQPage() {
                   Are there size limits for images?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Images are automatically compressed to a maximum of 2MB file size and 1920px on the longest dimension. This optimization happens client-side before upload, ensuring fast page loads while maintaining excellent visual quality. SVG files have no size restrictions since they're vector-based.
+                  Images are automatically compressed to a maximum of 2MB file size and 1920px on the longest dimension. This optimization happens client-side before upload, ensuring fast page loads while maintaining excellent visual quality. SVG files have no size restrictions since they&apos;re vector-based.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -267,20 +267,20 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Semantic search finds notes by meaning, not just exact keywords. Nabu uses OpenAI's text-embedding-3-small model to convert your content into 512-dimensional vectors that capture semantic meaning. When you search, your query is also converted to a vector, and Nabu finds notes with similar meaning using mathematical similarity (cosine distance).
+                    Semantic search finds notes by meaning, not just exact keywords. Nabu uses OpenAI&apos;s text-embedding-3-small model to convert your content into 512-dimensional vectors that capture semantic meaning. When you search, your query is also converted to a vector, and Nabu finds notes with similar meaning using mathematical similarity (cosine distance).
                   </p>
                   <p className="mb-3">
-                    For example, searching "client meeting" will find notes about "customer calls" or "stakeholder discussions" even if those exact words aren't present. The system understands context and relationships between concepts.
+                    For example, searching &quot;client meeting&quot; will find notes about &quot;customer calls&quot; or &quot;stakeholder discussions&quot; even if those exact words aren&apos;t present. The system understands context and relationships between concepts.
                   </p>
                   <p>
-                    To handle long notes efficiently, content is automatically chunked into ~2000 character segments with 200-character overlap, ensuring important context isn't lost at boundaries. Each chunk is embedded separately, so you get precise matches within large documents.
+                    To handle long notes efficiently, content is automatically chunked into ~2000 character segments with 200-character overlap, ensuring important context isn&apos;t lost at boundaries. Each chunk is embedded separately, so you get precise matches within large documents.
                   </p>
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="keyword-vs-semantic" className="glass rounded-xl border-white/10 px-6">
                 <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
-                  What's the difference between keyword and semantic search?
+                  What&apos;s the difference between keyword and semantic search?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <strong className="text-white">Keyword search</strong> looks for exact text matches—fast and precise when you know the specific terms. <strong className="text-white">Semantic search</strong> understands meaning and context, finding conceptually related content even with different wording. Keyword search is great for names and specific phrases; semantic search excels at finding ideas and themes.
@@ -293,7 +293,7 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Nabu's hybrid search combines the best of both approaches: keyword search (40% weight) for exact matches and semantic search (60% weight) for conceptual relevance. The system runs both searches in parallel, then blends the results using a weighted average of scores.
+                    Nabu&apos;s hybrid search combines the best of both approaches: keyword search (40% weight) for exact matches and semantic search (60% weight) for conceptual relevance. The system runs both searches in parallel, then blends the results using a weighted average of scores.
                   </p>
                   <p>
                     This means you get both precise term matches AND related concepts in your results. The weights are configurable, but the default 40/60 split has been optimized to provide the most useful results across different query types.
@@ -315,7 +315,7 @@ export default function FAQPage() {
                   How do I find related notes?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Nabu automatically suggests related notes based on semantic similarity, shared tags, and explicit links. When viewing a note, you'll see a "Related Notes" section showing relevant content. You can also use the search system to find conceptually similar notes by searching for key concepts from your current note.
+                  Nabu automatically suggests related notes based on semantic similarity, shared tags, and explicit links. When viewing a note, you&apos;ll see a &quot;Related Notes&quot; section showing relevant content. You can also use the search system to find conceptually similar notes by searching for key concepts from your current note.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -330,7 +330,7 @@ export default function FAQPage() {
                   How do I link notes together?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  You can link notes using @ mentions in the editor (type @ to see a list of your notes), or add explicit links in the metadata sidebar's "Linked Notes" section. Links are bidirectional—when you link Note A to Note B, both notes show the relationship.
+                  You can link notes using @ mentions in the editor (type @ to see a list of your notes), or add explicit links in the metadata sidebar&apos;s &quot;Linked Notes&quot; section. Links are bidirectional—when you link Note A to Note B, both notes show the relationship.
                 </AccordionContent>
               </AccordionItem>
 
@@ -360,7 +360,7 @@ export default function FAQPage() {
                   How does Nabu suggest related notes?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Nabu uses semantic similarity from the vector embedding system to identify conceptually related notes. The system compares vector embeddings to find notes with similar themes, topics, or context, even if they don't share exact keywords or tags.
+                  Nabu uses semantic similarity from the vector embedding system to identify conceptually related notes. The system compares vector embeddings to find notes with similar themes, topics, or context, even if they don&apos;t share exact keywords or tags.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -392,13 +392,13 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Visit the <strong className="text-white">Upgrade</strong> page from the main navigation. You'll see a comparison of all plans with your current plan highlighted. Click "Upgrade" on the plan you want.
+                    Visit the <strong className="text-white">Upgrade</strong> page from the main navigation. You&apos;ll see a comparison of all plans with your current plan highlighted. Click &quot;Upgrade&quot; on the plan you want.
                   </p>
                   <p className="mb-3">
                     For Personal plan: Your upgrade is instant—your entitlements update immediately.
                   </p>
                   <p>
-                    For Teams plan: You'll be prompted to create a workspace name. A new team workspace will be created with you as the owner, and you can then invite team members.
+                    For Teams plan: You&apos;ll be prompted to create a workspace name. A new team workspace will be created with you as the owner, and you can then invite team members.
                   </p>
                 </AccordionContent>
               </AccordionItem>
@@ -460,10 +460,10 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Go to your workspace's <strong className="text-white">Members</strong> page and click "Invite Member". Enter their email address and choose a role (Admin, Member, or Guest).
+                    Go to your workspace&apos;s <strong className="text-white">Members</strong> page and click &quot;Invite Member&quot;. Enter their email address and choose a role (Admin, Member, or Guest).
                   </p>
                   <p className="mb-3">
-                    The invited person will receive an email with a link to accept the invitation. If they don't have a Nabu account, they'll create one during the acceptance process and automatically join your workspace.
+                    The invited person will receive an email with a link to accept the invitation. If they don&apos;t have a Nabu account, they&apos;ll create one during the acceptance process and automatically join your workspace.
                   </p>
                   <p>
                     You can also copy the invite link directly to share through other channels.
@@ -477,13 +477,13 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Click the invite link in your email or the link shared with you. You'll see the workspace name and your assigned role.
+                    Click the invite link in your email or the link shared with you. You&apos;ll see the workspace name and your assigned role.
                   </p>
                   <p className="mb-3">
-                    If you're already logged in, simply click "Accept Invite" to join immediately.
+                    If you&apos;re already logged in, simply click &quot;Accept Invite&quot; to join immediately.
                   </p>
                   <p>
-                    If you're not logged in, click "Sign in to Accept"—you'll be redirected back to accept the invite after authentication. New users can sign up directly from the invite page.
+                    If you&apos;re not logged in, click &quot;Sign in to Accept&quot;—you&apos;ll be redirected back to accept the invite after authentication. New users can sign up directly from the invite page.
                   </p>
                 </AccordionContent>
               </AccordionItem>
@@ -511,7 +511,7 @@ export default function FAQPage() {
                   How long are workspace invites valid?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Workspace invites are valid for <strong className="text-white">7 days</strong> from when they're sent. After that, they expire and the recipient will need a new invitation. You can see expiration dates for pending invites on the Members page.
+                  Workspace invites are valid for <strong className="text-white">7 days</strong> from when they&apos;re sent. After that, they expire and the recipient will need a new invitation. You can see expiration dates for pending invites on the Members page.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -588,7 +588,7 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Nabu uses heuristic analysis to classify content as it's captured. The system looks at multiple signals:
+                    Nabu uses heuristic analysis to classify content as it&apos;s captured. The system looks at multiple signals:
                   </p>
                   <ul className="space-y-2 ml-4">
                     <li><strong className="text-white">Length:</strong> Very short content (&lt;150 chars) → Thought</li>
@@ -607,7 +607,7 @@ export default function FAQPage() {
                   What are AI-suggested tags?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  AI-suggested tags are intelligent recommendations generated by analyzing your content for entities (people, companies), topics, and themes. They appear after a cooldown period when you've finished editing (minimum 200 characters, fewer than 3 existing tags). You can accept, reject, or cherry-pick specific suggestions.
+                  AI-suggested tags are intelligent recommendations generated by analyzing your content for entities (people, companies), topics, and themes. They appear after a cooldown period when you&apos;ve finished editing (minimum 200 characters, fewer than 3 existing tags). You can accept, reject, or cherry-pick specific suggestions.
                 </AccordionContent>
               </AccordionItem>
 
@@ -625,7 +625,7 @@ export default function FAQPage() {
                   Can I accept/reject AI suggestions?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Yes! All AI suggestions are optional. You can accept all suggestions with one click, select individual tags to accept, or dismiss everything. Rejecting suggestions adds a cooldown period so you won't be repeatedly prompted with the same content.
+                  Yes! All AI suggestions are optional. You can accept all suggestions with one click, select individual tags to accept, or dismiss everything. Rejecting suggestions adds a cooldown period so you won&apos;t be repeatedly prompted with the same content.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -686,7 +686,7 @@ export default function FAQPage() {
                   What happens to deleted items (soft delete)?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Nabu uses soft deletes—when you delete something, it's marked as deleted (deletedAt timestamp) but not removed from the database. This enables recovery if you accidentally delete something important, maintains referential integrity, and preserves audit history. Soft-deleted items are automatically hidden from queries and search results.
+                  Nabu uses soft deletes—when you delete something, it&apos;s marked as deleted (deletedAt timestamp) but not removed from the database. This enables recovery if you accidentally delete something important, maintains referential integrity, and preserves audit history. Soft-deleted items are automatically hidden from queries and search results.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -710,17 +710,17 @@ export default function FAQPage() {
                     <li><strong className="text-white">Save on page leave:</strong> Both beforeunload and component unmount handlers ensure nothing is lost</li>
                   </ul>
                   <p className="mt-3">
-                    You'll see visual indicators showing "Saved locally" or "Synced" status.
+                    You&apos;ll see visual indicators showing &quot;Saved locally&quot; or &quot;Synced&quot; status.
                   </p>
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="local-vs-server" className="glass rounded-xl border-white/10 px-6">
                 <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
-                  What's the difference between local save and server sync?
+                  What&apos;s the difference between local save and server sync?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  <strong className="text-white">Local save</strong> stores to your browser's localStorage—instant but only accessible on this device/browser. <strong className="text-white">Server sync</strong> saves to the database—takes slightly longer but accessible everywhere and permanent. The system uses timestamps to always load the newest version, whether local or server.
+                  <strong className="text-white">Local save</strong> stores to your browser&apos;s localStorage—instant but only accessible on this device/browser. <strong className="text-white">Server sync</strong> saves to the database—takes slightly longer but accessible everywhere and permanent. The system uses timestamps to always load the newest version, whether local or server.
                 </AccordionContent>
               </AccordionItem>
 
@@ -738,7 +738,7 @@ export default function FAQPage() {
                   How does cross-device sync work?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Once your changes are synced to the server (every 60 seconds), they're immediately available on all your devices. Opening a note on another device loads the latest server version. If you have local unsaved changes on device A and server changes from device B, Nabu shows a notification and lets you choose which version to keep.
+                  Once your changes are synced to the server (every 60 seconds), they&apos;re immediately available on all your devices. Opening a note on another device loads the latest server version. If you have local unsaved changes on device A and server changes from device B, Nabu shows a notification and lets you choose which version to keep.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -768,11 +768,11 @@ export default function FAQPage() {
 
               <AccordionItem value="embedding-system" className="glass rounded-xl border-white/10 px-6">
                 <AccordionTrigger className="text-lg font-semibold hover:text-[var(--nabu-mint)] transition-colors">
-                  What's the embedding system?
+                  What&apos;s the embedding system?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    The embedding system powers semantic search by converting text into mathematical vectors that capture meaning. Here's how it works:
+                    The embedding system powers semantic search by converting text into mathematical vectors that capture meaning. Here&apos;s how it works:
                   </p>
                   <ul className="space-y-2 ml-4">
                     <li><strong className="text-white">Model:</strong> OpenAI text-embedding-3-small (512 dimensions, ~$0.02 per 1,000 notes)</li>
@@ -825,13 +825,13 @@ export default function FAQPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
                   <p className="mb-3">
-                    Deleted notes and thoughts are kept in the Trash for <strong className="text-white">60 days</strong> before being permanently removed. This gives you plenty of time to recover accidentally deleted items while ensuring your storage doesn't fill up with old deleted content.
+                    Deleted notes and thoughts are kept in the Trash for <strong className="text-white">60 days</strong> before being permanently removed. This gives you plenty of time to recover accidentally deleted items while ensuring your storage doesn&apos;t fill up with old deleted content.
                   </p>
                   <p className="mb-3">
                     The Trash page shows a countdown for each item, indicating how many days remain until permanent deletion. Items closer to permanent deletion are highlighted with a warning badge (red for ≤7 days, yellow for ≤30 days).
                   </p>
                   <p>
-                    When an item is permanently deleted after 60 days, the system automatically checks if any attached files (images and attachments) are referenced by other active notes or thoughts. Only unreferenced files are removed from storage, ensuring shared files aren't accidentally deleted.
+                    When an item is permanently deleted after 60 days, the system automatically checks if any attached files (images and attachments) are referenced by other active notes or thoughts. Only unreferenced files are removed from storage, ensuring shared files aren&apos;t accidentally deleted.
                   </p>
                 </AccordionContent>
               </AccordionItem>
@@ -841,7 +841,7 @@ export default function FAQPage() {
                   Can I restore multiple items at once?
                 </AccordionTrigger>
                 <AccordionContent className="text-white/80 pt-4">
-                  Absolutely! The Trash page supports bulk operations for both notes and thoughts. You can select multiple items using checkboxes (or use "Select All") and restore them all with one click. The table view shows the Type column to distinguish between notes and thoughts, making it easy to scan through deleted items, search by title or content, and perform batch operations efficiently.
+                  Absolutely! The Trash page supports bulk operations for both notes and thoughts. You can select multiple items using checkboxes (or use &quot;Select All&quot;) and restore them all with one click. The table view shows the Type column to distinguish between notes and thoughts, making it easy to scan through deleted items, search by title or content, and perform batch operations efficiently.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

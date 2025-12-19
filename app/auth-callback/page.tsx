@@ -15,11 +15,11 @@ import { headers, cookies } from "next/headers";
 import { prismaClient, MAIN_TENANT_ID } from "@/lib/db";
 import { updateUserPropertiesInKinde, refreshUserClaimsInKinde } from "@/lib/kinde";
 
-interface AuthCallbackPageProps {
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}
-
-export default async function AuthCallbackPage(props: AuthCallbackPageProps = {}) {
+export default async function AuthCallbackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   console.log("[AuthCallback] Starting user sync...");
   
   const { getUser } = getKindeServerSession();
@@ -146,16 +146,16 @@ export default async function AuthCallbackPage(props: AuthCallbackPageProps = {}
     }
     
     // 2. Check query params (from postLoginRedirectURL or direct navigation)
-    if (!inviteToken && props?.searchParams) {
-      const searchParams = await props.searchParams;
+    if (!inviteToken) {
+      const params = await searchParams;
       // Check for inviteToken query param
-      const tokenParam = searchParams.inviteToken;
+      const tokenParam = params.inviteToken;
       if (tokenParam && typeof tokenParam === 'string') {
         inviteToken = tokenParam;
         console.log(`[AuthCallback] Found invite token in query params: ${inviteToken}`);
       }
       // Also check if the returnTo URL contains an invite path
-      const returnTo = searchParams.returnTo || searchParams.return_to;
+      const returnTo = params.returnTo || params.return_to;
       if (!inviteToken && returnTo && typeof returnTo === 'string' && returnTo.includes('/invite/')) {
         const match = returnTo.match(/\/invite\/([^/?]+)/);
         if (match && match[1]) {

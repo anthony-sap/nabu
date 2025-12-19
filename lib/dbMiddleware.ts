@@ -131,11 +131,11 @@ export const tenantAware = Prisma.defineExtension({
           // Check if tenantId is explicitly provided in the data
           const dataObject = args?.data ?? {};
           const explicitTenantId = Array.isArray(dataObject) 
-            ? dataObject[0]?.tenantId 
-            : dataObject?.tenantId;
+            ? (dataObject[0] as any)?.tenantId 
+            : (dataObject as any)?.tenantId;
           const explicitWorkspaceId = Array.isArray(dataObject)
-            ? dataObject[0]?.workspaceId
-            : dataObject?.workspaceId;
+            ? (dataObject[0] as any)?.workspaceId
+            : (dataObject as any)?.workspaceId;
           
           // For workspace-aware models: if workspaceId is set, tenantId should be null
           // Otherwise use explicit tenantId or session tenantId
@@ -276,8 +276,8 @@ export const workspaceAware = Prisma.defineExtension({
         ) {
           const dataObject = args?.data ?? {};
           const explicitWorkspaceId = Array.isArray(dataObject)
-            ? dataObject[0]?.workspaceId
-            : dataObject?.workspaceId;
+            ? (dataObject[0] as any)?.workspaceId
+            : (dataObject as any)?.workspaceId;
 
           // If workspaceId is set, verify membership and ensure tenantId is null
           if (explicitWorkspaceId !== undefined && explicitWorkspaceId !== null) {
@@ -292,8 +292,8 @@ export const workspaceAware = Prisma.defineExtension({
                 }
               });
             } else {
-              dataObject.tenantId = null;
-              dataObject.userId = userId; // Ensure userId matches authenticated user
+              (dataObject as any).tenantId = null;
+              (dataObject as any).userId = userId; // Ensure userId matches authenticated user
             }
           } else {
             // Personal item - ensure userId matches
@@ -304,7 +304,7 @@ export const workspaceAware = Prisma.defineExtension({
                 }
               });
             } else {
-              dataObject.userId = userId;
+              (dataObject as any).userId = userId;
             }
           }
         }
