@@ -29,6 +29,10 @@ export async function GET(
     const { userId, tenantId } = await getUserContext();
     const { id: noteId } = await params;
 
+    if (!tenantId) {
+      return errorResponse("Tenant context required", 400);
+    }
+
     // Verify the note exists and belongs to the user
     const note = await prisma.note.findFirst({
       where: {
@@ -87,6 +91,10 @@ export async function POST(
     const { userId, tenantId } = await getUserContext();
     const { id: noteId } = await params;
     const body = await req.json();
+
+    if (!tenantId) {
+      return errorResponse("Tenant context required", 400);
+    }
 
     const { folderId, newFolderName, newFolderColor } = body;
 

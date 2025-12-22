@@ -55,6 +55,8 @@ export async function POST(
           tag = await prisma.tag.create({
             data: {
               name: tagName,
+              userId,
+              tenantId,
               workspaceId: note.workspaceId || null,
               status: "ENABLE",
               createdBy: userId,

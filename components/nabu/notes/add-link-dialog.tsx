@@ -55,6 +55,7 @@ export function AddLinkDialog({ open, onOpenChange, noteId, onLinkAdded }: AddLi
       setSearchQuery("");
       setSelectedNoteId(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   /**

@@ -89,8 +89,8 @@ export function LexicalToolbar({ noteId }: { noteId?: string }) {
     
     if (rows && cols) {
       editor.dispatchCommand(INSERT_TABLE_COMMAND, {
-        rows: parseInt(rows, 10),
-        columns: parseInt(cols, 10),
+        rows,
+        columns: cols,
       });
     }
   }, [editor]);
@@ -472,6 +472,7 @@ export function LexicalToolbar({ noteId }: { noteId?: string }) {
             disabled={uploadState.isUploading}
             title="Insert Image"
           >
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
             <Image className="h-4 w-4" />
           </Button>
           <input

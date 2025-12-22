@@ -116,7 +116,7 @@ export function InviteAcceptanceForm({
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
           <Users className="h-8 w-8 text-primary" />
         </div>
-        <CardTitle className="text-2xl">You're Invited!</CardTitle>
+        <CardTitle className="text-2xl">You&apos;re Invited!</CardTitle>
         <CardDescription>
           Join <span className="font-semibold">{workspaceName}</span>
         </CardDescription>
@@ -145,7 +145,7 @@ export function InviteAcceptanceForm({
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              This invite was sent to <strong>{inviteEmail}</strong>, but you're
+              This invite was sent to <strong>{inviteEmail}</strong>, but you&apos;re
               logged in as <strong>{userEmail}</strong>. Please log in with the
               correct email to accept this invite.
             </AlertDescription>
@@ -169,7 +169,7 @@ export function InviteAcceptanceForm({
                 <LoginLink>Sign in with correct email</LoginLink>
               </Button>
               <p className="text-xs text-center text-muted-foreground">
-                You'll need to sign out first
+                You&apos;ll need to sign out first
               </p>
             </>
           ) : (
@@ -208,7 +208,7 @@ export function InviteAcceptanceForm({
               </Button>
             </LoginLink>
             <p className="text-xs text-center text-muted-foreground">
-              Don't have an account? You'll create one when you sign in.
+              Don&apos;t have an account? You&apos;ll create one when you sign in.
             </p>
           </>
         )}

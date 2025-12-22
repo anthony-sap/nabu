@@ -17,7 +17,7 @@ export function extractHashtags(content: string): string[] {
   const matches = content.matchAll(hashtagRegex);
   const hashtags = new Set<string>();
   
-  for (const match of matches) {
+  for (const match of Array.from(matches)) {
     // match[1] is the captured group (tag without #)
     const tagName = match[1].toLowerCase();
     hashtags.add(tagName);

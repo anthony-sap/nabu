@@ -133,7 +133,7 @@ export const createUserInKinde = async (
       if (response.status === 409 || errorMessage.includes("already exists") || errorMessage.includes("duplicate")) {
         // User already exists - this is okay, we can return the existing user ID
         // Try to find the user by email
-        const existingUser = await findUsersInKinde({ email: user.email, page_size: 1 });
+        const existingUser = await findUsersInKinde({ email: user.email ?? undefined, page_size: 1 });
         if (existingUser && typeof existingUser === 'object' && 'users' in existingUser) {
           const users = (existingUser as any).users;
           if (Array.isArray(users) && users.length > 0 && users[0].id) {

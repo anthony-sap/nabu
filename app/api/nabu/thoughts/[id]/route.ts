@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { thoughtUpdateSchema } from "@/lib/validations/nabu";
 import {
@@ -135,12 +136,23 @@ export async function PATCH(
       ? shouldRegenerateEmbeddings(existingThought.content, data.content)
       : false;
 
+    // Extract fields that need special handling
+    const { noteId, meta, ...updateData } = data;
+
     // Update thought
     const thought = await prisma.thought.update({
       where: { id: thoughtId },
       data: {
-        ...data,
+        ...updateData,
         updatedBy: userId,
+        // Handle meta field - Prisma requires JsonNull for null values
+        ...(meta !== undefined && {
+          meta: meta === null ? Prisma.JsonNull : meta,
+        }),
+        // Handle noteId relation properly
+        ...(noteId !== undefined && {
+          note: noteId ? { connect: { id: noteId } } : { disconnect: true },
+        }),
       },
       include: {
         note: {

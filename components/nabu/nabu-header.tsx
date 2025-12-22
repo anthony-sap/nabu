@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { LoginLink, useKindeAuth } from "@kinde-oss/kinde-auth-nextjs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ export function NabuHeader() {
             <div className="h-9 w-9 rounded-2xl bg-[var(--nabu-deep)] relative shadow-inner ring-1 ring-white/10">
               <div className="absolute inset-1 rounded-2xl bg-[var(--nabu-deep)]"/>
               {/* Mint tablet minimal glyph */}
-              <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+              <Image src="/logo.png" alt="Nabu" width={20} height={20} className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
             </div>
             <span className="text-xl font-serif">Nabu</span>
           </Link>

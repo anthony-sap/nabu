@@ -144,6 +144,7 @@ function ImageComponent({
       style={{ maxWidth: maxWidth ? `${maxWidth}px` : undefined }}
       onClick={handleClick}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={altText}
@@ -199,7 +200,7 @@ function ImageLoading() {
 /**
  * Custom ImageNode for Lexical editor
  */
-export class CustomImageNode extends DecoratorNode<JSX.Element> {
+export class CustomImageNode extends DecoratorNode<React.JSX.Element> {
   __src: string;
   __altText: string;
   __width?: number;
@@ -336,7 +337,7 @@ export class CustomImageNode extends DecoratorNode<JSX.Element> {
     return false;
   }
 
-  decorate(): JSX.Element {
+  decorate(): React.JSX.Element {
     return (
       <Suspense fallback={<ImageLoading />}>
         <ImageComponent

@@ -533,7 +533,7 @@ export function LexicalEditor({
    * Handle content changes - extract both plain text and serialized state
    * Also preserve source URLs in the serialized state
    */
-  const handleChange = (editorState: EditorState, editor: LexicalEditor) => {
+  const handleChange = (editorState: EditorState, editor: LexicalEditorType) => {
     editorState.read(() => {
       const root = $getRoot();
       const plainText = root.getTextContent();
@@ -544,10 +544,7 @@ export function LexicalEditor({
       // Add source URLs from root node to the serialized state
       const sourceUrls = (root as any).__sourceUrls;
       if (sourceUrls && Array.isArray(sourceUrls) && sourceUrls.length > 0) {
-        stateJSON.root = {
-          ...stateJSON.root,
-          __sourceUrls: sourceUrls,
-        };
+        (stateJSON.root as any).__sourceUrls = sourceUrls;
       }
       
       const serialized = JSON.stringify(stateJSON);
@@ -565,6 +562,7 @@ export function LexicalEditor({
               <ContentEditable
                 className="w-full px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none resize-none min-h-[120px] overflow-y-visible bg-transparent"
                 aria-placeholder={placeholder}
+                placeholder={() => null}
               />
             }
             placeholder={
@@ -601,8 +599,8 @@ export function LexicalEditor({
         <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
         
         {/* Source URL Capture Plugins */}
-        <SourceUrlCapturePlugin sourceUrlsRef={sourceUrlsRef} />
-        <SourceUrlDisplayPlugin sourceUrlsRef={sourceUrlsRef} onSourceUrlsChanged={onSourceUrlsChanged} />
+        <SourceUrlCapturePlugin />
+        <SourceUrlDisplayPlugin onSourceUrlsChanged={onSourceUrlsChanged} />
         
         {/* Mentions Plugin */}
         <BeautifulMentionsPlugin

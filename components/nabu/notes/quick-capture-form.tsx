@@ -70,9 +70,6 @@ export function QuickCaptureForm({ onSaved }: QuickCaptureFormProps = {}) {
       
       // Reset form
       setNewThought({ title: "", content: "", editorState: "" });
-      setClassification(null);
-      setShowSuggestion(false);
-      setUserOverrideType(null);
       
       // Force editor to remount by changing key
       setEditorKey(prev => prev + 1);
@@ -125,7 +122,6 @@ export function QuickCaptureForm({ onSaved }: QuickCaptureFormProps = {}) {
               }
               placeholder="What's on your mind?"
               className="min-h-[100px]"
-              disabled={isSaving}
               showToolbar={false}
             />
           </div>

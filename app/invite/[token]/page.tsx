@@ -87,7 +87,7 @@ export default async function InviteAcceptancePage({ params }: PageProps) {
         workspaceName={invite.workspace.name}
         workspaceId={invite.workspace.id}
         role={invite.role}
-        isAuthenticated={authenticated}
+        isAuthenticated={authenticated ?? false}
         userEmail={kindeUser?.email || null}
       />
     </div>

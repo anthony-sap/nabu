@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,7 +35,7 @@ export function NabuMobileMenu() {
           {/* Brand */}
           <div className="flex items-center gap-2 px-2">
             <div className="h-8 w-8 rounded-xl bg-primary/10 relative">
-            <img src="/logo.png" alt="Nabu" className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
+            <Image src="/logo.png" alt="Nabu" width={16} height={16} className="absolute inset-0 m-2 fill-[var(--nabu-mint)]"/>
 
             </div>
             <span className="font-serif font-bold text-lg">Nabu</span>

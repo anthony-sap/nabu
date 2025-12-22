@@ -2,15 +2,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles } from "lucide-react";
 import { QuickCaptureForm } from "./quick-capture-form";
-import { ThoughtCard } from "./thought-card";
-import { SavedThought } from "./types";
+import { ThoughtCard, ApiThought } from "./thought-card";
 
 /**
  * Props for the ActivityFeed component
  */
 interface ActivityFeedProps {
-  thoughts: SavedThought[];
-  onSaveThought: (title: string, content: string) => void;
+  thoughts: ApiThought[];
+  onSaveThought?: () => void;
 }
 
 /**
@@ -23,7 +22,7 @@ export function ActivityFeed({ thoughts, onSaveThought }: ActivityFeedProps) {
       <ScrollArea className="h-full">
         <div className="space-y-6 max-w-4xl mx-auto">
           {/* Quick capture form */}
-          <QuickCaptureForm onSave={onSaveThought} />
+          <QuickCaptureForm onSaved={onSaveThought} />
           
           {/* Empty state when no thoughts exist */}
           {thoughts.length === 0 ? (
@@ -40,7 +39,7 @@ export function ActivityFeed({ thoughts, onSaveThought }: ActivityFeedProps) {
                 <div className="space-y-2">
                   <h3 className="font-serif font-bold text-xl text-foreground">No thoughts yet</h3>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                    Start capturing your thoughts using the quick capture tool. They'll appear here in your activity feed.
+                    Start capturing your thoughts using the quick capture tool. They&apos;ll appear here in your activity feed.
                   </p>
                 </div>
               </CardContent>

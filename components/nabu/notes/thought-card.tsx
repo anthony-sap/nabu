@@ -18,7 +18,7 @@ import { PromoteThoughtDialog } from "./promote-thought-dialog";
 /**
  * Thought data from API (matching the database model)
  */
-interface ApiThought {
+export interface ApiThought {
   id: string;
   content: string;
   source: string;
@@ -278,7 +278,9 @@ export function ThoughtCard({
                 variant="outline"
                 onClick={(e) => {
                   e.stopPropagation();
-                  router.push(`/notes?noteId=${thought.note.id}`);
+                  if (thought.note) {
+                    router.push(`/notes?noteId=${thought.note.id}`);
+                  }
                 }}
                 className="h-8 px-3 text-xs font-medium border-green-500/30 text-green-600 dark:text-green-400 hover:bg-green-500/10 hover:border-green-500/50"
               >

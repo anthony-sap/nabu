@@ -116,7 +116,7 @@ export default function WorkspaceOverviewPage({ params }: PageProps) {
           <CardHeader>
             <CardTitle>Workspace Not Found</CardTitle>
             <CardDescription>
-              The workspace you're looking for doesn't exist or you don't have access to it.
+              The workspace you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
             </CardDescription>
           </CardHeader>
           <CardContent>

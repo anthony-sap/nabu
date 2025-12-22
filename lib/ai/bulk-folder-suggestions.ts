@@ -127,10 +127,10 @@ export async function analyzeBulkFolderSuggestions(
   // Process each note to find best existing folder match
   for (const note of notes) {
     // Find first chunk with embedding (filter in JS since embedding is Unsupported type)
-    const chunkWithEmbedding = note.chunks?.find(chunk => chunk.embedding !== null);
+    const chunkWithEmbedding = note.chunks?.find(chunk => (chunk as any).embedding !== null);
     
     // Skip notes without embeddings
-    if (!chunkWithEmbedding || !chunkWithEmbedding.embedding) {
+    if (!chunkWithEmbedding || !(chunkWithEmbedding as any).embedding) {
       unmatchedNotes.push({
         noteId: note.id,
         title: note.title,
@@ -150,7 +150,7 @@ export async function analyzeBulkFolderSuggestions(
         n.id as note_id,
         f.id as folder_id,
         f.name as folder_name,
-        1 - (nc.embedding <=> ${chunkWithEmbedding.embedding}::vector) as similarity
+        1 - (nc.embedding <=> ${(chunkWithEmbedding as any).embedding}::vector) as similarity
       FROM "NoteChunk" nc
       INNER JOIN "Note" n ON n.id = nc."noteId"
       LEFT JOIN "Folder" f ON f.id = n."folderId"
@@ -159,7 +159,7 @@ export async function analyzeBulkFolderSuggestions(
         AND nc.embedding IS NOT NULL
         AND n."deletedAt" IS NULL
         AND n."folderId" IS NOT NULL
-      ORDER BY nc.embedding <=> ${chunkWithEmbedding.embedding}::vector
+      ORDER BY nc.embedding <=> ${(chunkWithEmbedding as any).embedding}::vector
       LIMIT 10
     `;
 
@@ -187,7 +187,7 @@ export async function analyzeBulkFolderSuggestions(
     // Calculate best match
     let bestMatch: { folderId: string; folderName: string; confidence: number } | null = null;
 
-    for (const [folderId, stats] of folderCounts.entries()) {
+    for (const [folderId, stats] of Array.from(folderCounts.entries())) {
       const folderName = similarNotes.find(n => n.folder_id === folderId)?.folder_name;
       if (!folderName) continue;
 
@@ -222,7 +222,7 @@ export async function analyzeBulkFolderSuggestions(
       unmatchedNotes.push({
         noteId: note.id,
         title: note.title,
-        embedding: chunkWithEmbedding.embedding,
+        embedding: (chunkWithEmbedding as any).embedding,
       });
     }
   }

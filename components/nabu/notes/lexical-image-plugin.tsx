@@ -176,33 +176,36 @@ export function ImagePlugin({ noteId }: ImagePluginProps) {
   useEffect(() => {
     return editor.registerCommand(
       DELETE_IMAGE_COMMAND,
-      async (imageId: string) => {
-        try {
-          // Call API to delete image
-          const response = await fetch(`/api/nabu/images/${imageId}`, {
-            method: "DELETE",
-          });
+      (imageId: string) => {
+        // Handle async delete without blocking command
+        (async () => {
+          try {
+            // Call API to delete image
+            const response = await fetch(`/api/nabu/images/${imageId}`, {
+              method: "DELETE",
+            });
 
-          if (!response.ok) {
-            throw new Error("Failed to delete image");
-          }
+            if (!response.ok) {
+              throw new Error("Failed to delete image");
+            }
 
-          // Remove node from editor
-          editor.update(() => {
-            const nodes = editor._editorState._nodeMap;
-            for (const [key, node] of nodes) {
-              if (node instanceof CustomImageNode) {
-                if (node.getImageId() === imageId) {
-                  node.remove();
+            // Remove node from editor
+            editor.update(() => {
+              const nodes = editor._editorState._nodeMap;
+              for (const [key, node] of Array.from(nodes)) {
+                if (node instanceof CustomImageNode) {
+                  if (node.getImageId() === imageId) {
+                    node.remove();
+                  }
                 }
               }
-            }
-          });
+            });
 
-          toast.success("Image deleted successfully");
-        } catch (error: any) {
-          toast.error(error.message || "Failed to delete image");
-        }
+            toast.success("Image deleted successfully");
+          } catch (error: any) {
+            toast.error(error.message || "Failed to delete image");
+          }
+        })();
 
         return true;
       },

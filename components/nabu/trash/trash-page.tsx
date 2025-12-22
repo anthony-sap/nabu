@@ -110,6 +110,7 @@ export default function TrashPage() {
 
   useEffect(() => {
     fetchTrash();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle search

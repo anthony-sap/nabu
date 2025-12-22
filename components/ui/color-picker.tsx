@@ -46,7 +46,7 @@ function useColorPickerContext() {
 
 export interface ColorPickerProps
   extends PropsWithChildren,
-    HTMLAttributes<HTMLDivElement> {
+    Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
   value?: string;
   defaultValue?: string;
   onChange?: (hex: string) => void;

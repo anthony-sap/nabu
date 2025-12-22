@@ -20,12 +20,13 @@ export default async function WhatsAppSettingsPage() {
 
   const user = await getUser();
   
-  // Get full user record with phone number
+  // Get full user record with phone number and tenantId
   const dbUser = await prisma.user.findUnique({
     where: { id: user!.id },
     select: {
       id: true,
       phoneNumber: true,
+      tenantId: true,
     },
   });
 
@@ -43,7 +44,7 @@ export default async function WhatsAppSettingsPage() {
   // Get tenant's WhatsApp integration
   const integration = await prisma.whatsAppIntegration.findFirst({
     where: {
-      tenantId: user!.tenantId || null,
+      tenantId: dbUser?.tenantId || null,
       deletedAt: null,
     },
   });

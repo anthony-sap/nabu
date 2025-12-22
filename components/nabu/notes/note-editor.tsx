@@ -751,7 +751,7 @@ export function NoteEditor({ noteId, folderId, onClose, onDelete }: NoteEditorPr
           function traverse(node: any) {
             if ((node.__type === "custom-beautifulMention" || node.__type === "beautifulMention") 
                 && node.__trigger === "#" 
-                && node.__value?.toLowerCase() === tagToRemove.name.toLowerCase()) {
+                && node.__value?.toLowerCase() === tagToRemove?.name?.toLowerCase()) {
               nodesToRemove.push(node);
             }
             const children = node.getChildren?.();

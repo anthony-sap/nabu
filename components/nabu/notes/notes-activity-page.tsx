@@ -259,6 +259,7 @@ export default function NotesActivityPage({
     };
 
     loadFolders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // localStorage logic removed - now using database-backed thoughts from API
@@ -404,6 +405,7 @@ export default function NotesActivityPage({
     if (!isLoadingFolders) {
       loadInitialContent();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialNoteId, initialThoughtId, isLoadingFolders, router, pathname]);
 
   /**

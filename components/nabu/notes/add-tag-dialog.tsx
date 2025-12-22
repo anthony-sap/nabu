@@ -182,7 +182,7 @@ export function AddTagDialog({ open, onOpenChange, noteId, onTagAdded }: AddTagD
                     <Plus className="h-4 w-4 text-primary flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-primary">
-                        Create "{searchQuery.trim()}"
+                        Create &quot;{searchQuery.trim()}&quot;
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Create and add new tag
