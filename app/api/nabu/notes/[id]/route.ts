@@ -1,0 +1,399 @@
+import { NextRequest } from "next/server";
+import { prisma, prismaClient } from "@/lib/db";
+import { noteUpdateSchema } from "@/lib/validations/nabu";
+import {
+  getUserContext,
+  validateOwnership,
+  formatNoteResponse,
+  successResponse,
+  handleApiError,
+  errorResponse,
+} from "@/lib/nabu-helpers";
+import { syncContentHashtagsToNote } from "@/lib/tag-sync-helper";
+import { shouldRegenerateEmbeddings, prepareNoteContent, extractTextContent } from "@/lib/embeddings";
+
+/**
+ * GET /api/nabu/notes/[id]
+ * Get a single note by ID with all relations
+ */
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
+
+    // Middleware automatically handles workspace filtering and tenant isolation
+    const note = await prisma.note.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        contentState: true,
+        folderId: true,
+        createdAt: true,
+        updatedAt: true,
+        tagSuggestionStatus: true,
+        lastTagSuggestionAt: true,
+        lastTagModifiedAt: true,
+        pendingJobId: true,
+        folder: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        noteTags: {
+          where: {
+            deletedAt: null, // Only include active NoteTag links
+          },
+          select: {
+            source: true,
+            confidence: true,
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                type: true,
+              },
+            },
+          },
+        },
+        attachments: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            mimeType: true,
+            createdAt: true,
+          },
+        },
+        outgoingLinks: {
+          where: {
+            deletedAt: null, // Only include active links
+          },
+          select: {
+            id: true,
+            toNoteId: true,
+            to: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        incomingLinks: {
+          where: {
+            deletedAt: null, // Only include active links
+          },
+          select: {
+            id: true,
+            fromNoteId: true,
+            from: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        thoughts: {
+          where: {
+            state: 'PROMOTED',
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            content: true,
+            meta: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        _count: {
+          select: {
+            noteTags: true,
+            attachments: true,
+            thoughts: true,
+          },
+        },
+      },
+    });
+
+    if (!note) {
+      return errorResponse("Note not found", 404);
+    }
+
+    const formattedNote = formatNoteResponse(note);
+
+    // Add additional relations
+    (formattedNote as any).attachments = note.attachments;
+    (formattedNote as any).outgoingLinks = note.outgoingLinks.map((link: any) => ({
+      id: link.id,
+      toNoteId: link.toNoteId,
+      toNoteTitle: link.to.title,
+    }));
+    (formattedNote as any).incomingLinks = note.incomingLinks.map((link: any) => ({
+      id: link.id,
+      fromNoteId: link.fromNoteId,
+      fromNoteTitle: link.from.title,
+    }));
+    (formattedNote as any).thoughts = note.thoughts || [];
+
+    return new Response(JSON.stringify(successResponse(formattedNote)), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/**
+ * PATCH /api/nabu/notes/[id]
+ * Update a note
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
+
+    // Verify ownership and get existing note (middleware handles filtering)
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+    });
+
+    if (!existingNote) {
+      return errorResponse("Note not found or access denied", 404);
+    }
+
+    const body = await req.json();
+
+    // Validate request body
+    const validationResult = noteUpdateSchema.safeParse(body);
+
+    if (!validationResult.success) {
+      return errorResponse(
+        validationResult.error.errors[0].message || "Invalid request body",
+        400
+      );
+    }
+
+    const { tagIds, ...noteData } = validationResult.data;
+
+    // If folderId is being changed, verify it exists and user has access (middleware handles filtering)
+    if (noteData.folderId !== undefined && noteData.folderId) {
+      const folder = await prisma.folder.findFirst({
+        where: {
+          id: noteData.folderId,
+          deletedAt: null,
+        },
+      });
+
+      if (!folder) {
+        return errorResponse("Folder not found", 404);
+      }
+      
+      // Ensure folder belongs to same workspace as note (if workspace note)
+      if (existingNote.workspaceId && folder.workspaceId !== existingNote.workspaceId) {
+        return errorResponse("Folder belongs to a different workspace", 400);
+      }
+      // If note is workspace note but folder is personal, that's invalid
+      if (existingNote.workspaceId && !folder.workspaceId) {
+        return errorResponse("Cannot move workspace note to personal folder", 400);
+      }
+    }
+
+    // If tagIds provided, verify they exist and user has access (middleware handles filtering)
+    if (tagIds && tagIds.length > 0) {
+      const tags = await prisma.tag.findMany({
+        where: {
+          id: { in: tagIds },
+          deletedAt: null,
+        },
+      });
+
+      if (tags.length !== tagIds.length) {
+        return errorResponse("One or more tags not found", 404);
+      }
+      
+      // Ensure tags belong to same workspace as note (if workspace note)
+      if (existingNote.workspaceId) {
+        const invalidTags = tags.filter(tag => tag.workspaceId !== existingNote.workspaceId);
+        if (invalidTags.length > 0) {
+          return errorResponse("Tags must belong to the same workspace as the note", 400);
+        }
+      }
+    }
+
+    // Check if content has changed (title or content/contentState)
+    const oldContentForComparison = prepareNoteContent(
+      existingNote.title,
+      extractTextContent(existingNote.contentState) || existingNote.content
+    );
+    const newContentForComparison = prepareNoteContent(
+      noteData.title ?? existingNote.title,
+      noteData.contentState
+        ? extractTextContent(noteData.contentState)
+        : noteData.content ?? existingNote.content
+    );
+    const contentChanged = shouldRegenerateEmbeddings(
+      oldContentForComparison,
+      newContentForComparison
+    );
+
+    // Update note with tags in a transaction
+    // Use prismaClient (base client) for transactions - middleware extensions don't work with transactions
+    const note = await prismaClient.$transaction(async (tx) => {
+      // Update note - preserve existing tenantId/workspaceId unless explicitly changed
+      const updatedNote = await tx.note.update({
+        where: { id },
+        data: {
+          ...noteData,
+          updatedBy: userId,
+        },
+      });
+
+      // Update tags if provided
+      if (tagIds !== undefined) {
+        // Remove existing tags
+        await tx.noteTag.deleteMany({
+          where: { noteId: id },
+        });
+
+        // Add new tags - preserve tenantId from existing note
+        if (tagIds.length > 0) {
+          await tx.noteTag.createMany({
+            data: tagIds.map((tagId) => ({
+              noteId: id,
+              tagId,
+              tenantId: existingNote.tenantId, // Preserve tenantId from existing note
+              createdBy: userId,
+            })),
+          });
+        }
+      }
+
+      // Fetch note with relations
+      return await tx.note.findUnique({
+        where: { id },
+        include: {
+          folder: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+          noteTags: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                  type: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              noteTags: true,
+              attachments: true,
+              thoughts: true,
+            },
+          },
+        },
+      });
+    });
+
+    // Embeddings will be generated by background cron job
+    // This prevents excessive embedding generation during active editing
+    if (contentChanged) {
+      console.log(`[NOTE UPDATE] Content changed for note ${note!.id}, embeddings will be generated by background job after 2 minutes of inactivity`);
+    } else {
+      console.log(`[NOTE UPDATE] Content not changed for note ${note!.id}, skipping embeddings`);
+    }
+
+    // Sync hashtags from content to tags (fallback for when mention plugin doesn't capture them)
+    if (noteData.content !== undefined || noteData.contentState !== undefined) {
+      const contentToCheck = noteData.content ?? note!.content;
+      if (contentToCheck) {
+        await syncContentHashtagsToNote(
+          id,
+          contentToCheck,
+          userId,
+          tenantId
+        );
+      }
+    }
+
+    return new Response(
+      JSON.stringify(successResponse(formatNoteResponse(note), "Note updated successfully")),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/**
+ * DELETE /api/nabu/notes/[id]
+ * Soft-delete a note
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { userId, tenantId } = await getUserContext();
+    const { id } = await params;
+
+    // Verify ownership
+    const isOwner = await validateOwnership("note", id, userId, tenantId);
+    if (!isOwner) {
+      return errorResponse("Note not found or access denied", 404);
+    }
+
+    // Soft delete note (thoughts relation preserved)
+    await prisma.note.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        updatedBy: userId,
+      },
+    });
+
+    return new Response(
+      JSON.stringify(successResponse(null, "Note deleted successfully")),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+

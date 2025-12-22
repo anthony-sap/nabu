@@ -1,0 +1,81 @@
+# Webhook Classification
+# Test this prompt individually: npm run promptfoo:eval:webhook-classify
+
+description: "Webhook Classification"
+
+providers:
+  - openai:gpt-4o-mini
+  - openai:gpt-4o
+  - openai:gpt-3.5-turbo
+
+defaultTest:
+  options:
+    temperature: 0.3
+    max_tokens: 150
+
+prompts:
+  - id: webhook-classify
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that classifies webhook payloads. Always return valid JSON."
+        },
+        {
+          "role": "user",
+          "content": "Analyze this webhook payload and classify it into the most appropriate type/category.\n\nWebhook name: {{webhook_name}}\nWebhook description: {{webhook_description}}\nContent: {{content}}\n\nClassify this into the most appropriate category (e.g., meeting_transcript, crm_note, ticket_update, calendar_event, invoice, purchase_order, etc.).\nYou can use any category that best fits the content - don't limit yourself to predefined types.\n\nReturn JSON: {\"type\": \"category_name\", \"confidence\": 0-100, \"reason\": \"explanation\"}"
+        }
+      ]
+
+tests:
+  - vars:
+      prompt: webhook-classify
+      webhook_name: "Zoom Meeting Webhook"
+      webhook_description: "Receives meeting transcripts from Zoom"
+      content: |
+        Meeting Transcript - Q4 Planning Session
+        Participants: Sarah, John, Mike
+        Date: November 15, 2024
+        
+        Sarah: Let's review the Q4 budget allocations.
+        John: I think we need to adjust the marketing spend.
+        Mike: Agreed, we should focus more on digital channels.
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "confidence": "number", "reason": "string"}'
+        description: "Should return valid JSON structure"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type && result.confidence >= 0 && result.confidence <= 100 && result.reason;
+        description: "Should have valid classification fields"
+      - type: contains-any
+        value: ["meeting", "transcript", "zoom"]
+        transform: "lowercase"
+        description: "Should classify as meeting-related"
+
+  - vars:
+      prompt: webhook-classify
+      webhook_name: "Salesforce Webhook"
+      webhook_description: "CRM updates"
+      content: |
+        {
+          "object": "Account",
+          "id": "001xx000003DGbQAAW",
+          "name": "Acme Corporation",
+          "type": "Customer",
+          "status": "Active"
+        }
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "confidence": "number", "reason": "string"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type.includes("crm") || result.type.includes("salesforce");
+        description: "Should classify as CRM-related"
+
+output:
+  path: .promptfoo/outputs
+

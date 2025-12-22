@@ -1,4 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dont ignore devreadyai folder
+!.devreadyai/
+!.devreadyai/**
+!.promptfoo/
+!.promptfoo/**
+
 
 docker-data
 
@@ -44,3 +50,7 @@ next-env.d.ts
 .vscode
 .contentlayer
 test-results
+
+# promptfoo outputs
+.promptfoo/outputs/
+.promptfoo/.promptfoo/

@@ -1,0 +1,154 @@
+# Webhook Processing Test Cases
+# Tests for webhook classification, title extraction, and folder suggestions
+# Prompts are defined in .promptfoo/promptfooconfig.yaml
+
+tests:
+  # Webhook Classification Tests
+  - vars:
+      prompt: webhook-classify
+      webhook_name: "Zoom Meeting Webhook"
+      webhook_description: "Receives meeting transcripts from Zoom"
+      content: |
+        Meeting Transcript - Q4 Planning Session
+        Participants: Sarah, John, Mike
+        Date: November 15, 2024
+        
+        Sarah: Let's review the Q4 budget allocations.
+        John: I think we need to adjust the marketing spend.
+        Mike: Agreed, we should focus more on digital channels.
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "confidence": "number", "reason": "string"}'
+        description: "Should return valid JSON structure"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type && result.confidence >= 0 && result.confidence <= 100 && result.reason;
+        description: "Should have valid classification fields"
+      - type: contains-any
+        value: ["meeting", "transcript", "zoom"]
+        transform: "lowercase"
+        description: "Should classify as meeting-related"
+
+  - vars:
+      prompt: webhook-classify
+      webhook_name: "Salesforce Webhook"
+      webhook_description: "CRM updates"
+      content: |
+        {
+          "object": "Account",
+          "id": "001xx000003DGbQAAW",
+          "name": "Acme Corporation",
+          "type": "Customer",
+          "status": "Active"
+        }
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "confidence": "number", "reason": "string"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type.includes("crm") || result.type.includes("salesforce");
+        description: "Should classify as CRM-related"
+
+  - vars:
+      prompt: webhook-classify
+      webhook_name: "Jira Webhook"
+      webhook_description: "Ticket updates"
+      content: |
+        Issue: PROJ-123
+        Summary: Fix authentication bug
+        Status: In Progress
+        Assignee: John Doe
+        Priority: High
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "confidence": "number", "reason": "string"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type.includes("ticket") || result.type.includes("issue");
+        description: "Should classify as ticket-related"
+
+  # Webhook Title Extraction Tests
+  - vars:
+      prompt: webhook-title
+      classification_type: "meeting_transcript"
+      webhook_name: "Zoom Meeting"
+      webhook_description: "Meeting transcript webhook"
+      content: |
+        Meeting Transcript - Q4 Planning Session
+        Participants: Sarah, John, Mike
+        Discussion covered budget allocations, team structure, and key milestones.
+    assert:
+      - type: javascript
+        value: "output.split(' ').length >= 3 && output.split(' ').length <= 8"
+        description: "Should be 3-8 words"
+      - type: not-contains
+        value: '"'
+        description: "Should not be wrapped in quotes"
+      - type: contains-any
+        value: ["Q4", "Planning", "Meeting"]
+        description: "Should capture main topic"
+
+  - vars:
+      prompt: webhook-title
+      classification_type: "crm_note"
+      webhook_name: "Salesforce"
+      webhook_description: "Account update"
+      content: "Account Acme Corporation updated. Status changed to Active. New contact added: John Doe."
+    assert:
+      - type: javascript
+        value: "output.length >= 3 && output.length <= 100"
+        description: "Should be reasonable length"
+      - type: contains-any
+        value: ["Acme", "Account", "Corporation"]
+        description: "Should reference key entities"
+
+  # Folder Suggestion Tests
+  - vars:
+      prompt: webhook-folder
+      title: "Q4 Planning Meeting Notes"
+      content: "Discussed budget allocations, team structure, and key milestones for Q4."
+      classification_type: "meeting_transcript"
+      folders_text: |
+        - Work (15 notes)
+        - Personal (8 notes)
+        - Projects (12 notes)
+        - Meetings (20 notes)
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "folderName": "string", "confidence": "number"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.type === "existing" || result.type === "new";
+        description: "Should specify folder type"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.confidence >= 0 && result.confidence <= 100;
+        description: "Should have valid confidence score"
+
+  - vars:
+      prompt: .promptfoo/prompts/webhook.yaml#webhook-folder
+      title: "Customer Feedback - Acme Corp"
+      content: "Customer reported issues with pricing and documentation. Need to follow up."
+      classification_type: "crm_note"
+      folders_text: |
+        - Customers (25 notes)
+        - Feedback (10 notes)
+        - Support (18 notes)
+    assert:
+      - type: contains-json
+        value: '{"type": "string", "folderName": "string", "confidence": "number"}'
+        description: "Should return valid JSON"
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          return result.folderName && result.folderName.length > 0;
+        description: "Should suggest a folder name"
+

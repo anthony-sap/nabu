@@ -25,6 +25,20 @@ export const env = createEnv({
     // Stripe
     STRIPE_API_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    // Supabase (server-side only)
+    SUPABASE_URL: z.string().url(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+    // OpenAI for embeddings
+    OPENAI_API_KEY: z.string().min(1),
+    // Embeddings configuration (optional - have sensible defaults)
+    EMBEDDING_MODEL: z.string().optional(),
+    EMBEDDING_DIMENSIONS: z.string().optional(),
+    // WhatsApp Business Cloud API
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),
+    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    WHATSAPP_WEBHOOK_SECRET: z.string().optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().min(1),
@@ -65,5 +79,18 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_STRIPE_BUSINESS_MONTHLY_PLAN_ID,
     NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID:
       process.env.NEXT_PUBLIC_STRIPE_BUSINESS_YEARLY_PLAN_ID,
+    // Supabase (server-side only)
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // OpenAI
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
+    EMBEDDING_DIMENSIONS: process.env.EMBEDDING_DIMENSIONS,
+    // WhatsApp
+    WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+    WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+    WHATSAPP_WEBHOOK_SECRET: process.env.WHATSAPP_WEBHOOK_SECRET,
   },
 });

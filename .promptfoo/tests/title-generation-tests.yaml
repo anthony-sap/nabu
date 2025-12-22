@@ -1,0 +1,74 @@
+# Title Generation Test Cases
+# Tests for single and bulk note title generation
+# Prompts are defined in .promptfoo/promptfooconfig.yaml
+
+tests:
+  # Single note title tests
+  - vars:
+      prompt: title-single
+      content: "Met with Sarah about Q4 planning. We discussed budget allocations, team structure, and key milestones for the upcoming quarter."
+    assert:
+      - type: contains
+        value: "Q4"
+        description: "Should contain Q4 reference"
+      - type: javascript
+        value: "output.split(' ').length >= 3 && output.split(' ').length <= 8"
+        description: "Should be 3-8 words"
+      - type: not-contains
+        value: "Note"
+        description: "Should not contain generic word 'Note'"
+
+  - vars:
+      prompt: title-single
+      content: "Customer feedback session with Acme Corp. Main concerns: pricing too high, need better documentation, and faster response times."
+    assert:
+      - type: contains
+        value: "Acme"
+        description: "Should reference customer name"
+      - type: javascript
+        value: "output.length <= 100"
+        description: "Should be concise"
+
+  - vars:
+      prompt: title-single
+      content: "Research findings on machine learning applications in healthcare. Key insights include improved diagnostic accuracy and personalized treatment recommendations."
+    assert:
+      - type: contains-any
+        value: ["Machine Learning", "Healthcare", "Research"]
+        description: "Should capture main topic"
+
+  - vars:
+      prompt: title-single
+      content: "Quick reminder: call John tomorrow"
+    assert:
+      - type: javascript
+        value: "output.length >= 3"
+        description: "Should handle short content"
+
+  # Bulk title tests
+  - vars:
+      prompt: title-bulk
+      thought_count: 3
+      combined_content: |
+        Thought 1: Meeting notes from project kickoff
+        Thought 2: Discussed timeline and deliverables
+        Thought 3: Assigned tasks to team members
+    assert:
+      - type: contains-any
+        value: ["Project", "Meeting", "Kickoff"]
+        description: "Should capture common theme"
+      - type: javascript
+        value: "output.split(' ').length >= 3 && output.split(' ').length <= 8"
+        description: "Should be 3-8 words"
+
+  - vars:
+      prompt: title-bulk
+      thought_count: 2
+      combined_content: |
+        Thought 1: Customer complaint about slow service
+        Thought 2: Need to improve response time
+    assert:
+      - type: contains-any
+        value: ["Customer", "Service", "Response"]
+        description: "Should identify common theme"
+

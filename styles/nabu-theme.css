@@ -1,0 +1,235 @@
+/* Nabu Brand Theme - Mint Icon Variant */
+
+@layer base {
+  :root {
+    /* Nabu brand palette */
+    --nabu-mint: 0 179 166;        /* #00B3A6 */
+    --nabu-deep: 7 22 51;          /* #071633 */
+    --nabu-lapis: 30 64 175;       /* #1E40AF */
+    --nabu-gold: 197 155 47;       /* #C59B2F */
+    --nabu-gold-access: 224 195 106; /* #E0C36A */
+    --nabu-clay: 231 220 199;      /* #E7DCC7 */
+    --nabu-white: 255 255 255;
+
+    /* shadcn design tokens - light */
+    --background: 0 0% 100%;
+    --foreground: 226 15% 14%;                /* near deep */
+    --card: 0 0% 100%;
+    --card-foreground: 226 15% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 226 15% 14%;
+    --primary: 173 100% 35%;                  /* mint as HSL */
+    --primary-foreground: 228 44% 11%;        /* deep text on mint */
+    --secondary: 226 70% 40%;                 /* lapis */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 36 32% 85%;                      /* clay */
+    --muted-foreground: 226 15% 35%;
+    --accent: 43 62% 48%;                     /* gold */
+    --accent-foreground: 228 44% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 226 15% 90%;
+    --input: 226 15% 90%;
+    --ring: 173 100% 35%;
+    --radius: 16px;
+  }
+
+  .dark {
+    /* shadcn design tokens - dark */
+    --background: 226 58% 11%;                /* deep navy */
+    --foreground: 0 0% 98%;
+    --card: 226 58% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 226 58% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 173 100% 45%;                  /* brighter mint for dark */
+    --primary-foreground: 228 44% 11%;
+    --secondary: 226 70% 46%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 226 30% 20%;
+    --muted-foreground: 226 15% 70%;
+    --accent: 43 62% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 226 30% 24%;
+    --input: 226 30% 24%;
+    --ring: 173 100% 45%;
+  }
+
+  /* Focus outline that matches mint brand */
+  :focus-visible {
+    outline: 3px solid hsl(var(--ring) / 0.35);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Nabu glass morphism effect */
+  .nabu-glass {
+    backdrop-filter: saturate(140%) blur(10px);
+    background: hsl(var(--foreground) / 0.04);
+    border: 1px solid hsl(var(--foreground) / 0.08);
+  }
+
+  /* Nabu pill badge */
+  .nabu-pill {
+    @apply rounded-full px-3 py-1 text-xs font-semibold tracking-wide;
+    background: hsl(var(--ring) / 0.15);
+    color: hsl(var(--ring));
+    border: 1px solid hsl(var(--ring) / 0.35);
+  }
+}
+
+@layer utilities {
+  /* Utility aliases for brand surfaces */
+  .nabu-surface-deep { 
+    background-color: hsl(226 58% 11%); 
+  }
+  
+  .nabu-surface-lapis { 
+    background-color: rgb(var(--nabu-lapis)); 
+  }
+  
+  .nabu-text-muted { 
+    color: hsl(var(--muted-foreground)); 
+  }
+
+  /* Rounded-rect shape language */
+  .rounded-nabu { 
+    border-radius: var(--radius); 
+  }
+
+  /* Direct brand color utilities */
+  .text-nabu-mint {
+    color: rgb(var(--nabu-mint));
+  }
+
+  .bg-nabu-mint {
+    background-color: rgb(var(--nabu-mint));
+  }
+
+  .bg-nabu-deep {
+    background-color: rgb(var(--nabu-deep));
+  }
+
+  .bg-nabu-lapis {
+    background-color: rgb(var(--nabu-lapis));
+  }
+
+  .bg-nabu-gold {
+    background-color: rgb(var(--nabu-gold));
+  }
+
+  .bg-nabu-clay {
+    background-color: rgb(var(--nabu-clay));
+  }
+
+  .border-nabu-mint {
+    border-color: rgb(var(--nabu-mint));
+  }
+
+  .shadow-nabu-mint {
+    --tw-shadow-color: rgb(var(--nabu-mint));
+  }
+}
+
+/* Nabu Button Styles */
+@layer components {
+  /* Primary Button - Prominent Actions */
+  .btn-nabu-primary {
+    @apply bg-nabu-mint text-white font-bold text-sm
+           rounded-xl py-2.5 px-5
+           shadow-lg shadow-nabu-mint/20
+           hover:bg-nabu-mint/90 hover:scale-105 
+           transition-all;
+  }
+  
+  /* Secondary Primary Button - Slightly smaller scale on hover */
+  .btn-nabu-primary-sm {
+    @apply bg-nabu-mint text-white font-bold text-sm
+           rounded-xl py-2.5 px-5
+           shadow-lg shadow-nabu-mint/20
+           hover:bg-nabu-mint/90 hover:scale-[1.02] 
+           transition-all;
+  }
+
+  /* Secondary / Ghost Button - Navigation & Utilities */
+  .btn-nabu-ghost {
+    @apply text-[rgb(var(--nabu-deep))]/60 dark:text-white/60
+           bg-transparent rounded-lg p-2
+           hover:bg-[rgb(var(--nabu-deep))]/5 dark:hover:bg-white/10
+           hover:text-[rgb(var(--nabu-deep))] dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Icon Button - Square ghost button for icons */
+  .btn-nabu-icon {
+    @apply w-10 h-10 flex items-center justify-center
+           text-[rgb(var(--nabu-deep))]/60 dark:text-white/60
+           bg-transparent rounded-xl
+           hover:bg-[rgb(var(--nabu-deep))]/5 dark:hover:bg-white/10
+           hover:text-[rgb(var(--nabu-deep))] dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Tab Button - For switchers */
+  .btn-nabu-tab {
+    @apply text-[rgb(var(--nabu-deep))]/40 dark:text-white/40
+           border-b-2 border-transparent
+           hover:text-[rgb(var(--nabu-deep))]/70 dark:hover:text-white/70
+           transition-all duration-200;
+  }
+
+  .btn-nabu-tab-active {
+    @apply text-[rgb(var(--nabu-deep))] dark:text-white
+           border-b-2 border-[rgb(var(--nabu-mint))];
+  }
+
+  /* Quick Action Chip */
+  .btn-nabu-chip {
+    @apply bg-white dark:bg-[rgb(var(--nabu-deep))]/60
+           border border-[rgb(var(--nabu-deep))]/5 dark:border-white/5
+           shadow-[0_4px_20px_rgba(7,22,51,0.04)]
+           rounded-xl px-3 py-2
+           hover:scale-[1.02] hover:shadow-xl
+           transition-all duration-200;
+  }
+
+  .btn-nabu-chip-active {
+    @apply border-[rgb(var(--nabu-mint))];
+  }
+
+  /* Modal Cancel/Ghost Button */
+  .btn-nabu-cancel {
+    @apply bg-transparent text-nabu-deep/60 dark:text-white/60
+           font-medium text-sm rounded-xl py-2.5 px-5
+           hover:bg-nabu-deep/5 dark:hover:bg-white/10
+           hover:text-nabu-deep dark:hover:text-white
+           transition-all duration-200;
+  }
+
+  /* Color Swatch Button - Tactile candy buttons */
+  .color-swatch {
+    @apply w-8 h-8 rounded-full shadow-sm
+           hover:scale-110 hover:ring-2 hover:ring-offset-2
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .color-swatch-selected {
+    @apply ring-2 ring-offset-2 ring-nabu-deep/20 dark:ring-white/20;
+  }
+
+  /* Nabu Modal Input - Etched Slot style */
+  .input-nabu {
+    @apply w-full h-12 px-4 py-3 rounded-xl
+           bg-[#F8FAFC] dark:bg-white/5
+           border border-nabu-deep/5 dark:border-white/10
+           text-base font-medium text-nabu-deep dark:text-white
+           placeholder:text-nabu-deep/30 dark:placeholder:text-white/30
+           focus:border-nabu-mint focus:ring-1 focus:ring-nabu-mint focus:outline-none
+           transition-all duration-200;
+  }
+}
+

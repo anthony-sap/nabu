@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("MIGRATE_DATABASE_URL")  // Direct connection (port 5432) for migrations
 }
 
 enum UserRole {
@@ -20,18 +21,99 @@ enum StatusEnum {
   DISABLE
 }
 
+enum ThoughtSource {
+  WEB
+  TELEGRAM
+  WHATSAPP
+  TEAMS
+  EMAIL
+  VOICE
+  OTHER
+}
+
+enum ThoughtState {
+  NEW
+  ENRICHED
+  GROUPED
+  PROMOTED
+  ARCHIVED
+}
+
+enum NoteVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+enum NoteLinkRelation {
+  RELATED
+  EXPANDS
+  SUPPORTS
+  CONTRADICTS
+  FOLLOWS_UP
+}
+
+enum TagType {
+  TOPIC
+  PROJECT
+  CLIENT
+  OTHER
+}
+
+enum ShareEntityType {
+  NOTE
+  TAG
+  FOLDER
+}
+
+enum SharePermission {
+  VIEW
+  COMMENT
+  EDIT
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TagSource {
+  USER_ADDED
+  AI_SUGGESTED
+}
+
 model Tenant {
-  id        String     @id @default(cuid())
-  status    StatusEnum @default(ENABLE)
-  name      String     @db.VarChar(50)
-  createdAt DateTime   @default(now())
-  createdBy String?
-  updatedAt DateTime   @default(now()) @updatedAt
-  updatedBy String?
-  deletedAt DateTime?
-  AuditLog  AuditLog[]
-  Account   Account[]
-  User      User[]
+  id                  String               @id @default(cuid())
+  status              StatusEnum           @default(ENABLE)
+  name                String               @db.VarChar(50)
+  createdAt           DateTime             @default(now())
+  createdBy           String?
+  updatedAt           DateTime             @default(now()) @updatedAt
+  updatedBy           String?
+  deletedAt           DateTime?
+  AuditLog            AuditLog[]
+  Account             Account[]
+  User                User[]
+  Folder              Folder[]
+  Tag                 Tag[]
+  Note                Note[]
+  Thought             Thought[]
+  NoteLink            NoteLink[]
+  Attachment          Attachment[]
+  Share               Share[]
+  ImageAttachment     ImageAttachment[]
+  NoteChunk           NoteChunk[]
+  ThoughtChunk        ThoughtChunk[]
+  EmbeddingJob        EmbeddingJob[]
+  whatsappIntegration WhatsAppIntegration?
+  userPhoneLinks      UserPhoneLink[]
+  whatsappMessages    WhatsAppMessage[]
+  webhookEndpoints     WebhookEndpoint[]
+  webhookProcessingJobs WebhookProcessingJob[]
+  NoteVersion         NoteVersion[]
+  UsageLog            UsageLog[]
 }
 
 model AuditLog {
@@ -88,27 +170,38 @@ model Session {
 }
 
 model User {
-  id                     String     @id @default(cuid())
-  status                 StatusEnum @default(ENABLE)
+  id                     String          @id @default(cuid())
+  status                 StatusEnum      @default(ENABLE)
   firstName              String?
   lastName               String?
-  email                  String?    @unique
+  email                  String?         @unique
   emailVerified          DateTime?
   image                  String?
-  roles                  UserRole[] @default([USER])
+  phoneNumber            String?         @unique
+  roles                  UserRole[]      @default([USER])
   tenantId               String?
-  Tenant                 Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdAt              DateTime   @default(now())
+  Tenant                 Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt              DateTime        @default(now())
   createdBy              String?
-  updatedAt              DateTime   @default(now()) @updatedAt
+  updatedAt              DateTime        @default(now()) @updatedAt
   updatedBy              String?
   deletedAt              DateTime?
   accounts               Account[]
   sessions               Session[]
-  stripeCustomerId       String?    @unique @map(name: "stripe_customer_id")
-  stripeSubscriptionId   String?    @unique @map(name: "stripe_subscription_id")
-  stripePriceId          String?    @map(name: "stripe_price_id")
-  stripeCurrentPeriodEnd DateTime?  @map(name: "stripe_current_period_end")
+  stripeCustomerId       String?         @unique @map(name: "stripe_customer_id")
+  stripeSubscriptionId   String?         @unique @map(name: "stripe_subscription_id")
+  stripePriceId          String?         @map(name: "stripe_price_id")
+  stripeCurrentPeriodEnd DateTime?       @map(name: "stripe_current_period_end")
+  plan                   String          @default("free") // 'free' | 'personal' | 'teams'
+  thoughts               Thought[]
+  notes                  Note[]
+  folders                Folder[]
+  tags                   Tag[]
+  shares                 Share[]
+  phoneLinks             UserPhoneLink[]
+  webhookEndpoints        WebhookEndpoint[]
+  usageLogs              UsageLog[]
+  workspaceMemberships   WorkspaceMembership[]
 }
 
 model VerificationToken {
@@ -117,4 +210,698 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Folder {
+  id          String     @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?    // Phase 3: Team folders
+  name        String
+  color       String?
+  description String?
+  parentId    String?
+  parent      Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Folder[]   @relation("FolderHierarchy")
+  order       Int?
+  status      StatusEnum @default(ENABLE)
+  createdAt   DateTime   @default(now())
+  createdBy   String?
+  updatedAt   DateTime   @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  notes       Note[]
+
+  @@index([tenantId, userId])
+  @@index([workspaceId])
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?  // Phase 3: Team tags
+  name      String
+  color     String?
+  type      TagType?
+  status    StatusEnum @default(ENABLE)
+  createdAt DateTime   @default(now())
+  createdBy String?
+  updatedAt DateTime   @default(now()) @updatedAt
+  updatedBy String?
+  deletedAt DateTime?
+  noteTags  NoteTag[]
+
+  @@unique([tenantId, userId, name])
+  @@unique([workspaceId, name]) // Team tags are unique per workspace
+  @@index([tenantId, userId])
+  @@index([workspaceId])
+}
+
+model Note {
+  id                   String            @id @default(cuid())
+  tenantId             String?
+  tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId          String?           // Phase 3: Team notes
+  folderId             String?
+  folder               Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  title                String
+  content              String            @db.Text
+  contentState         String?           @db.Text // Lexical editor serialized state (JSON)
+  sourceThoughts       String[]
+  summary              String?           @db.Text
+  meta                 Json?             // Metadata for webhooks, classification, etc.
+  visibility           NoteVisibility    @default(PRIVATE)
+  status               StatusEnum        @default(ENABLE)
+  tagSuggestionStatus      String?           // "pending", "completed", null
+  lastTagSuggestionAt      DateTime?         // When last suggestion was made (cooldown)
+  lastTagModifiedAt        DateTime?         // When user last manually modified tags
+  pendingJobId             String?           // Current pending job ID
+  lastEmbeddingGeneratedAt DateTime?         // When embeddings were last generated (for batching)
+  createdAt                DateTime          @default(now())
+  createdBy                String?
+  updatedAt                DateTime          @default(now()) @updatedAt
+  updatedBy                String?
+  deletedAt                DateTime?
+  deletedBy                String?
+  noteTags             NoteTag[]
+  attachments          Attachment[]
+  images               ImageAttachment[]
+  outgoingLinks        NoteLink[]        @relation("NoteOutgoing")
+  incomingLinks        NoteLink[]        @relation("NoteIncoming")
+  thoughts             Thought[]
+  chunks               NoteChunk[]       // Chunked content for embeddings
+  webhookProcessingJobs WebhookProcessingJob[]
+  versions             NoteVersion[]     // Version history snapshots
+
+  @@index([tenantId, userId])
+  @@index([folderId])
+  @@index([workspaceId])
+}
+
+model Thought {
+  id                   String        @id @default(cuid())
+  tenantId             String?
+  tenant               Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId          String?       // Phase 3: Team thoughts
+  noteId               String?
+  note                 Note?         @relation(fields: [noteId], references: [id], onDelete: SetNull)
+  content              String        @db.Text
+  source               ThoughtSource
+  state                ThoughtState  @default(NEW)
+  suggestedTags        String[]
+  meta                 Json?
+  tagSuggestionStatus  String?       // "pending", "completed", null
+  lastTagSuggestionAt  DateTime?     // When last suggestion was made (cooldown)
+  lastTagModifiedAt    DateTime?     // When user last manually modified tags
+  pendingJobId         String?       // Current pending job ID
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+  deletedBy            String?
+  attachments          Attachment[]
+  chunks               ThoughtChunk[] // Chunked content for embeddings
+
+  @@index([tenantId, userId])
+  @@index([noteId])
+  @@index([workspaceId])
+}
+
+model NoteTag {
+  noteId     String
+  tagId      String
+  tenantId  String?
+  confidence Float?
+  source     TagSource @default(USER_ADDED)
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+model NoteLink {
+  id         String           @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromNoteId String
+  toNoteId   String
+  relation   NoteLinkRelation
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+
+  from Note @relation("NoteOutgoing", fields: [fromNoteId], references: [id], onDelete: Cascade)
+  to   Note @relation("NoteIncoming", fields: [toNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([fromNoteId])
+  @@index([toNoteId])
+}
+
+model TagSuggestionJob {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  userId        String
+  entityType    String    // "NOTE" or "THOUGHT"
+  entityId      String
+  content       String    @db.Text
+  status        JobStatus @default(PENDING)
+  
+  // Results
+  suggestedTags String[]  // Tag names suggested by AI
+  confidence    Float?    // Overall confidence score
+  
+  // Metadata
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  error         String?   @db.Text
+  consumed      Boolean   @default(false) // Prevents reuse
+  
+ createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([consumed])
+}
+
+model Attachment {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  noteId        String?
+  note          Note?     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  thoughtId     String?
+  thought       Thought?  @relation(fields: [thoughtId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  extractedText String?   @db.Text
+  embedding     Bytes?
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+
+  @@index([tenantId])
+  @@index([noteId])
+  @@index([thoughtId])
+}
+
+model Share {
+  id         String          @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType ShareEntityType
+  entityId   String
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission SharePermission
+  createdAt            DateTime      @default(now())
+  createdBy            String?
+  updatedAt            DateTime      @default(now()) @updatedAt
+  updatedBy            String?
+  deletedAt            DateTime?
+  revokedAt  DateTime?
+
+  @@index([tenantId, entityType, entityId])
+  @@index([userId])
+}
+
+// Image attachments for notes - stored in Supabase storage
+model ImageAttachment {
+  id               String    @id @default(cuid())
+  noteId           String
+  note             Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  // File metadata
+  filename         String    // Unique filename in storage (uuid-originalname)
+  originalFilename String    // Original uploaded filename
+  storagePath      String    // Full path in Supabase: {tenantId}/note-images/{noteId}/{filename}
+  url              String?   // Public URL from Supabase (null until upload confirmed)
+  
+  // File properties
+  fileSize         Int       // Size in bytes
+  mimeType         String    // image/jpeg, image/png, etc.
+  width            Int?      // Image width in pixels
+  height           Int?      // Image height in pixels
+  
+  // Optimized versions (generated by edge function)
+  thumbnailUrl     String?   // 300px width
+  mediumUrl        String?   // 800px width
+  
+  // Multi-tenancy
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  
+  // Audit timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Audit users
+  createdBy        String
+  updatedBy        String
+  
+  // Soft delete
+  deletedAt        DateTime?
+  deletedBy        String?
+  
+  @@index([noteId])
+  @@index([tenantId])
+  @@index([fileSize]) // For storage reporting
+  @@index([createdAt]) // For reporting queries
+}
+
+// Chunked note content for embeddings
+// Handles long notes by splitting into ~2000 char chunks with overlap
+model NoteChunk {
+  id         String                       @id @default(cuid())
+  noteId     String
+  note       Note                         @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunkIndex Int                          // Order of chunk (0, 1, 2, etc.)
+  content    String                       @db.Text // Chunked text content
+  embedding  Unsupported("vector(512)")?  // Vector embedding (512 dimensions - OpenAI text-embedding-3-small)
+  
+  // Audit fields
+  createdAt  DateTime                     @default(now())
+  createdBy  String?
+  updatedAt  DateTime                     @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  deletedBy  String?
+  
+  @@index([noteId])
+  @@index([tenantId])
+}
+
+// Chunked thought content for embeddings
+// Handles long thoughts by splitting into ~2000 char chunks with overlap
+model ThoughtChunk {
+  id         String                       @id @default(cuid())
+  thoughtId  String
+  thought    Thought                      @relation(fields: [thoughtId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunkIndex Int                          // Order of chunk (0, 1, 2, etc.)
+  content    String                       @db.Text // Chunked text content
+  embedding  Unsupported("vector(512)")?  // Vector embedding (512 dimensions - OpenAI text-embedding-3-small)
+  
+  // Audit fields
+  createdAt  DateTime                     @default(now())
+  createdBy  String?
+  updatedAt  DateTime                     @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  deletedBy  String?
+  
+  @@index([thoughtId])
+  @@index([tenantId])
+}
+
+// Job queue for generating embeddings
+// Similar to TagSuggestionJob but for embeddings
+model EmbeddingJob {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String
+  entityType    String    // "NOTE" or "THOUGHT"
+  entityId      String    // Note or Thought ID
+  chunkId       String    // NoteChunk or ThoughtChunk ID
+  chunkIndex    Int       // Index of chunk being processed
+  content       String    @db.Text // Text content to embed
+  status        JobStatus @default(PENDING)
+  
+  // Metadata for retry logic
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  error         String?   @db.Text
+  
+  // Audit fields
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @default(now()) @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([tenantId])
+}
+
+// WhatsApp Integration Models
+
+// Tenant-level WhatsApp configuration
+model WhatsAppIntegration {
+  id                String    @id @default(cuid())
+  tenantId          String?   @unique
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phoneNumberId     String    // WhatsApp Phone Number ID from Meta
+  businessAccountId String    // WhatsApp Business Account ID
+  phoneNumber       String    // Display number (e.g., +1234567890)
+  accessToken       String    @db.Text // Encrypted access token
+  webhookSecret     String    // For signature verification
+  mode              String    @default("personal") // "personal", "team", "both"
+  isActive          Boolean   @default(true)
+  
+  // Audit fields
+  createdAt         DateTime  @default(now())
+  createdBy         String?
+  updatedAt         DateTime  @default(now()) @updatedAt
+  updatedBy         String?
+  deletedAt         DateTime?
+  deletedBy         String?
+  
+  @@index([tenantId])
+  @@index([phoneNumberId])
+}
+
+// Maps WhatsApp phone numbers to Nabu users
+model UserPhoneLink {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phoneNumber   String    // E.164 format: +1234567890
+  isActive      Boolean   @default(true)
+  linkedAt      DateTime  @default(now())
+  lastMessageAt DateTime? // Track last message received
+  
+  // Audit fields
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  updatedAt     DateTime  @updatedAt
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  
+  @@unique([phoneNumber, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([phoneNumber])
+}
+
+// One-time tokens for phone number linking
+model WhatsAppLinkToken {
+  id                String    @id @default(cuid())
+  token             String    @unique
+  phoneNumber       String    // E.164 format
+  whatsappMessageId String?   // Original WhatsApp message ID
+  verificationCode  String?   // 6-digit code for 2FA-style verification
+  expiresAt         DateTime  // 15 minutes from creation
+  usedAt            DateTime? // Enforce one-time use
+  userId            String?   // Set when used
+  metadata          Json?     // Store WhatsApp context
+
+  // Multi-tenancy (nullable so tokens can be global if needed)
+  tenantId          String?
+
+  // Audit fields
+  createdAt         DateTime  @default(now())
+  createdBy         String?
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String?
+  deletedAt         DateTime?
+  deletedBy         String?
+
+  @@index([token])
+  @@index([phoneNumber, tenantId])
+  @@index([expiresAt])
+}
+
+// Raw message storage for debugging and retry
+model WhatsAppMessage {
+  id                String    @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  whatsappMessageId String    @unique // WhatsApp's message ID
+  fromNumber        String    // Sender phone number
+  toNumber          String    // Nabu bot number
+  messageType       String    // "text", "image", "audio", "document"
+  content           String?   @db.Text // Text content
+  mediaUrl          String?   // Media URL from WhatsApp
+  mimeType          String?
+  rawPayload        Json      // Full webhook payload
+  processed         Boolean   @default(false)
+  processedAt       DateTime?
+  thoughtId         String?   // Link to created Thought
+  error             String?   @db.Text
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([whatsappMessageId])
+  @@index([fromNumber])
+  @@index([processed])
+  @@index([tenantId])
+}
+
+// Webhook Integration Models
+
+// User-level webhook endpoint configuration
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String    @unique // Unguessable token for webhook URL
+  name        String    // User-friendly name
+  description String?   // Optional description
+  isActive    Boolean   @default(true)
+  
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  createdBy   String?
+  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  deletedBy   String?
+  
+  // Relations
+  processingJobs WebhookProcessingJob[]
+  
+  @@index([userId, tenantId])
+  @@index([token])
+}
+
+// Background job queue for processing webhook payloads
+model WebhookProcessingJob {
+  id                String    @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  noteId            String
+  note              Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  webhookEndpointId String
+  webhookEndpoint   WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+  status            JobStatus @default(PENDING)
+  
+  // Raw payload data for processing
+  headers           Json      // HTTP headers
+  body              Json      // Parsed body or raw text
+  rawBody           String?    @db.Text // Original raw body
+  method            String    // HTTP method
+  ipAddress         String?    // Client IP address
+  
+  // Error tracking
+  error             String?    @db.Text
+  
+  // Audit fields
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @default(now()) @updatedAt
+  
+  @@index([noteId])
+  @@index([webhookEndpointId])
+  @@index([status, createdAt])
+  @@index([tenantId])
+}
+
+// Note version history for tracking changes and enabling restore
+model NoteVersion {
+  id             String    @id @default(cuid())
+  noteId         String
+  note           Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tenantId       String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Snapshot content
+  title          String
+  content        String    @db.Text
+  contentState   String?   @db.Text  // Lexical JSON state
+  
+  // Version metadata
+  reason         String    // "autosave" | "manual" | "restore"
+  versionNumber  Int       // Sequential version number per note
+  changesSummary String?   // Brief description of changes
+  
+  // Audit fields
+  createdAt      DateTime  @default(now())
+  createdBy      String?
+  updatedAt      DateTime  @updatedAt
+  updatedBy      String?
+  deletedAt      DateTime?
+  deletedBy      String?
+  
+  @@index([noteId, createdAt])
+  @@index([noteId, reason])
+  @@index([tenantId])
+}
+
+// Usage tracking for entitlements and billing
+model UsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  month      String   // '2025-11' format: YYYY-MM
+  metricType String   // 'ai_actions', 'automation_runs', 'webhook_calls', 'linked_docs'
+  count      Int      @default(0)
+  
+  // Audit fields
+  createdAt  DateTime @default(now())
+  createdBy  String?
+  updatedAt  DateTime @default(now()) @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+  
+  @@unique([userId, tenantId, month, metricType])
+  @@index([userId, month])
+  @@index([tenantId, month])
+  @@index([metricType])
+}
+
+// Workspace models for Teams plan (Phase 3)
+model Workspace {
+  id             String   @id @default(cuid())
+  name           String
+  planCode       String   @default("teams") // 'teams'
+  billingMode    String   @default("self_service") // 'self_service' | 'offline_invoice'
+  customPlan     Boolean  @default(false)
+  
+  // Stripe billing (self-service)
+  stripeCustomerId       String?  @unique
+  stripeSubscriptionId   String?  @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Custom entitlements (Phase 4)
+  entitlementsOverride Json?
+  
+  // Contract info (Phase 4)
+  contractSeats        Int?
+  contractStart        DateTime?
+  contractEnd          DateTime?
+  paymentTermsDays     Int?
+  billingCompanyName   String?
+  billingContactEmail  String?
+  billingAddress       String?
+  
+  // Audit fields
+  createdAt    DateTime @default(now())
+  createdBy    String?
+  updatedAt    DateTime @default(now()) @updatedAt
+  updatedBy    String?
+  deletedAt    DateTime?
+  
+  memberships  WorkspaceMembership[]
+  invites      WorkspaceInvite[]
+  usageSnapshots WorkspaceUsageSnapshot[]
+  
+  @@index([planCode])
+  @@index([billingMode])
+}
+
+// Usage snapshots for workspace billing (Phase 4)
+model WorkspaceUsageSnapshot {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  month          String   // '2025-11' format: YYYY-MM
+  seats          Int      // Active seats
+  aiActions      Int      @default(0)
+  automationRuns Int      @default(0)
+  storageGB      Float    @default(0)
+  createdAt      DateTime @default(now())
+  
+  @@unique([workspaceId, month])
+  @@index([workspaceId])
+  @@index([month])
+}
+
+model WorkspaceMembership {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    // 'owner' | 'admin' | 'member' | 'guest'
+  status      String    @default("active") // 'pending' | 'active' | 'deactivated'
+  
+  invitedById String?
+  invitedAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  
+  // Audit fields
+  createdAt   DateTime  @default(now())
+  createdBy   String?
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([status])
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        String    // 'admin' | 'member' | 'guest'
+  token       String    @unique
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+  
+  // Audit fields
+  createdBy   String?
+  updatedAt   DateTime  @default(now()) @updatedAt
+  updatedBy   String?
+  deletedAt   DateTime?
+  
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
 }

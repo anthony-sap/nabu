@@ -1,0 +1,74 @@
+# Title Generation - Single Note
+# Test this prompt individually: npm run promptfoo:eval:title-single
+
+description: "Title Generation - Single Note"
+
+providers:
+  - openai:gpt-4o-mini
+  - openai:gpt-4o
+  - openai:gpt-3.5-turbo
+
+defaultTest:
+  options:
+    temperature: 0.7
+    max_tokens: 5000
+
+prompts:
+  - id: title-single
+    raw: |
+      [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant that generates concise, meaningful titles for notes.\nGenerate a title that:\n- Is 3-8 words long\n- Captures the main idea or topic\n- Uses title case\n- Is specific and descriptive\n- Avoids generic words like \"Note\" or \"Thought\"\n\nReturn ONLY the title text, nothing else."
+        },
+        {
+          "role": "user",
+          "content": "Generate a title for this note content:\n\n{{content}}"
+        }
+      ]
+
+tests:
+  - vars:
+      prompt: title-single
+      content: "Met with Sarah about Q4 planning. We discussed budget allocations, team structure, and key milestones for the upcoming quarter."
+    assert:
+      - type: contains
+        value: "Q4"
+        description: "Should contain Q4 reference"
+      - type: javascript
+        value: "output.split(' ').length >= 3 && output.split(' ').length <= 8"
+        description: "Should be 3-8 words"
+      - type: not-contains
+        value: "Note"
+        description: "Should not contain generic word 'Note'"
+
+  - vars:
+      prompt: title-single
+      content: "Customer feedback session with Acme Corp. Main concerns: pricing too high, need better documentation, and faster response times."
+    assert:
+      - type: contains
+        value: "Acme"
+        description: "Should reference customer name"
+      - type: javascript
+        value: "output.length <= 100"
+        description: "Should be concise"
+
+  - vars:
+      prompt: title-single
+      content: "Research findings on machine learning applications in healthcare. Key insights include improved diagnostic accuracy and personalized treatment recommendations."
+    assert:
+      - type: contains-any
+        value: ["Machine Learning", "Healthcare", "Research"]
+        description: "Should capture main topic"
+
+  - vars:
+      prompt: title-single
+      content: "Quick reminder: call John tomorrow"
+    assert:
+      - type: javascript
+        value: "output.length >= 3"
+        description: "Should handle short content"
+
+output:
+  path: .promptfoo/outputs
+

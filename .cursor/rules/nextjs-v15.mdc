@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+
+There's a Next.js 15 API change - params needs to be awaited. 
+{ params }: { params: Promise<{ id: string }> }

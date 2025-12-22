@@ -7,6 +7,11 @@ import { TextDecoder, TextEncoder } from "util";
 global.TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
+// Add setImmediate for Prisma
+if (typeof setImmediate === "undefined") {
+  (global as any).setImmediate = (fn: any, ...args: any[]) => setTimeout(fn, 0, ...args);
+}
+
 window.HTMLElement.prototype.hasPointerCapture = jest.fn();
 window.HTMLElement.prototype.scrollIntoView = jest.fn();
 

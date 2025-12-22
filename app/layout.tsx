@@ -1,6 +1,7 @@
 import "@/styles/globals.css";
+import "@/styles/nabu-theme.css";
 
-import { fontGeist, fontHeading, fontSans, fontUrban } from "@/assets/fonts";
+import { fontGeist, fontHeading, fontSans, fontSerif, fontUrban } from "@/assets/fonts";
 import { ThemeProvider } from "next-themes";
 
 import { cn, constructMetadata } from "@/lib/utils";
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
           fontUrban.variable,
           fontHeading.variable,
           fontGeist.variable,
+          fontSerif.variable,
         )}
       >
         <ThemeProvider

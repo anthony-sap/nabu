@@ -16,6 +16,7 @@ export interface CurrentUser extends KindeUser, KindeAccessToken {
   lastName: string;
   tenantId: string;
   dbId: string;
+  
 }
 
 export const getCurrentUser = cache(
@@ -31,14 +32,12 @@ export const getCurrentUser = cache(
     }
     user["firstName"] = user.given_name;
     user["lastName"] = user.family_name;
-
     if (user?.properties) {
       for (const propertyKey in USER_PROPERTIES_MAP) {
         const valueKey = USER_PROPERTIES_MAP[propertyKey];
         user[propertyKey] = user?.properties[valueKey] || undefined;
       }
     }
-
     const accessToken = await getAccessToken();
     if (!accessToken) {
       return undefined;
