@@ -21,10 +21,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.time('[NOTES] Total request time');
+    
+    console.time('[NOTES] getUserContext');
     const { userId, tenantId } = await getUserContext();
+    console.timeEnd('[NOTES] getUserContext');
+    
     const { id } = await params;
 
     // Middleware automatically handles workspace filtering and tenant isolation
+    console.time('[NOTES] Fetch note with relations');
     const note = await prisma.note.findFirst({
       where: {
         id,
@@ -130,8 +136,10 @@ export async function GET(
         },
       },
     });
+    console.timeEnd('[NOTES] Fetch note with relations');
 
     if (!note) {
+      console.timeEnd('[NOTES] Total request time');
       return errorResponse("Note not found", 404);
     }
 
@@ -151,11 +159,13 @@ export async function GET(
     }));
     (formattedNote as any).thoughts = note.thoughts || [];
 
+    console.timeEnd('[NOTES] Total request time');
     return new Response(JSON.stringify(successResponse(formattedNote)), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.timeEnd('[NOTES] Total request time');
     return handleApiError(error);
   }
 }

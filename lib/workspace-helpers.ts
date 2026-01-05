@@ -20,13 +20,16 @@ const workspaceIdsCache = new Map<string, { ids: string[]; timestamp: number }>(
 const CACHE_TTL = 60000; // 1 minute cache
 
 export async function getUserWorkspaceIds(userId: string): Promise<string[]> {
+  const cacheStart = Date.now();
   const cached = workspaceIdsCache.get(userId);
   const now = Date.now();
   
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    console.log(`[WORKSPACE] getUserWorkspaceIds: ${Date.now() - cacheStart}ms (cached)`);
     return cached.ids;
   }
 
+  const dbStart = Date.now();
   const memberships = await prismaClient.workspaceMembership.findMany({
     where: {
       userId,
@@ -36,10 +39,12 @@ export async function getUserWorkspaceIds(userId: string): Promise<string[]> {
       workspaceId: true,
     },
   });
+  console.log(`[WORKSPACE] getUserWorkspaceIds DB query: ${Date.now() - dbStart}ms`);
 
   const workspaceIds = memberships.map((m) => m.workspaceId);
   workspaceIdsCache.set(userId, { ids: workspaceIds, timestamp: now });
   
+  console.log(`[WORKSPACE] getUserWorkspaceIds: ${Date.now() - cacheStart}ms (fresh, found ${workspaceIds.length} workspaces)`);
   return workspaceIds;
 }
 
@@ -50,6 +55,7 @@ export async function verifyWorkspaceMembership(
   userId: string,
   workspaceId: string
 ): Promise<void> {
+  const start = Date.now();
   const membership = await prismaClient.workspaceMembership.findFirst({
     where: {
       userId,
@@ -57,6 +63,7 @@ export async function verifyWorkspaceMembership(
       status: "active",
     },
   });
+  console.log(`[WORKSPACE] verifyWorkspaceMembership: ${Date.now() - start}ms`);
 
   if (!membership) {
     throw new Error(`User ${userId} does not have access to workspace ${workspaceId}`);
@@ -64,14 +71,32 @@ export async function verifyWorkspaceMembership(
 }
 
 /**
- * Get user's tenantId
+ * Get user's tenantId (cached per request)
  */
+const tenantIdCache = new Map<string, { tenantId: string | null; timestamp: number }>();
+const TENANT_ID_CACHE_TTL = 60000; // 1 minute cache
+
 export async function getUserTenantId(userId: string): Promise<string | null> {
+  const cacheStart = Date.now();
+  const cached = tenantIdCache.get(userId);
+  const now = Date.now();
+  
+  if (cached && (now - cached.timestamp) < TENANT_ID_CACHE_TTL) {
+    console.log(`[WORKSPACE] getUserTenantId: ${Date.now() - cacheStart}ms (cached)`);
+    return cached.tenantId;
+  }
+
+  const dbStart = Date.now();
   const user = await prismaClient.user.findUnique({
     where: { id: userId },
     select: { tenantId: true },
   });
-  return user?.tenantId || null;
+  const tenantId = user?.tenantId || null;
+  console.log(`[WORKSPACE] getUserTenantId DB query: ${Date.now() - dbStart}ms`);
+  
+  tenantIdCache.set(userId, { tenantId, timestamp: now });
+  console.log(`[WORKSPACE] getUserTenantId: ${Date.now() - cacheStart}ms (fresh)`);
+  return tenantId;
 }
 
 /**

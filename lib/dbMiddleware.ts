@@ -18,9 +18,13 @@ export const softDeleteAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
+        const middlewareStart = Date.now();
+        
         // Skip soft-delete behaviour for pure log / raw tables and job queues
         if (model == "AuditLog" || model == "WhatsAppMessage" || model == "WhatsAppLinkToken" || model == "WebhookProcessingJob" || model == "EmbeddingJob" || model == "TagSuggestionJob") {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:softDeleteAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
 
         const user = await getCurrentUser();
@@ -68,7 +72,9 @@ export const softDeleteAware = Prisma.defineExtension({
           delete args["includeDeleted"];
         }
 
-        return query(args);
+        const result = await query(args);
+        console.log(`[Middleware:softDeleteAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
+        return result;
       },
     },
   },
@@ -80,18 +86,28 @@ export const tenantAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
+        const middlewareStart = Date.now();
+        
         if (model == "Tenant") {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:tenantAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
         if (model == "AuditLog") {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:tenantAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
         if (model == "WhatsAppLinkToken") {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:tenantAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
         // Skip tenant filtering for workspace-related models (handled by workspaceAware)
         if (model == "Workspace" || model == "WorkspaceMembership" || model == "WorkspaceInvite") {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:tenantAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
 
         const user = await getCurrentUser();
@@ -172,7 +188,9 @@ export const tenantAware = Prisma.defineExtension({
             },
           });
         }
-        return query(args);
+        const result = await query(args);
+        console.log(`[Middleware:tenantAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
+        return result;
       },
     },
   },
@@ -184,14 +202,20 @@ export const workspaceAware = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
+        const middlewareStart = Date.now();
+        
         // Only apply to models with workspaceId field
         if (!hasWorkspaceIdField(model)) {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:workspaceAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+          return result;
         }
 
         const user = await getCurrentUser();
         if (!user?.id) {
-          return query(args);
+          const result = await query(args);
+          console.log(`[Middleware:workspaceAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms (no user)`);
+          return result;
         }
 
         const userId = user.id;
@@ -309,7 +333,9 @@ export const workspaceAware = Prisma.defineExtension({
           }
         }
 
-        return query(args);
+        const result = await query(args);
+        console.log(`[Middleware:workspaceAware] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
+        return result;
       },
     },
   },
@@ -321,6 +347,7 @@ export const createdByUpdatedBy = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
+        const middlewareStart = Date.now();
         const modelData: any = { ...((args as any)?.data as any) };
         if (modelData["CreatedBy"] === undefined) {
           const user = await getCurrentUser();
@@ -358,7 +385,9 @@ export const createdByUpdatedBy = Prisma.defineExtension({
             });
           }
         }
-        return query(args);
+        const result = await query(args);
+        console.log(`[Middleware:createdByUpdatedBy] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
+        return result;
       },
     },
   },
@@ -370,10 +399,13 @@ export const storingAuditLog = Prisma.defineExtension({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
+        const middlewareStart = Date.now();
         const user = await getCurrentUser();
         if (operation === "create") {
           if (model === "AuditLog") {
-            return query(args);
+            const result = await query(args);
+            console.log(`[Middleware:storingAuditLog] ${model}.${operation}: ${Date.now() - middlewareStart}ms (skipped)`);
+            return result;
           } else if (model === "Tenant") {
             const tenant = await query(args);
             const currentData: any = args["data"] ?? {};
@@ -388,6 +420,7 @@ export const storingAuditLog = Prisma.defineExtension({
                 tenantId: tenant.id,
               },
             });
+            console.log(`[Middleware:storingAuditLog] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
             return Promise.resolve(tenant);
           }
           const item = await query(args);
@@ -403,6 +436,7 @@ export const storingAuditLog = Prisma.defineExtension({
               tenantId: user?.tenantId,
             },
           });
+          console.log(`[Middleware:storingAuditLog] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
           return Promise.resolve(item);
         } else if (operation === "update" || operation === "delete") {
           const currentData: any = args["data"] ?? {};
@@ -435,7 +469,9 @@ export const storingAuditLog = Prisma.defineExtension({
             },
           });
         }
-        return query(args);
+        const result = await query(args);
+        console.log(`[Middleware:storingAuditLog] ${model}.${operation}: ${Date.now() - middlewareStart}ms`);
+        return result;
       },
     },
   },

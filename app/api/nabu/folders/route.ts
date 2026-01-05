@@ -18,7 +18,12 @@ import {
  */
 export async function GET(req: NextRequest) {
   try {
+    console.time('[FOLDERS] Total request time');
+    
+    console.time('[FOLDERS] getUserContext');
     const { userId, tenantId } = await getUserContext();
+    console.timeEnd('[FOLDERS] getUserContext');
+    
     const { searchParams } = new URL(req.url);
 
     // Check if we need to return grouped folders (personal + workspaces)
@@ -26,7 +31,8 @@ export async function GET(req: NextRequest) {
 
     // If includeWorkspaces is true, return grouped folders
     if (includeWorkspaces) {
-      // Get user's workspace memberships
+      // Get user's workspace memberships (needed first for workspace groups)
+      console.time('[FOLDERS] Fetch user with memberships');
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -38,57 +44,64 @@ export async function GET(req: NextRequest) {
           },
         },
       });
+      console.timeEnd('[FOLDERS] Fetch user with memberships');
 
-      // Fetch personal folders (workspaceId IS NULL)
-      const personalFolders = await prisma.folder.findMany({
-        where: {
-          userId,
-          tenantId,
-          workspaceId: null,
-          deletedAt: null,
-          parentId: null,
-        },
-        include: {
-          _count: {
-            select: { notes: true, children: true },
+      // Fetch personal folders and notes in parallel (they're independent)
+      console.time('[FOLDERS] Fetch personal data (parallel)');
+      const [personalFolders, personalUncategorisedNotes] = await Promise.all([
+        // Fetch personal folders (workspaceId IS NULL)
+        prisma.folder.findMany({
+          where: {
+            userId,
+            tenantId,
+            workspaceId: null,
+            deletedAt: null,
+            parentId: null,
           },
-          children: {
-            where: { 
-              deletedAt: null,
-              workspaceId: null, // Only personal folder children
+          include: {
+            _count: {
+              select: { notes: true, children: true },
             },
-            include: {
-              _count: {
-                select: { notes: true, children: true },
+            children: {
+              where: { 
+                deletedAt: null,
+                workspaceId: null, // Only personal folder children
               },
+              include: {
+                _count: {
+                  select: { notes: true, children: true },
+                },
+              },
+              orderBy: [{ order: "asc" }, { name: "asc" }],
             },
-            orderBy: [{ order: "asc" }, { name: "asc" }],
           },
-        },
-        orderBy: [{ order: "asc" }, { name: "asc" }],
-      });
-
-      // Fetch personal uncategorised notes
-      const personalUncategorisedNotes = await prisma.note.findMany({
-        where: {
-          userId,
-          tenantId,
-          workspaceId: null,
-          folderId: null,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          title: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { updatedAt: "desc" },
-      });
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+        }),
+        // Fetch personal uncategorised notes
+        prisma.note.findMany({
+          where: {
+            userId,
+            tenantId,
+            workspaceId: null,
+            folderId: null,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        }),
+      ]);
+      console.timeEnd('[FOLDERS] Fetch personal data (parallel)');
 
       // Fetch workspace folders for each workspace
+      console.time('[FOLDERS] Fetch all workspace groups');
       const workspaceGroups = await Promise.all(
         (user?.workspaceMemberships || []).map(async (membership) => {
+          console.time(`[FOLDERS] Fetch workspace ${membership.workspaceId} folders`);
           const workspaceFolders = await prisma.folder.findMany({
             where: {
               workspaceId: membership.workspaceId,
@@ -111,8 +124,10 @@ export async function GET(req: NextRequest) {
             },
             orderBy: [{ order: "asc" }, { name: "asc" }],
           });
+          console.timeEnd(`[FOLDERS] Fetch workspace ${membership.workspaceId} folders`);
 
           // Fetch workspace uncategorised notes
+          console.time(`[FOLDERS] Fetch workspace ${membership.workspaceId} uncategorised notes`);
           const workspaceUncategorisedNotes = await prisma.note.findMany({
             where: {
               workspaceId: membership.workspaceId,
@@ -127,6 +142,7 @@ export async function GET(req: NextRequest) {
             },
             orderBy: { updatedAt: "desc" },
           });
+          console.timeEnd(`[FOLDERS] Fetch workspace ${membership.workspaceId} uncategorised notes`);
 
           return {
             id: membership.workspaceId,
@@ -139,7 +155,9 @@ export async function GET(req: NextRequest) {
           };
         })
       );
+      console.timeEnd('[FOLDERS] Fetch all workspace groups');
 
+      console.timeEnd('[FOLDERS] Total request time');
       return new Response(
         JSON.stringify(
           successResponse({
@@ -175,6 +193,7 @@ export async function GET(req: NextRequest) {
 
     // If includeFullTree is true, use recursive CTE to fetch entire hierarchy
     if (includeFullTree) {
+      console.time('[FOLDERS] Fetch full tree with CTE');
       const fullTree = await prisma.$queryRaw<Array<{
         id: string;
         name: string;
@@ -230,7 +249,7 @@ export async function GET(req: NextRequest) {
         GROUP BY ft.id, ft.name, ft.color, ft."parentId", ft."userId", ft."tenantId", ft.level, ft.path, ft."order"
         ORDER BY ft.path, ft."order", ft.name;
       `;
-
+      console.timeEnd('[FOLDERS] Fetch full tree with CTE');
 
       // Transform flat results into nested structure
       const folderMap = new Map<string, any>();
@@ -266,6 +285,7 @@ export async function GET(req: NextRequest) {
         formatFolderResponse(folder, true, false)
       );
 
+      console.timeEnd('[FOLDERS] Total request time');
       return new Response(JSON.stringify(successResponse(formattedFolders)), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -288,6 +308,7 @@ export async function GET(req: NextRequest) {
       where.parentId = null; // Only root-level folders
     }
 
+    console.time('[FOLDERS] Fetch folders (standard query)');
     const folders = await prisma.folder.findMany({
       where,
       include: {
@@ -326,16 +347,19 @@ export async function GET(req: NextRequest) {
       },
       orderBy: [{ order: "asc" }, { name: "asc" }],
     });
+    console.timeEnd('[FOLDERS] Fetch folders (standard query)');
 
     const formattedFolders = folders.map((folder) =>
       formatFolderResponse(folder, includeChildren, includeNotes)
     );
 
+    console.timeEnd('[FOLDERS] Total request time');
     return new Response(JSON.stringify(successResponse(formattedFolders)), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.timeEnd('[FOLDERS] Total request time');
     return handleApiError(error);
   }
 }
