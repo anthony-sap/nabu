@@ -21,13 +21,24 @@ export interface CurrentUser extends KindeUser, KindeAccessToken {
 
 export const getCurrentUser = cache(
   async (): Promise<CurrentUser | undefined> => {
+    const sessionStart = Date.now();
+    
+    const authCheckStart = Date.now();
     const { getUser, getAccessToken, isAuthenticated } =
       getKindeServerSession();
     if (!(await isAuthenticated())) {
+      console.log(`[SESSION] isAuthenticated check: ${Date.now() - authCheckStart}ms`);
+      console.log(`[SESSION] getCurrentUser: ${Date.now() - sessionStart}ms (not authenticated)`);
       return undefined;
     }
+    console.log(`[SESSION] isAuthenticated check: ${Date.now() - authCheckStart}ms`);
+    
+    const getUserStart = Date.now();
     const user: any = await getUser();
+    console.log(`[SESSION] getUser: ${Date.now() - getUserStart}ms`);
+    
     if (!user || !user.email) {
+      console.log(`[SESSION] getCurrentUser: ${Date.now() - sessionStart}ms (no user/email)`);
       return undefined;
     }
     user["firstName"] = user.given_name;
@@ -38,11 +49,17 @@ export const getCurrentUser = cache(
         user[propertyKey] = user?.properties[valueKey] || undefined;
       }
     }
+    
+    const tokenStart = Date.now();
     const accessToken = await getAccessToken();
+    console.log(`[SESSION] getAccessToken: ${Date.now() - tokenStart}ms`);
+    
     if (!accessToken) {
+      console.log(`[SESSION] getCurrentUser: ${Date.now() - sessionStart}ms (no access token)`);
       return undefined;
     }
 
+    console.log(`[SESSION] getCurrentUser: ${Date.now() - sessionStart}ms (success)`);
     return { ...user, ...accessToken };
   },
 );

@@ -16,7 +16,12 @@ import { enqueueThoughtEmbeddingJobs } from "@/lib/embeddings";
  */
 export async function GET(req: NextRequest) {
   try {
+    console.time('[THOUGHTS] Total request time');
+    
+    console.time('[THOUGHTS] getUserContext');
     const { userId, tenantId } = await getUserContext();
+    console.timeEnd('[THOUGHTS] getUserContext');
+    
     const { searchParams } = new URL(req.url);
 
     // Validate query params
@@ -76,6 +81,7 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Fetch thoughts and total count
+    console.time('[THOUGHTS] Fetch thoughts + count (parallel)');
     const [thoughts, total] = await Promise.all([
       prisma.thought.findMany({
         where,
@@ -98,9 +104,11 @@ export async function GET(req: NextRequest) {
       }),
       prisma.thought.count({ where }),
     ]);
+    console.timeEnd('[THOUGHTS] Fetch thoughts + count (parallel)');
 
     const formattedThoughts = thoughts.map(formatThoughtResponse);
 
+    console.timeEnd('[THOUGHTS] Total request time');
     return new Response(
       JSON.stringify(
         successResponse({
@@ -119,6 +127,7 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (error) {
+    console.timeEnd('[THOUGHTS] Total request time');
     return handleApiError(error);
   }
 }
